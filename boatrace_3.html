@@ -2,36 +2,30 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>🚤 ボートレース予想ツール</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ボートレース予想ツール</title>
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{margin:0;background:#0e1b2c;color:#e8eef5;font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;}
-select,input,button{font-family:inherit;-webkit-appearance:none;}
-input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
-button{cursor:pointer;border:none;}
-
-/* 横スクロールテーブル（スマホ対応） */
-table{-webkit-overflow-scrolling:touch;}
-::-webkit-scrollbar{height:6px;}
-::-webkit-scrollbar-thumb{background:#2c4762;border-radius:3px;}
-
-/* 画面幅に応じたグリッド調整 */
-@media(max-width:380px){
-  .venue-grid-auto{grid-template-columns:repeat(3,1fr) !important;}
-}
-@media(min-width:600px){
-  .venue-grid-auto{grid-template-columns:repeat(6,1fr) !important;}
-}
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: #0e1b2c; overscroll-behavior-y: none; }
+  body { -webkit-font-smoothing: antialiased; }
+  input, select, button, textarea { font-family: inherit; }
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  ::-webkit-scrollbar { height: 6px; width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  #root { min-height: 100vh; }
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
 
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
 const { useState, useMemo, useCallback } = React;
 
 
@@ -731,6 +725,16 @@ function App() {
     for(var b=1;b<=6;b++){if(rd.motors[b]&&rd.motors[b].ren2!=null)motorEntries.push([b,rd.motors[b].ren2]);}
     motorEntries.sort(function(a,b){return b[1]-a[1];});
     var motorTop2={};for(var i=0;i<Math.min(2,motorEntries.length);i++)motorTop2[motorEntries[i][0]]=true;
+
+    var r1Vals=[],r3Vals=[];
+    for(var b=1;b<=6;b++){
+      var rr=rows.filter(function(x){return x.boat===b;})[0];
+      if(rr&&rr.racerR1final!=null)r1Vals.push(rr.racerR1final);
+      if(rr&&rr.racerR3final!=null)r3Vals.push(rr.racerR3final);
+    }
+    var r1Avg=r1Vals.length>=2?r1Vals.reduce(function(a,c){return a+c;},0)/r1Vals.length:null;
+    var r3Avg=r3Vals.length>=2?r3Vals.reduce(function(a,c){return a+c;},0)/r3Vals.length:null;
+
     var evals=rows.map(function(r){
       var m=rd.motors[r.boat];
       var crit={
@@ -745,9 +749,48 @@ function App() {
       if(stAvg!=null&&effSt[r.boat]!=null&&effSt[r.boat]-stAvg>=0.03)warns.push("ST遅め注意");
       if(rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0)warns.push("チルト跳ね・伸び警戒");
       if(stAvg!=null&&effSt[r.boat]!=null&&stAvg-effSt[r.boat]>=0.03)plus.push("スリット先行候補");
-      var score=goods*10+r.diff*5+(m&&m.ren2!=null&&motorAvg!=null?(m.ren2-motorAvg)*0.1:0)+r.windAdj*0.5+r.final1*0.05;
+      if(r3Avg!=null&&r.racerR3final!=null&&r.racerR3final-r3Avg<=-5)warns.push("3連対率低く紐でも過信禁物");
+      var score=goods*10+(r.racerR1final!=null&&r1Avg!=null?(r.racerR1final-r1Avg)*0.3:0)+r.diff*5+(m&&m.ren2!=null&&motorAvg!=null?(m.ren2-motorAvg)*0.1:0)+r.windAdj*0.5+r.final1*0.05;
       return Object.assign({},r,{crit:crit,goods:goods,mark:mark,warns:warns,plus:plus,score:score});
     });
+
+    var km=rd.kimari?rd.kimari[kimariPeriod]:null;
+    var b1=evals.filter(function(r){return r.boat===1;})[0];
+    if(km&&b1){
+      if(km.nige!=null&&km.nige>=40)b1.plus.push("逃げ率"+km.nige+"%と高水準");
+      else if(km.nige!=null&&km.nige<=25)b1.warns.push("逃げ率"+km.nige+"%と低調");
+      var types=[
+        {key:"sashi",name:"差し",def:km.sasare,defName:"差され"},
+        {key:"makuri",name:"捲り",def:km.makurare,defName:"捲られ"},
+        {key:"makurizashi",name:"捲り差し",def:km.makuraresashi,defName:"捲られ差"},
+      ];
+      for(var ti=0;ti<types.length;ti++){
+        var t=types[ti];
+        var arr=km[t.key];
+        if(!arr||t.def==null)continue;
+        var mb=0,mv=-1;
+        for(var ai=0;ai<arr.length;ai++){var v=arr[ai];if(v!=null&&v>mv){mv=v;mb=ai+2;}}
+        var atk=evals.filter(function(r){return r.boat===mb;})[0];
+        if(t.def>=15&&mv>=15){
+          b1.warns.push(t.defName+t.def+"%×"+mb+"号艇の"+t.name+mv+"%で要警戒");
+          if(atk)atk.plus.push(t.name+mv+"%で1号艇を脅かす");
+        }
+      }
+    }
+
+    // 各艇の予想1着率に応じたコメント（イン逃げ崩れ警戒／頭有り）
+    if(b1&&b1.racerR1final!=null&&b1.racerR1final<50){
+      var nigeRate=km&&km.nige!=null?km.nige:null;
+      b1.warns.push("逃げ率"+(nigeRate!=null?nigeRate+"%":"低調")+"イン飛び注意");
+    }
+    var headThresholds={2:20,3:20,4:15,5:15,6:10};
+    for(var hb=2;hb<=6;hb++){
+      var rEval=evals.filter(function(r){return r.boat===hb;})[0];
+      if(rEval&&rEval.racerR1final!=null&&rEval.racerR1final>=headThresholds[hb]){
+        rEval.plus.push("1着率"+fmt(rEval.racerR1final,1)+"%　頭有り");
+      }
+    }
+
     var ranked=evals.slice().sort(function(a,b){return b.score-a.score;});
     for(var i=0;i<ranked.length;i++)ranked[i].rankPos=i+1;
     var maxG=0;for(var i=0;i<evals.length;i++)if(evals[i].goods>maxG)maxG=evals[i].goods;
@@ -757,7 +800,7 @@ function App() {
     else if(maxG>=2){badge="やや本命";badgeColor="#5a9e2e";}
     else{badge="混戦・波乱含み";badgeColor="#b3463f";}
     return{ranked:ranked,badge:badge,badgeColor:badgeColor};
-  },[result,rd.sts,rd.fHold,rd.fSts,rd.motors,rd.tilts,rd.wind]);
+  },[result,rd.sts,rd.fHold,rd.fSts,rd.motors,rd.tilts,rd.wind,rd.kimari,kimariPeriod]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
@@ -776,7 +819,7 @@ function App() {
     );
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
-  var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"12px 10px 64px"};
+  var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px"};
   var innerS={maxWidth:760,margin:"0 auto"};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
@@ -802,7 +845,7 @@ function App() {
 
         <div style={{marginBottom:16}}>
           <div style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
-          <div className="venue-grid-auto" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {Object.keys(VENUES).map(function(v){
               var hasBas=RNUMS.some(function(n){var r=races[rk(v,n)];return r&&(r.racerStats!=null||r.stTable!=null||r.motors[1]!=null);});
               return (
@@ -898,7 +941,8 @@ function App() {
           {[1,2,3,4,5,6].map(function(b){
             return (
               <div key={b} style={cardS}>
-                <div style={{display:"grid",gridTemplateColumns:"40px 52px 1fr 1fr 1fr 1fr",gap:4,alignItems:"center"}}>
+                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                <div style={{display:"grid",gridTemplateColumns:"40px 56px 64px 64px 64px 64px",gap:6,alignItems:"center",minWidth:420}}>
                   <div style={{width:36,height:36,borderRadius:8,background:LANE[b].bg,color:LANE[b].fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:17,border:b===1?"1px solid #ccc":"none"}}>{b}</div>
                   <div>
                     <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>コース</div>
@@ -914,6 +958,7 @@ function App() {
                       </div>
                     );
                   })}
+                </div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap",borderTop:"1px solid #1d3149",paddingTop:8,marginTop:8}}>
                   <div style={{minWidth:72}}>
@@ -992,11 +1037,11 @@ function App() {
 
         <div style={{marginBottom:24}}>
           <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>展示タイム一覧</div>
-          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:340}}>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
                 <tr style={{color:"#7da3c8",fontSize:11}}>
-                  {["艇","周回","周り足","直線","展示"].map(function(h,i){return <th key={h} style={{padding:"6px 10px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap",position:i===0?"sticky":"static",left:i===0?0:"auto",background:i===0?"#0e1b2c":"transparent"}}>{h}</th>;})}
+                  {["艇","周回","周り足","直線","展示"].map(function(h){return <th key={h} style={{padding:"6px 10px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
                 </tr>
               </thead>
               <tbody>
@@ -1012,7 +1057,7 @@ function App() {
                     var isEmpty=["tenji","isshu","mawari","chokusen"].every(function(k){return inp[k]==="";});
                     return (
                       <tr key={b} style={{borderBottom:"1px solid #1d3149",opacity:isEmpty?0.35:1}}>
-                        <td style={{padding:"8px 10px",textAlign:"center",position:"sticky",left:0,background:"#0e1b2c"}}><LB b={b}/></td>
+                        <td style={{padding:"8px 10px",textAlign:"center"}}><LB b={b}/></td>
                         {[inp.isshu,inp.mawari,inp.chokusen,inp.tenji].map(function(v,i){
                           var num=parseFloat(v),isF=!isNaN(num)&&num===ranks[i].first,isS=!isNaN(num)&&num===ranks[i].second;
                           return <td key={i} style={{padding:"6px 10px",textAlign:"center"}}><span style={{display:"inline-block",minWidth:48,padding:"4px 8px",borderRadius:6,background:isF?"rgba(217,48,37,0.55)":isS?"rgba(249,197,19,0.35)":"transparent",fontWeight:700,color:isF||isS?"#fff":v?"#fff":"#4a5d70"}}>{v||"―"}</span></td>;
@@ -1061,21 +1106,21 @@ function App() {
                     })}
                   </div>
                 )}
-                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:560}}>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <thead>
                       <tr style={{color:"#7da3c8",fontSize:11}}>
-                        <th style={{padding:"6px 8px",textAlign:"left",borderBottom:"1px solid #2c4762",position:"sticky",left:0,background:"#0e1b2c"}}>艇</th>
-                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>合計／出走数</th>}
-                        {rd.stScore&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>得点率</th>}
-                        {rd.stScore&&rd.stScore.rank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>順位</th>}
-                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>予想1着率</th>}
-                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>予想2着率</th>}
-                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>予想3着率</th>}
-                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>逃げ</th>}
-                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>差し</th>}
-                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>捲り</th>}
-                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap"}}>捲差</th>}
+                        <th style={{padding:"6px 8px",textAlign:"left",borderBottom:"1px solid #2c4762"}}>艇</th>
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>合計／出走数</th>}
+                        {rd.stScore&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>得点率</th>}
+                        {rd.stScore&&rd.stScore.rank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>順位</th>}
+                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想1着率</th>}
+                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想2着率</th>}
+                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想3着率</th>}
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>逃げ</th>}
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>差し</th>}
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>捲り</th>}
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>捲差</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -1087,16 +1132,16 @@ function App() {
                         function pctC(v){return <td style={{padding:"7px 8px",textAlign:"center",fontWeight:600,color:v!=null?(v>=0?"#5dd39e":"#ff8a80"):"#4a5d70"}}>{v!=null?(fmt(v,1)+"%"):"―"}</td>;}
                         return (
                           <tr key={r.boat} style={{borderBottom:"1px solid #1d3149"}}>
-                            <td style={{padding:"7px 8px",position:"sticky",left:0,background:"#16273c"}}>
+                            <td style={{padding:"7px 8px"}}>
                               <div style={{display:"flex",alignItems:"center",gap:4}}>
                                 <LB b={r.boat}/>
                                 {r.course!==r.boat&&<span style={{fontSize:10,color:"#f9c513"}}>{r.course}C</span>}
                                 {rd.racerClass&&<span style={{fontSize:10,fontWeight:700,color:rd.racerClass[r.boat-1]==="A1"?"#f9c513":rd.racerClass[r.boat-1]==="A2"?"#5dd39e":"#9db5cc"}}>{rd.racerClass[r.boat-1]}</span>}
                               </div>
                             </td>
-                            {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>{nc!=null?nc:"―"}<span style={{color:"#7da3c8",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
+                            {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff"}}>{nc!=null?nc:"―"}<span style={{color:"#7da3c8",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
                             {rd.stScore&&numC(rd.stScore.rate[r.boat-1])}
-                            {rd.stScore&&rd.stScore.rank&&<td style={{padding:"7px 8px",textAlign:"center",color:"#9db5cc",whiteSpace:"nowrap"}}>{rd.stScore.rank[r.boat-1]!=null?rd.stScore.rank[r.boat-1]+"位":"―"}</td>}
+                            {rd.stScore&&rd.stScore.rank&&<td style={{padding:"7px 8px",textAlign:"center",color:"#9db5cc"}}>{rd.stScore.rank[r.boat-1]!=null?rd.stScore.rank[r.boat-1]+"位":"―"}</td>}
                             {result.racerRank&&pctC(r.racerR1final)}
                             {result.racerRank&&pctC(r.racerR2final)}
                             {result.racerRank&&pctC(r.racerR3final)}
@@ -1113,24 +1158,24 @@ function App() {
               </div>
             )}
 
-            <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",marginBottom:26}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:420}}>
+            <div style={{overflowX:"auto",marginBottom:26}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:400}}>
                 <thead>
                   <tr style={{color:"#7da3c8",fontSize:11}}>
-                    {["艇","1着補正","2着補正","3着補正","3連補正","合計","差"].map(function(h,i){return <th key={h} style={{padding:"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762",whiteSpace:"nowrap",position:i===0?"sticky":"static",left:i===0?0:"auto",background:i===0?"#0e1b2c":"transparent"}}>{h}</th>;})}
+                    {["艇","1着補正","2着補正","3着補正","3連補正","合計","差"].map(function(h,i){return <th key={h} style={{padding:"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
                   </tr>
                 </thead>
                 <tbody>
                   {result.rows.map(function(r){
                     return (
                       <tr key={r.boat} style={{borderBottom:"1px solid #1d3149"}}>
-                        <td style={{padding:"9px 8px",position:"sticky",left:0,background:"#0e1b2c"}}><LB b={r.boat}/>{r.course!==r.boat&&<span style={{fontSize:10,color:"#f9c513",marginLeft:4}}>{r.course}C</span>}</td>
+                        <td style={{padding:"9px 8px"}}><LB b={r.boat}/>{r.course!==r.boat&&<span style={{fontSize:10,color:"#f9c513",marginLeft:4}}>{r.course}C</span>}</td>
                         <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w1)}</td>
                         <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w2)}</td>
                         <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w3)}</td>
                         <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.top3)}</td>
-                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:"#fff",whiteSpace:"nowrap"}}>{r.sum!=null?fmt(r.sum):"―"}</td>
-                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:r.diff>0?"#5dd39e":r.diff<0?"#ff8a80":"#9db5cc",whiteSpace:"nowrap"}}>{r.hasTime?(r.diff>0?"+":"")+fmt(r.diff):"―"}</td>
+                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:"#fff"}}>{r.sum!=null?fmt(r.sum):"―"}</td>
+                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:r.diff>0?"#5dd39e":r.diff<0?"#ff8a80":"#9db5cc"}}>{r.hasTime?(r.diff>0?"+":"")+fmt(r.diff):"―"}</td>
                       </tr>
                     );
                   })}
@@ -1210,8 +1255,9 @@ function App() {
 }
 
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
+
 </script>
 </body>
 </html>
