@@ -749,7 +749,6 @@ function App() {
       if(stAvg!=null&&effSt[r.boat]!=null&&effSt[r.boat]-stAvg>=0.03)warns.push("ST遅め注意");
       if(rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0)warns.push("チルト跳ね・伸び警戒");
       if(stAvg!=null&&effSt[r.boat]!=null&&stAvg-effSt[r.boat]>=0.03)plus.push("スリット先行候補");
-      if(r3Avg!=null&&r.racerR3final!=null&&r.racerR3final-r3Avg<=-5)warns.push("3連対率低く紐でも過信禁物");
       var score=goods*10+(r.racerR1final!=null&&r1Avg!=null?(r.racerR1final-r1Avg)*0.3:0)+r.diff*5+(m&&m.ren2!=null&&motorAvg!=null?(m.ren2-motorAvg)*0.1:0)+r.windAdj*0.5+r.final1*0.05;
       return Object.assign({},r,{crit:crit,goods:goods,mark:mark,warns:warns,plus:plus,score:score});
     });
