@@ -941,8 +941,7 @@ function App() {
           {[1,2,3,4,5,6].map(function(b){
             return (
               <div key={b} style={cardS}>
-                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                <div style={{display:"grid",gridTemplateColumns:"40px 56px 64px 64px 64px 64px",gap:6,alignItems:"center",minWidth:420}}>
+                <div style={{display:"grid",gridTemplateColumns:"44px 58px 1fr 1fr 1fr 1fr",gap:6,alignItems:"center"}}>
                   <div style={{width:36,height:36,borderRadius:8,background:LANE[b].bg,color:LANE[b].fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:17,border:b===1?"1px solid #ccc":"none"}}>{b}</div>
                   <div>
                     <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>コース</div>
@@ -958,7 +957,6 @@ function App() {
                       </div>
                     );
                   })}
-                </div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap",borderTop:"1px solid #1d3149",paddingTop:8,marginTop:8}}>
                   <div style={{minWidth:72}}>
@@ -1037,7 +1035,7 @@ function App() {
 
         <div style={{marginBottom:24}}>
           <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>展示タイム一覧</div>
-          <div style={{overflowX:"auto"}}>
+          <div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
                 <tr style={{color:"#7da3c8",fontSize:11}}>
@@ -1158,8 +1156,8 @@ function App() {
               </div>
             )}
 
-            <div style={{overflowX:"auto",marginBottom:26}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:400}}>
+            <div style={{marginBottom:26}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
                   <tr style={{color:"#7da3c8",fontSize:11}}>
                     {["艇","1着補正","2着補正","3着補正","3連補正","合計","差"].map(function(h,i){return <th key={h} style={{padding:"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
@@ -1209,8 +1207,8 @@ function App() {
             {aiEval&&(
               <div style={{marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <span style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8"}}>総合AI評価</span>
-                  <span style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
+                  <span style={{fontSize:12,letterSpacing:"0.2em",color:"#7da3c8"}}>総合AI評価</span>
+                  <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
                 </div>
                 <div style={{display:"grid",gap:8}}>
                   {aiEval.ranked.map(function(r){
@@ -1220,11 +1218,11 @@ function App() {
                     return (
                       <div key={r.boat} style={{background:"#16273c",borderRadius:10,padding:"10px 12px",border:r.rankPos===1?"1px solid #3d7ab8":"1px solid transparent"}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                          <span style={{fontSize:12,color:"#7da3c8",width:18}}>{r.rankPos}.</span>
-                          <span style={{fontSize:20,fontWeight:800,width:26,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":"#e8eef5"}}>{r.mark}</span>
+                          <span style={{fontSize:13,color:"#7da3c8",width:18}}>{r.rankPos}.</span>
+                          <span style={{fontSize:22,fontWeight:800,width:28,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":"#e8eef5"}}>{r.mark}</span>
                           <LB b={r.boat}/>
-                          <span style={{fontSize:11,color:"#7da3c8"}}>{r.course}C進入</span>
-                          <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>参考 {fmt(r.final1,1)}%</span>
+                          <span style={{fontSize:12,color:"#7da3c8"}}>{r.course}C進入</span>
+                          <span style={{fontSize:12,color:"#7da3c8",marginLeft:"auto"}}>参考 {fmt(r.final1,1)}%</span>
                         </div>
                         <div style={{height:6,background:"#0e1b2c",borderRadius:3,overflow:"hidden",marginTop:8}}>
                           <div style={{width:w+"%",height:"100%",background:r.rankPos===1?"#f9c513":r.rankPos<=3?"#3d7ab8":"#2c4762"}}/>
@@ -1232,13 +1230,13 @@ function App() {
                         <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
                           {[["展示タイム",r.crit.time],["モーター",r.crit.motor],["風",r.crit.wind]].map(function(item){
                             var label=item[0],v=item[1];
-                            return <span key={label} style={{fontSize:10,fontWeight:800,padding:"4px 8px",borderRadius:6,background:v===true?"rgba(46,158,107,0.22)":v===false?"#1d3149":"transparent",color:v===true?"#5dd39e":v===false?"#7a8da0":"#4a5d70",border:v===null?"1px dashed #2c4762":"1px solid transparent"}}>{v===true?"✓":v===false?"✗":"−"} {label}</span>;
+                            return <span key={label} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:v===true?"rgba(46,158,107,0.22)":v===false?"#1d3149":"transparent",color:v===true?"#5dd39e":v===false?"#7a8da0":"#4a5d70",border:v===null?"1px dashed #2c4762":"1px solid transparent"}}>{v===true?"✓":v===false?"✗":"−"} {label}</span>;
                           })}
                         </div>
                         {(r.warns.length>0||r.plus.length>0)&&(
                           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                            {r.warns.map(function(w){return <span key={w} style={{fontSize:10,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(249,197,19,0.15)",color:"#f9c513"}}>⚠ {w}</span>;})}
-                            {r.plus.map(function(p){return <span key={p} style={{fontSize:10,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(61,122,184,0.2)",color:"#7db4e8"}}>＋ {p}</span>;})}
+                            {r.warns.map(function(w){return <span key={w} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(249,197,19,0.15)",color:"#f9c513"}}>⚠ {w}</span>;})}
+                            {r.plus.map(function(p){return <span key={p} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(61,122,184,0.2)",color:"#7db4e8"}}>＋ {p}</span>;})}
                           </div>
                         )}
                       </div>
