@@ -6,7 +6,7 @@
 <title>ボートレース予想ツール</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: #0e1b2c; overscroll-behavior-y: none; }
+  html, body { margin: 0; padding: 0; background: #0e1b2c; overflow-x: hidden; width: 100%; overscroll-behavior-y: none; }
   body { -webkit-font-smoothing: antialiased; }
   input, select, button, textarea { font-family: inherit; }
   input[type=number] { -moz-appearance: textfield; }
@@ -15,7 +15,7 @@
   ::-webkit-scrollbar { height: 6px; width: 6px; }
   ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  #root { min-height: 100vh; }
+  #root { min-height: 100vh; overflow-x: hidden; }
 </style>
 </head>
 <body>
@@ -819,7 +819,7 @@ function App() {
     );
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
-  var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px"};
+  var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px",overflowX:"hidden",maxWidth:"100vw"};
   var innerS={maxWidth:760,margin:"0 auto"};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
@@ -941,53 +941,58 @@ function App() {
           {[1,2,3,4,5,6].map(function(b){
             return (
               <div key={b} style={cardS}>
-                <div style={{display:"grid",gridTemplateColumns:"44px 58px 1fr 1fr 1fr 1fr",gap:6,alignItems:"center"}}>
-                  <div style={{width:36,height:36,borderRadius:8,background:LANE[b].bg,color:LANE[b].fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:17,border:b===1?"1px solid #ccc":"none"}}>{b}</div>
+                <div style={{display:"grid",gridTemplateColumns:"34px 52px repeat(4,1fr)",gap:4,alignItems:"center"}}>
+                  <div style={{width:30,height:30,borderRadius:7,background:LANE[b].bg,color:LANE[b].fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,border:b===1?"1px solid #ccc":"none"}}>{b}</div>
                   <div>
-                    <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>コース</div>
-                    <select value={rd.courses[b]} onChange={function(e){var val=Number(e.target.value);updateRd(function(prev){var n=Object.assign({},prev);n.courses=Object.assign({},prev.courses);n.courses[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",boxSizing:"border-box",fontSize:15,fontWeight:700,padding:"7px 4px"}),{color:rd.courses[b]!==b?"#f9c513":"#fff"})}>
+                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>コース</div>
+                    <select value={rd.courses[b]} onChange={function(e){var val=Number(e.target.value);updateRd(function(prev){var n=Object.assign({},prev);n.courses=Object.assign({},prev.courses);n.courses[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",boxSizing:"border-box",fontSize:13,fontWeight:700,padding:"6px 2px"}),{color:rd.courses[b]!==b?"#f9c513":"#fff"})}>
                       {[1,2,3,4,5,6].map(function(c){return <option key={c} value={c}>{c}</option>;})}
                     </select>
                   </div>
                   {FIELDS.map(function(f){
                     return (
-                      <div key={f.key}>
-                        <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>{f.label}</div>
-                        <input type="number" inputMode="decimal" step="0.01" value={rd.inputs[b][f.key]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.inputs=Object.assign({},prev.inputs);n.inputs[b]=Object.assign({},prev.inputs[b]);n.inputs[b][f.key]=val;return n;});}} placeholder="0.00" style={inpS}/>
+                      <div key={f.key} style={{minWidth:0}}>
+                        <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>{f.label}</div>
+                        <input type="number" inputMode="decimal" step="0.01" value={rd.inputs[b][f.key]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.inputs=Object.assign({},prev.inputs);n.inputs[b]=Object.assign({},prev.inputs[b]);n.inputs[b][f.key]=val;return n;});}} placeholder="0.00" style={Object.assign({},inpS,{padding:"6px 4px",fontSize:13,width:"100%"})}/>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap",borderTop:"1px solid #1d3149",paddingTop:8,marginTop:8}}>
-                  <div style={{minWidth:72}}>
-                    <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>チルト</div>
-                    <select value={rd.tilts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.tilts=Object.assign({},prev.tilts);n.tilts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",fontWeight:700}),{color:rd.tilts[b]===""?"#7da3c8":parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#fff"})}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,borderTop:"1px solid #1d3149",paddingTop:8,marginTop:8}}>
+                  <div>
+                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>チルト</div>
+                    <select value={rd.tilts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.tilts=Object.assign({},prev.tilts);n.tilts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",fontWeight:700,padding:"6px 2px",fontSize:13}),{color:rd.tilts[b]===""?"#7da3c8":parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#fff"})}>
                       <option value="">―</option>
                       {TILT_OPT.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                     </select>
                   </div>
-                  {rd.tilts[b]!==""&&parseFloat(rd.tilts[b])>=1.0&&<span style={{fontSize:10,fontWeight:800,padding:"4px 7px",borderRadius:5,background:"#6b5a1d",color:"#f9c513",marginBottom:6}}>⚡伸び警戒</span>}
-                  <div style={{minWidth:90}}>
-                    <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>平均ST</div>
-                    <select value={rd.sts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.sts=Object.assign({},prev.sts);n.sts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%"}),{color:rd.sts[b]===""?"#7da3c8":"#fff"})}>
+                  <div>
+                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>平均ST</div>
+                    <select value={rd.sts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.sts=Object.assign({},prev.sts);n.sts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",padding:"6px 2px",fontSize:13}),{color:rd.sts[b]===""?"#7da3c8":"#fff"})}>
                       <option value="">―</option>
                       {ST_OPT.map(function(s){return <option key={s} value={s}>{s}</option>;})}
                     </select>
                   </div>
-                  <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.fHold=Object.assign({},prev.fHold);n.fHold[b]=!prev.fHold[b];return n;});}} style={{padding:"8px 12px",fontSize:13,fontWeight:700,borderRadius:6,cursor:"pointer",background:rd.fHold[b]?"#b3463f":"#0e1b2c",color:rd.fHold[b]?"#fff":"#7da3c8",border:rd.fHold[b]?"1px solid #d96b63":"1px solid #2c4762"}}>F持ち{rd.fHold[b]?"✓":""}</button>
+                  <div>
+                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>F持ち</div>
+                    <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.fHold=Object.assign({},prev.fHold);n.fHold[b]=!prev.fHold[b];return n;});}} style={{width:"100%",padding:"6px 2px",fontSize:13,fontWeight:700,borderRadius:6,cursor:"pointer",background:rd.fHold[b]?"#b3463f":"#0e1b2c",color:rd.fHold[b]?"#fff":"#7da3c8",border:rd.fHold[b]?"1px solid #d96b63":"1px solid #2c4762"}}>{rd.fHold[b]?"あり":"なし"}</button>
+                  </div>
+                  <div>
+                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>体重(kg)</div>
+                    <input type="number" inputMode="decimal" step="0.1" value={rd.weights[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.weights=Object.assign({},prev.weights);n.weights[b]=val;return n;});}} placeholder="―" style={Object.assign({},inpS,{fontSize:13,padding:"6px 4px",width:"100%"})}/>
+                  </div>
+                  {rd.tilts[b]!==""&&parseFloat(rd.tilts[b])>=1.0&&(
+                    <div style={{gridColumn:"1 / -1"}}><span style={{fontSize:10,fontWeight:800,padding:"4px 7px",borderRadius:5,background:"#6b5a1d",color:"#f9c513"}}>⚡伸び警戒</span></div>
+                  )}
                   {rd.fHold[b]&&(
-                    <div style={{minWidth:110}}>
-                      <div style={{fontSize:10,color:"#d96b63",marginBottom:2}}>F持ち時ST</div>
-                      <select value={rd.fSts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.fSts=Object.assign({},prev.fSts);n.fSts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%"}),{color:rd.fSts[b]===""?"#f9c513":"#fff",border:"1px solid #6b3530"})}>
+                    <div style={{gridColumn:"1 / -1"}}>
+                      <div style={{fontSize:9,color:"#d96b63",marginBottom:2}}>F持ち時ST</div>
+                      <select value={rd.fSts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.fSts=Object.assign({},prev.fSts);n.fSts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",padding:"6px 4px",fontSize:13}),{color:rd.fSts[b]===""?"#f9c513":"#fff",border:"1px solid #6b3530"})}>
                         <option value="">－</option>
                         {ST_OPT.map(function(s){return <option key={s} value={s}>{s}</option>;})}
                       </select>
                     </div>
                   )}
-                  <div style={{minWidth:72}}>
-                    <div style={{fontSize:10,color:"#7da3c8",marginBottom:2}}>体重(kg)</div>
-                    <input type="number" inputMode="decimal" step="0.1" value={rd.weights[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.weights=Object.assign({},prev.weights);n.weights[b]=val;return n;});}} placeholder="―" style={Object.assign({},inpS,{fontSize:14})}/>
-                  </div>
                 </div>
                 {rd.motors[b]&&(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",borderTop:"1px solid #1d3149",paddingTop:7,marginTop:6,fontSize:11,color:"#9db5cc"}}>
