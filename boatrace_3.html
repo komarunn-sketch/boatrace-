@@ -364,6 +364,7 @@ function parseRowByIndex(d){
   var stScore={
     rate:[68,69,70,71,72,73].map(function(i){return pf(g(d,i));}),
     rank:[75,76,77,78,79,80].map(function(i){return pi(g(d,i));}),
+    st1y:[443,444,445,446,447,448].map(function(i){return pf(g(d,i));}),
   };
 
   // ★ 修正: CAT_BASEを+1ずつ補正（例: 今期 83→84, 直近6ヶ月 90→91, ...）
@@ -841,7 +842,7 @@ function App() {
         </div>
 
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
+          <div id="section-venue" style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {Object.keys(VENUES).map(function(v){
               var hasBas=RNUMS.some(function(n){var r=races[rk(v,n)];return r&&(r.racerStats!=null||r.stTable!=null||r.motors[1]!=null);});
@@ -878,8 +879,8 @@ function App() {
                   var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
                   for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][0]!=null)total+=arrs[ai][0];}
                   var ratio=total/rc;
-                  if(ratio<0.5)isWave=true;
-                  else if(ratio>=0.7)isStrong=true;
+                  if(ratio<0.45)isWave=true;
+                  else if(ratio>=0.75)isStrong=true;
                 }
               }
               var isActive=curRace===n;
@@ -898,7 +899,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#7da3c8",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（70%以上） ● 紫字＝波乱注意（50%未満）</div>
+          <div style={{fontSize:10,color:"#7da3c8",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（75%以上） ● 紫字＝波乱注意（45%以下）</div>
         </div>
 
         <div style={{marginBottom:16}}>
@@ -913,6 +914,7 @@ function App() {
           <button onClick={function(){setOpenPanel(function(v){return v==="tenji"?null:"tenji";});}} style={btnS(openPanel==="tenji"?"#2c4762":"#3d7ab8","#fff",{border:openPanel==="tenji"?"1px solid #5a87b8":"none"})}>📋 展示タイム</button>
           <button onClick={function(){updateRd(function(){return emptyRace();});}} style={btnS("#3b1a1a","#ff8a80",{border:"1px solid #6b2e2e"})}>🗑 {curRace}R消去</button>
           <button onClick={function(){setRaces(initRaces());}} style={btnS("#2a1a1a","#ff6060",{fontSize:11,border:"1px solid #4b2020"})}>🗑 全消去</button>
+          <button onClick={function(){var el=document.getElementById("section-tenji");if(el)el.scrollIntoView({behavior:"smooth"});}} style={btnS("#1d3149","#fff",{fontSize:19,fontWeight:800,border:"1px solid #2c4762",marginLeft:"auto"})}>展示↓</button>
         </div>
 
         {openPanel==="basic"&&(
@@ -1045,6 +1047,11 @@ function App() {
                         </div>
                       </div>
                       <span style={{width:34,fontSize:11,color:"#9db5cc",textAlign:"right",flexShrink:0}}>.{r.st.toFixed(2).split(".")[1]}</span>
+                      {rd.stScore&&rd.stScore.st1y&&(
+                        <span style={{width:38,fontSize:10,color:"#7db4e8",textAlign:"right",flexShrink:0}}>
+                          {rd.stScore.st1y[r.boat-1]!=null?rd.stScore.st1y[r.boat-1].toFixed(1)+"位":"―"}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -1054,7 +1061,7 @@ function App() {
         </div>
 
         <div style={{marginBottom:24}}>
-          <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>展示タイム一覧</div>
+          <div id="section-tenji" style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>展示タイム一覧</div>
           <div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
@@ -1108,8 +1115,9 @@ function App() {
 
             {(result.racerRank||kimariByBoat)&&(
               <div style={{marginBottom:24}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8}}>
-                  予想着率（枠別成績＋補正）{kimariByBoat&&<span style={{fontSize:11,color:"#5dd39e",fontWeight:400,marginLeft:6}}>＋ 決まり手数</span>}
+                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <span>予想着率（枠別成績＋補正）{kimariByBoat&&<span style={{fontSize:11,color:"#5dd39e",fontWeight:400,marginLeft:6}}>＋ 決まり手数</span>}</span>
+                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:19,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
                 </div>
                 {rd.racerStats!=null&&(
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
@@ -1129,6 +1137,7 @@ function App() {
                     <thead>
                       <tr style={{color:"#7da3c8",fontSize:11}}>
                         <th style={{padding:"6px 8px",textAlign:"left",borderBottom:"1px solid #2c4762"}}>艇</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>SSA</th>
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>合計／出走数</th>}
                         {rd.stScore&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>得点率</th>}
                         {rd.stScore&&rd.stScore.rank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>順位</th>}
@@ -1148,6 +1157,24 @@ function App() {
                         var nc=kc?kc.total:null;
                         function numC(v){return <td style={{padding:"7px 8px",textAlign:"center",color:v!=null?"#c8d8e8":"#4a5d70"}}>{v!=null?v:"―"}</td>;}
                         function pctC(v){return <td style={{padding:"7px 8px",textAlign:"center",fontWeight:600,color:v!=null?(v>=0?"#5dd39e":"#ff8a80"):"#4a5d70"}}>{v!=null?(fmt(v,1)+"%"):"―"}</td>;}
+                        // かみなりマーク判定（2コース以上のみ）
+                        var showThunder=false;
+                        if(r.course>=2){
+                          var inner=result.rows.filter(function(x){return x.course===r.course-1;})[0];
+                          if(inner){
+                            var myB=Number(r.boat);
+                            var inB=Number(inner.boat);
+                            var myInp=rd.inputs[myB]||rd.inputs[String(myB)];
+                            var inInp=rd.inputs[inB]||rd.inputs[String(inB)];
+                            var myTenji=myInp?parseFloat(myInp.tenji):NaN;
+                            var inTenji=inInp?parseFloat(inInp.tenji):NaN;
+                            var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
+                            var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
+                            var tenjOk=!isNaN(myTenji)&&!isNaN(inTenji)&&(inTenji-myTenji)>=0.1;
+                            var stOk=mySt==null||inSt==null||(inSt-mySt)>=0.5;
+                            if(tenjOk&&stOk)showThunder=true;
+                          }
+                        }
                         return (
                           <tr key={r.boat} style={{borderBottom:"1px solid #1d3149"}}>
                             <td style={{padding:"7px 8px"}}>
@@ -1157,6 +1184,7 @@ function App() {
                                 {rd.racerClass&&<span style={{fontSize:10,fontWeight:700,color:rd.racerClass[r.boat-1]==="A1"?"#f9c513":rd.racerClass[r.boat-1]==="A2"?"#5dd39e":"#9db5cc"}}>{rd.racerClass[r.boat-1]}</span>}
                               </div>
                             </td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontSize:16}}>{showThunder?"⚡":""}</td>
                             {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff"}}>{nc!=null?nc:"―"}<span style={{color:"#7da3c8",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
                             {rd.stScore&&numC(rd.stScore.rate[r.boat-1])}
                             {rd.stScore&&rd.stScore.rank&&<td style={{padding:"7px 8px",textAlign:"center",color:"#9db5cc"}}>{rd.stScore.rank[r.boat-1]!=null?rd.stScore.rank[r.boat-1]+"位":"―"}</td>}
