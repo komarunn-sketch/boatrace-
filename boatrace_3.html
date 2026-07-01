@@ -914,7 +914,7 @@ function App() {
           <button onClick={function(){setOpenPanel(function(v){return v==="tenji"?null:"tenji";});}} style={btnS(openPanel==="tenji"?"#2c4762":"#3d7ab8","#fff",{border:openPanel==="tenji"?"1px solid #5a87b8":"none"})}>📋 展示タイム</button>
           <button onClick={function(){updateRd(function(){return emptyRace();});}} style={btnS("#3b1a1a","#ff8a80",{border:"1px solid #6b2e2e"})}>🗑 {curRace}R消去</button>
           <button onClick={function(){setRaces(initRaces());}} style={btnS("#2a1a1a","#ff6060",{fontSize:11,border:"1px solid #4b2020"})}>🗑 全消去</button>
-          <button onClick={function(){var el=document.getElementById("section-tenji");if(el)el.scrollIntoView({behavior:"smooth"});}} style={btnS("#1d3149","#fff",{fontSize:19,fontWeight:800,border:"1px solid #2c4762",marginLeft:"auto"})}>展示↓</button>
+          <button onClick={function(){var el=document.getElementById("section-tenji");if(el)el.scrollIntoView({behavior:"smooth"});}} style={btnS("#1d3149","#fff",{fontSize:18,fontWeight:800,border:"1px solid #2c4762",marginLeft:"auto"})}>展示↓</button>
         </div>
 
         {openPanel==="basic"&&(
@@ -1117,7 +1117,7 @@ function App() {
               <div style={{marginBottom:24}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <span>予想着率（枠別成績＋補正）{kimariByBoat&&<span style={{fontSize:11,color:"#5dd39e",fontWeight:400,marginLeft:6}}>＋ 決まり手数</span>}</span>
-                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:19,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
+                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
                 </div>
                 {rd.racerStats!=null&&(
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
