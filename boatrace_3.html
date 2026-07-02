@@ -873,7 +873,7 @@ function App() {
               if(r.kimariCount&&r.racerRaceCount){
                 var kc=r.kimariCount;
                 var rc=r.racerRaceCount[0];
-                if(rc!=null&&rc>0){
+                if(rc!=null&&rc>9){
                   var total=0;
                   var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
                   for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][0]!=null)total+=arrs[ai][0];}
