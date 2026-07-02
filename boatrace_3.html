@@ -800,6 +800,151 @@ function App() {
     return{ranked:ranked,badge:badge,badgeColor:badgeColor};
   },[result,rd.sts,rd.fHold,rd.fSts,rd.motors,rd.tilts,rd.wind,rd.kimari,kimariPeriod]);
 
+  const yoso=useMemo(function(){
+    if(!result)return null;
+    var rows=result.rows;
+    var kc=rd.kimariCount;
+    var rc=rd.racerRaceCount;
+
+    // 各艇の決まり手合計（コース別）
+    function kimariTotal(r){
+      if(!kc)return null;
+      var ci=r.course-1;
+      var total=0;
+      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
+      var hasAny=false;
+      for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null){total+=arrs[ai][ci];hasAny=true;}}
+      return hasAny?total:null;
+    }
+
+    // 予想1着率を取得（なければ場平均）
+    function r1(r){return r.racerR1final!=null?r.racerR1final:r.final1;}
+    function r2(r){return r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;}
+    function r3(r){return r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;}
+
+    var b1row=rows.filter(function(r){return r.boat===1;})[0];
+    var b1r1=b1row?r1(b1row):0;
+
+    // 1着候補を決定
+    var firstCandidates=[];
+    if(b1r1>=70){
+      // 1号艇1着率70%以上→逃げ本命
+      firstCandidates=[1];
+    } else if(b1r1<=40){
+      // 1号艇1着率40%以下→他号艇から
+      var thresholds={2:20,3:20,4:15,5:15,6:10};
+      rows.forEach(function(r){
+        if(r.boat===1)return;
+        var kt=kimariTotal(r);
+        var hasKimari=kt==null||kt>=1; // データなしは除外しない
+        if(r1(r)>=thresholds[r.boat]&&hasKimari){
+          firstCandidates.push(r.boat);
+        }
+      });
+      // 候補がなければ1号艇も含める
+      if(firstCandidates.length===0)firstCandidates=[1];
+    } else {
+      // 40%超70%未満→1号艇＋条件満たす他艇
+      firstCandidates=[1];
+      var thresholds={2:20,3:20,4:15,5:15,6:10};
+      rows.forEach(function(r){
+        if(r.boat===1)return;
+        var kt=kimariTotal(r);
+        var hasKimari=kt==null||kt>=1;
+        if(r1(r)>=thresholds[r.boat]&&hasKimari){
+          firstCandidates.push(r.boat);
+        }
+      });
+    }
+
+    // 1着本命・対抗を1着率でソート
+    var fc=firstCandidates.map(function(b){return rows.filter(function(r){return r.boat===b;})[0];}).filter(Boolean);
+    fc.sort(function(a,b){return r1(b)-r1(a);});
+    var honmei=fc[0]?fc[0].boat:null;
+    var taiko=fc[1]?fc[1].boat:null;
+    if(!taiko){
+      var allBy1=rows.slice().sort(function(a,b){return r1(b)-r1(a);});
+      var taikoRow=allBy1.filter(function(r){return r.boat!==honmei;})[0];
+      taiko=taikoRow?taikoRow.boat:null;
+    }
+
+    // 2着・3着候補（除外: 10%未満）
+    var place2=rows.filter(function(r){return r2(r)>=10;}).sort(function(a,b){return r2(b)-r2(a);});
+    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){return r3(b)-r3(a);});
+
+    // 2着最優先（30%以上）・優先（20%以上）
+    var p2top=place2.filter(function(r){return r2(r)>=30;}).map(function(r){return r.boat;});
+    var p2mid=place2.filter(function(r){return r2(r)>=20&&r2(r)<30;}).map(function(r){return r.boat;});
+    var p2rest=place2.filter(function(r){return r2(r)>=10&&r2(r)<20;}).map(function(r){return r.boat;});
+
+    // 3着最優先（30%以上）・優先（20%以上）
+    var p3top=place3.filter(function(r){return r3(r)>=30;}).map(function(r){return r.boat;});
+    var p3mid=place3.filter(function(r){return r3(r)>=20&&r3(r)<30;}).map(function(r){return r.boat;});
+    var p3rest=place3.filter(function(r){return r3(r)>=10&&r3(r)<20;}).map(function(r){return r.boat;});
+
+    // 3着候補（本命・対抗以外）
+    var san3boat=place3.filter(function(r){return r.boat!==honmei&&r.boat!==taiko;})[0];
+    var san3=san3boat?san3boat.boat:null;
+
+    // 3連単本線
+    var sanrentan=honmei&&taiko&&san3?[honmei+"-"+taiko+"-"+san3]:[];
+
+    // 2連単
+    var rentan=honmei&&taiko?[[honmei,taiko],[taiko,honmei]]:[];
+
+    // 本命流し
+    var nagashi2=honmei?place2.filter(function(r){return r.boat!==honmei;}).slice(0,3).map(function(r){return honmei+"-"+r.boat;}):[];
+
+    // SSA
+    var ssaBoats=[];
+    rows.forEach(function(r){
+      if(r.course>=2){
+        var inner=rows.filter(function(x){return x.course===r.course-1;})[0];
+        if(inner){
+          var myB=Number(r.boat),inB=Number(inner.boat);
+          var myInp=rd.inputs[myB]||rd.inputs[String(myB)];
+          var inInp=rd.inputs[inB]||rd.inputs[String(inB)];
+          var myT=myInp?parseFloat(myInp.tenji):NaN;
+          var inT=inInp?parseFloat(inInp.tenji):NaN;
+          var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
+          var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
+          var tOk=!isNaN(myT)&&!isNaN(inT)&&(inT-myT)>=0.1;
+          var sOk=mySt==null||inSt==null||(inSt-mySt)>=0.5;
+          if(tOk&&sOk)ssaBoats.push(r.boat);
+        }
+      }
+    });
+
+    // 6点予想生成（1着固定、2着x3着上位から重複なし6点）
+    // 表示形式: 1-23-345
+    function make6(axis){
+      if(!axis)return{text:"",count:0};
+      var p2c=[].concat(p2top,p2mid,p2rest).filter(function(b){return b!==axis;});
+      var p3c=[].concat(p3top,p3mid,p3rest).filter(function(b){return b!==axis;});
+      var used2={},used3={},count=0;
+      for(var i=0;i<p2c.length&&count<6;i++){
+        for(var j=0;j<p3c.length&&count<6;j++){
+          if(p2c[i]!==p3c[j]){used2[p2c[i]]=1;used3[p3c[j]]=1;count++;}
+        }
+      }
+      var s2=Object.keys(used2).sort().join("");
+      var s3=Object.keys(used3).sort().join("");
+      return{text:axis+"-"+s2+"-"+s3,count:count};
+    }
+    var honmei6=make6(honmei);
+    var taiko6=make6(taiko);
+    return{
+      honmei:honmei,taiko:taiko,san3:san3,
+      b1r1:b1r1,firstCandidates:firstCandidates,
+      p2top:p2top,p2mid:p2mid,p2rest:p2rest,
+      p3top:p3top,p3mid:p3mid,p3rest:p3rest,
+      ssaBoats:ssaBoats,
+      honmei6:honmei6,taiko6:taiko6,
+      rentan:rentan,sanrentan:sanrentan,nagashi2:nagashi2,
+      excludedBoats:[],
+    };
+  },[result,rd.inputs,rd.stScore,rd.courses,rd.kimariCount,rd.racerRaceCount]);
+
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
   function col(n){return n>0?"#5dd39e":n<0?"#ff8a80":"#9db5cc";}
@@ -1265,6 +1410,56 @@ function App() {
             )}
           </div>
         )}
+
+            {yoso&&(
+              <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:10}}>🎯 着順予想</div>
+                <div style={{display:"grid",gap:10}}>
+                  <div>
+                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>
+                      1着予想
+                      {yoso.b1r1>=70&&<span style={{marginLeft:6,fontSize:10,color:"#f9c513"}}>（1号艇逃げ本命）</span>}
+                      {yoso.b1r1<=40&&<span style={{marginLeft:6,fontSize:10,color:"#ff8a80"}}>（1号艇飛び注意）</span>}
+                    </div>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      {yoso.honmei&&<div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:10,color:"#f9c513",fontWeight:700}}>◎</span><LB b={yoso.honmei}/></div>}
+                      {yoso.taiko&&<div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:10,color:"#5dd39e",fontWeight:700}}>○</span><LB b={yoso.taiko}/></div>}
+                      {yoso.ssaBoats.length>0&&<span style={{fontSize:11,color:"#f9c513",marginLeft:4}}>⚡SSA: {yoso.ssaBoats.map(function(b){return b+"号艇";}).join("・")}</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>2着予想</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                      {yoso.p2top.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#f9c513",fontWeight:700}}>最優先</span><LB b={b}/></span>;})}
+                      {yoso.p2mid.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#5dd39e",fontWeight:700}}>優先</span><LB b={b}/></span>;})}
+                      {yoso.p2rest.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#9db5cc",fontWeight:700}}>候補</span><LB b={b}/></span>;})}
+                      {yoso.p2top.length===0&&yoso.p2mid.length===0&&yoso.p2rest.length===0&&<span style={{fontSize:11,color:"#4a5d70"}}>―</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>3着予想</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                      {yoso.p3top.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#f9c513",fontWeight:700}}>最優先</span><LB b={b}/></span>;})}
+                      {yoso.p3mid.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#5dd39e",fontWeight:700}}>優先</span><LB b={b}/></span>;})}
+                      {yoso.p3rest.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#9db5cc",fontWeight:700}}>候補</span><LB b={b}/></span>;})}
+                      {yoso.p3top.length===0&&yoso.p3mid.length===0&&yoso.p3rest.length===0&&<span style={{fontSize:11,color:"#4a5d70"}}>―</span>}
+                    </div>
+                  </div>
+                  {yoso.honmei6&&yoso.honmei6.count>0&&(
+                    <div>
+                      <div style={{fontSize:11,color:"#f9c513",marginBottom:6,fontWeight:700}}>◎ 本線予想 {yoso.honmei6.count}点</div>
+                      <span style={{background:"#0e1b2c",borderRadius:6,padding:"6px 14px",fontSize:16,fontWeight:800,color:"#fff",letterSpacing:"0.05em"}}>{yoso.honmei6.text}</span>
+                    </div>
+                  )}
+                  {yoso.taiko6&&yoso.taiko6.count>0&&(
+                    <div style={{marginTop:8}}> 
+                      <div style={{fontSize:11,color:"#5dd39e",marginBottom:6,fontWeight:700}}>○ 対抗予想 {yoso.taiko6.count}点</div>
+                      <span style={{background:"#0e1b2c",borderRadius:6,padding:"6px 14px",fontSize:16,fontWeight:800,color:"#9db5cc",letterSpacing:"0.05em"}}>{yoso.taiko6.text}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
       </div>
     </div>
   );
