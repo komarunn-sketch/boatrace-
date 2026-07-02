@@ -831,7 +831,6 @@ function App() {
 
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 CSVから全レース一括取り込み</div>
-          <div style={{fontSize:11,color:"#9db5cc",marginBottom:8}}>kyoteibiyori形式のCSVを選択してください。</div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <label style={{padding:"9px 18px",borderRadius:8,cursor:"pointer",background:"#2e9e6b",color:"#fff",fontSize:13,fontWeight:700}}>
               CSVを選択して取り込む
@@ -954,6 +953,31 @@ function App() {
           );
         })}
 
+        {hasBasic&&(
+          <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+              {[1,2,3,4,5,6].map(function(b){
+                var m=rd.motors[b];
+                var hasSt=rd.sts[b]!=="";
+                return (
+                  <div key={b} style={{background:"#0e1b2c",borderRadius:8,padding:"6px 8px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                      <span style={{display:"inline-flex",width:22,height:22,borderRadius:5,background:LANE[b].bg,color:LANE[b].fg,alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,border:b===1?"1px solid #ccc":"none",flexShrink:0}}>{b}</span>
+                      {rd.racerClass&&<span style={{fontSize:10,fontWeight:700,color:rd.racerClass[b-1]==="A1"?"#f9c513":rd.racerClass[b-1]==="A2"?"#5dd39e":"#9db5cc"}}>{rd.racerClass[b-1]}</span>}
+                    </div>
+                    <div style={{fontSize:10,color:"#9db5cc"}}>
+                      {m&&m.ren2!=null&&<div>2連 <b style={{color:"#fff"}}>{m.ren2}%</b></div>}
+                      {hasSt&&<div>ST <b style={{color:"#fff"}}>{rd.sts[b]}</b></div>}
+                      {rd.tilts[b]!==""&&<div style={{color:parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#9db5cc"}}>チルト <b>{rd.tilts[b]}</b></div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {!hasBasic&&(
         <div style={{display:"grid",gap:8,marginBottom:24}}>
           {[1,2,3,4,5,6].map(function(b){
             return (
@@ -1023,22 +1047,35 @@ function App() {
             );
           })}
         </div>
+        )}
 
         <div style={{marginBottom:24}}>
           <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>スリット予測</div>
           {!slit?(
             <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#7da3c8",fontSize:12}}>6艇すべての平均STを選択するとスリット隊形を表示します</div>
           ):(
+            <React.Fragment>
             <div style={{background:"#16273c",borderRadius:10,padding:"14px 12px",position:"relative"}}>
-              <div style={{position:"absolute",top:10,bottom:10,right:56,width:2,background:"#d96b63",opacity:0.8}}/>
-              <div style={{position:"absolute",top:0,right:8,fontSize:9,color:"#d96b63"}}>スリット</div>
+              <div style={{display:"grid",gap:4,marginBottom:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{width:22,flexShrink:0}}></span>
+                  <div style={{flex:1}}></div>
+                  <span style={{width:34,fontSize:9,color:"#d96b63",textAlign:"right",flexShrink:0}}>ST</span>
+                  {rd.stScore&&rd.stScore.st1y&&<span style={{width:44,fontSize:9,color:"#7db4e8",textAlign:"right",flexShrink:0}}>ST順1年</span>}
+                  <span style={{width:44,fontSize:9,color:"#9db5cc",textAlign:"right",flexShrink:0}}>展示差</span>
+                </div>
+              </div>
               <div style={{display:"grid",gap:6}}>
                 {slit.map(function(r){
                   var p=Math.max(0,Math.min(1,(0.25-r.st)/0.25));
+                  var innerRow=slit.filter(function(x){return x.course===r.course-1;})[0];
+                  var myTenji=parseFloat(rd.inputs[r.boat].tenji);
+                  var inTenji=innerRow?parseFloat(rd.inputs[innerRow.boat].tenji):NaN;
+                  var tenjDiff=(!isNaN(myTenji)&&!isNaN(inTenji))?(inTenji-myTenji):null;
                   return (
                     <div key={r.boat} style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{width:22,fontSize:10,color:"#7da3c8",flexShrink:0}}>{r.course}C</span>
-                      <div style={{flex:1,position:"relative",height:26,marginRight:56}}>
+                      <div style={{flex:1,position:"relative",height:26}}>
                         <div style={{position:"absolute",left:0,top:"50%",width:(p*100)+"%",height:3,transform:"translateY(-50%)",background:"#2c4762",borderRadius:2}}/>
                         <div style={{position:"absolute",top:"50%",left:"calc("+(p*100)+"% - 13px)",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:3}}>
                           <LB b={r.boat}/>
@@ -1048,15 +1085,21 @@ function App() {
                       </div>
                       <span style={{width:34,fontSize:11,color:"#9db5cc",textAlign:"right",flexShrink:0}}>.{r.st.toFixed(2).split(".")[1]}</span>
                       {rd.stScore&&rd.stScore.st1y&&(
-                        <span style={{width:38,fontSize:10,color:"#7db4e8",textAlign:"right",flexShrink:0}}>
+                        <span style={{width:44,fontSize:10,color:"#7db4e8",textAlign:"right",flexShrink:0}}>
                           {rd.stScore.st1y[r.boat-1]!=null?rd.stScore.st1y[r.boat-1].toFixed(1)+"位":"―"}
                         </span>
                       )}
+                      <span style={{width:44,fontSize:10,textAlign:"right",flexShrink:0,color:tenjDiff==null?"#4a5d70":tenjDiff>0?"#5dd39e":"#fff"}}>
+                        {tenjDiff!=null?(tenjDiff>=0?"+":"")+tenjDiff.toFixed(2):"―"}
+                      </span>
                     </div>
                   );
                 })}
               </div>
             </div>
+            <div style={{fontSize:11,color:"#fff",marginTop:8,paddingLeft:4}}>展示差は+0.10以上でスリットアラート</div>
+            <div style={{fontSize:11,color:"#fff",marginTop:4,paddingLeft:4}}>スリットアラートとST順位差0.5早ければ⚡SSA発動</div>
+            </React.Fragment>
           )}
         </div>
 
