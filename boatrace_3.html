@@ -933,13 +933,28 @@ function App() {
     }
     var honmei6=make6(honmei);
     var taiko6=make6(taiko);
+
+    // スイチ：本命1着固定で2着率×3着率が最大の1点
+    var suichi=null;
+    if(honmei){
+      var p2all=place2.filter(function(r){return r.boat!==honmei;});
+      var p3all=place3.filter(function(r){return r.boat!==honmei;});
+      var bestScore=-1;
+      for(var si=0;si<p2all.length;si++){
+        for(var sj=0;sj<p3all.length;sj++){
+          if(p2all[si].boat===p3all[sj].boat)continue;
+          var score=r2(p2all[si])*r3(p3all[sj]);
+          if(score>bestScore){bestScore=score;suichi=honmei+"-"+p2all[si].boat+"-"+p3all[sj].boat;}
+        }
+      }
+    }
     return{
       honmei:honmei,taiko:taiko,san3:san3,
       b1r1:b1r1,firstCandidates:firstCandidates,
       p2top:p2top,p2mid:p2mid,p2rest:p2rest,
       p3top:p3top,p3mid:p3mid,p3rest:p3rest,
       ssaBoats:ssaBoats,
-      honmei6:honmei6,taiko6:taiko6,
+      honmei6:honmei6,taiko6:taiko6,suichi:suichi,
       rentan:rentan,sanrentan:sanrentan,nagashi2:nagashi2,
       excludedBoats:[],
     };
@@ -1445,6 +1460,12 @@ function App() {
                       {yoso.p3top.length===0&&yoso.p3mid.length===0&&yoso.p3rest.length===0&&<span style={{fontSize:11,color:"#4a5d70"}}>―</span>}
                     </div>
                   </div>
+                  {yoso.suichi&&(
+                    <div style={{background:"#0e1b2c",borderRadius:8,padding:"10px 12px",border:"1px solid #f9c513"}}>
+                      <div style={{fontSize:11,color:"#f9c513",marginBottom:6,fontWeight:700}}>⭐ スイチ（最確1点）</div>
+                      <span style={{fontSize:20,fontWeight:900,color:"#f9c513",letterSpacing:"0.1em"}}>{yoso.suichi}</span>
+                    </div>
+                  )}
                   {yoso.honmei6&&yoso.honmei6.count>0&&(
                     <div>
                       <div style={{fontSize:11,color:"#f9c513",marginBottom:6,fontWeight:700}}>◎ 本線予想 {yoso.honmei6.count}点</div>
