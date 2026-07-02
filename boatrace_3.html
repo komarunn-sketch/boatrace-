@@ -292,7 +292,7 @@ const VW={
 
 function emptyRace() {
   return {
-    pText:"",pMsg:"",shimekiri:"",
+    pText:"",pMsg:"",shimekiri:null,
     motors:{1:null,2:null,3:null,4:null,5:null,6:null},
     racerStats:null,racerRaceCount:null,racerClass:null,
     stTable:null,stScore:null,
@@ -443,7 +443,9 @@ function parseRowByIndex(d){
   base.stTable=stTable;base.stScore=stScore;base.sts=sts;base.fSts=fSts;
   base.racerStats=racerStats;base.racerRaceCount=racerRaceCount;
   base.kimari=kimari;base.kimariCount=kimariCount;base.nigeSim=nigeSim;
-  base.motors=motors;base.pMsg="✓ CSVから読み込みました";
+  var shimekiriMatch=(g(d,0)||"").match(/締切(\d{1,2}:\d{2})/);
+  var shimekiri=shimekiriMatch?shimekiriMatch[1]:null;
+  base.motors=motors;base.shimekiri=shimekiri;base.pMsg="✓ CSVから読み込みました";
   return base;
 }
 
