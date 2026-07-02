@@ -953,9 +953,8 @@ function App() {
           );
         })}
 
-        {hasBasic&&(
-          <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
+        <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
               {[1,2,3,4,5,6].map(function(b){
                 var m=rd.motors[b];
@@ -976,78 +975,6 @@ function App() {
               })}
             </div>
           </div>
-        )}
-        {!hasBasic&&(
-        <div style={{display:"grid",gap:8,marginBottom:24}}>
-          {[1,2,3,4,5,6].map(function(b){
-            return (
-              <div key={b} style={cardS}>
-                <div style={{display:"grid",gridTemplateColumns:"34px 52px repeat(4,1fr)",gap:4,alignItems:"center"}}>
-                  <div style={{width:30,height:30,borderRadius:7,background:LANE[b].bg,color:LANE[b].fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,border:b===1?"1px solid #ccc":"none"}}>{b}</div>
-                  <div>
-                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>コース</div>
-                    <select value={rd.courses[b]} onChange={function(e){var val=Number(e.target.value);updateRd(function(prev){var n=Object.assign({},prev);n.courses=Object.assign({},prev.courses);n.courses[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",boxSizing:"border-box",fontSize:13,fontWeight:700,padding:"6px 2px"}),{color:rd.courses[b]!==b?"#f9c513":"#fff"})}>
-                      {[1,2,3,4,5,6].map(function(c){return <option key={c} value={c}>{c}</option>;})}
-                    </select>
-                  </div>
-                  {FIELDS.map(function(f){
-                    return (
-                      <div key={f.key} style={{minWidth:0}}>
-                        <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>{f.label}</div>
-                        <input type="number" inputMode="decimal" step="0.01" value={rd.inputs[b][f.key]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.inputs=Object.assign({},prev.inputs);n.inputs[b]=Object.assign({},prev.inputs[b]);n.inputs[b][f.key]=val;return n;});}} placeholder="0.00" style={Object.assign({},inpS,{padding:"6px 4px",fontSize:13,width:"100%"})}/>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,borderTop:"1px solid #1d3149",paddingTop:8,marginTop:8}}>
-                  <div>
-                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>チルト</div>
-                    <select value={rd.tilts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.tilts=Object.assign({},prev.tilts);n.tilts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",fontWeight:700,padding:"6px 2px",fontSize:13}),{color:rd.tilts[b]===""?"#7da3c8":parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#fff"})}>
-                      <option value="">―</option>
-                      {TILT_OPT.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                    </select>
-                  </div>
-                  <div>
-                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>平均ST</div>
-                    <select value={rd.sts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.sts=Object.assign({},prev.sts);n.sts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",padding:"6px 2px",fontSize:13}),{color:rd.sts[b]===""?"#7da3c8":"#fff"})}>
-                      <option value="">―</option>
-                      {ST_OPT.map(function(s){return <option key={s} value={s}>{s}</option>;})}
-                    </select>
-                  </div>
-                  <div>
-                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>F持ち</div>
-                    <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.fHold=Object.assign({},prev.fHold);n.fHold[b]=!prev.fHold[b];return n;});}} style={{width:"100%",padding:"6px 2px",fontSize:13,fontWeight:700,borderRadius:6,cursor:"pointer",background:rd.fHold[b]?"#b3463f":"#0e1b2c",color:rd.fHold[b]?"#fff":"#7da3c8",border:rd.fHold[b]?"1px solid #d96b63":"1px solid #2c4762"}}>{rd.fHold[b]?"あり":"なし"}</button>
-                  </div>
-                  <div>
-                    <div style={{fontSize:9,color:"#7da3c8",marginBottom:2}}>体重(kg)</div>
-                    <input type="number" inputMode="decimal" step="0.1" value={rd.weights[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.weights=Object.assign({},prev.weights);n.weights[b]=val;return n;});}} placeholder="―" style={Object.assign({},inpS,{fontSize:13,padding:"6px 4px",width:"100%"})}/>
-                  </div>
-                  {rd.tilts[b]!==""&&parseFloat(rd.tilts[b])>=1.0&&(
-                    <div style={{gridColumn:"1 / -1"}}><span style={{fontSize:10,fontWeight:800,padding:"4px 7px",borderRadius:5,background:"#6b5a1d",color:"#f9c513"}}>⚡伸び警戒</span></div>
-                  )}
-                  {rd.fHold[b]&&(
-                    <div style={{gridColumn:"1 / -1"}}>
-                      <div style={{fontSize:9,color:"#d96b63",marginBottom:2}}>F持ち時ST</div>
-                      <select value={rd.fSts[b]} onChange={function(e){var val=e.target.value;updateRd(function(prev){var n=Object.assign({},prev);n.fSts=Object.assign({},prev.fSts);n.fSts[b]=val;return n;});}} style={Object.assign({},selS({width:"100%",padding:"6px 4px",fontSize:13}),{color:rd.fSts[b]===""?"#f9c513":"#fff",border:"1px solid #6b3530"})}>
-                        <option value="">－</option>
-                        {ST_OPT.map(function(s){return <option key={s} value={s}>{s}</option>;})}
-                      </select>
-                    </div>
-                  )}
-                </div>
-                {rd.motors[b]&&(
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",borderTop:"1px solid #1d3149",paddingTop:7,marginTop:6,fontSize:11,color:"#9db5cc"}}>
-                    <span style={{background:"#0e1b2c",borderRadius:5,padding:"3px 7px",fontWeight:800,color:"#7da3c8"}}>モーター</span>
-                    {rd.motors[b].rate!=null&&<span>勝率 <b style={{color:"#fff"}}>{rd.motors[b].rate.toFixed(2)}</b></span>}
-                    {rd.motors[b].ren2!=null&&<span>2連 <b style={{color:"#fff"}}>{rd.motors[b].ren2}%</b></span>}
-                    {rd.motors[b].ren3!=null&&<span>3連 <b style={{color:rd.motors[b].ren3>=50?"#5dd39e":"#fff"}}>{rd.motors[b].ren3}%</b></span>}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        )}
 
         <div style={{marginBottom:24}}>
           <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>スリット予測</div>
