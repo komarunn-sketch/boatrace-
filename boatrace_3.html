@@ -1650,7 +1650,10 @@ function App() {
 
             {yoso&&(
               <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8}}>🎯 着順予想</div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🎯 着順予想</div>
+                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
+                </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
                   {RCATS.map(function(cat){
                     var active=racerCat===cat;
