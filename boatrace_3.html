@@ -821,10 +821,36 @@ function App() {
       return hasAny?total:null;
     }
 
-    // 予想1着率を取得（なければ場平均）
     function r1(r){return r.racerR1final!=null?r.racerR1final:r.final1;}
     function r2(r){return r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;}
     function r3(r){return r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;}
+
+    // 階級スコア A1=4, A2=3, B1=2, B2=1
+    function classScore(b){
+      var cl=rd.racerClass?rd.racerClass[b-1]:null;
+      if(cl==="A1")return 4; if(cl==="A2")return 3; if(cl==="B1")return 2; return 1;
+    }
+    // 得点順位スコア（1位→6点, 6位→1点）
+    function rankScore(b){
+      var rank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[b-1]:null;
+      return rank!=null?Math.max(0,7-rank):0;
+    }
+    // 決まり手率スコア（0〜10点）
+    function kimariScore(r){
+      if(!kc||!rc)return 5;
+      var rcVal=rc[r.boat-1];
+      if(rcVal==null||rcVal===0)return 5;
+      var ci=r.course-1,total=0;
+      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
+      for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)total+=arrs[ai][ci];}
+      return Math.min(10,total/rcVal*10);
+    }
+    // 総合スコア（1着）
+    function totalScore1(r){return r1(r)*0.6+classScore(r.boat)*2+rankScore(r.boat)*0.5+kimariScore(r)*0.3;}
+    // 総合スコア（2着）
+    function totalScore2(r){return r2(r)*0.5+classScore(r.boat)*1.5+rankScore(r.boat)*0.5+kimariScore(r)*0.3;}
+    // 総合スコア（3着）
+    function totalScore3(r){return r3(r)*0.7+classScore(r.boat)*1+kimariScore(r)*0.2;}
 
     var b1row=rows.filter(function(r){return r.boat===1;})[0];
     var b1r1=b1row?r1(b1row):0;
@@ -863,11 +889,11 @@ function App() {
 
     // 1着本命・対抗を1着率でソート
     var fc=firstCandidates.map(function(b){return rows.filter(function(r){return r.boat===b;})[0];}).filter(Boolean);
-    fc.sort(function(a,b){return r1(b)-r1(a);});
+    fc.sort(function(a,b){return totalScore1(b)-totalScore1(a);});
     var honmei=fc[0]?fc[0].boat:null;
     var taiko=fc[1]?fc[1].boat:null;
     if(!taiko){
-      var allBy1=rows.slice().sort(function(a,b){return r1(b)-r1(a);});
+      var allBy1=rows.slice().sort(function(a,b){return totalScore1(b)-totalScore1(a);});
       var taikoRow=allBy1.filter(function(r){return r.boat!==honmei;})[0];
       taiko=taikoRow?taikoRow.boat:null;
     }
@@ -963,8 +989,8 @@ function App() {
     var sujiP3Boats=sujiData?(sujiData.p3.length>0?sujiData.p3.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):allOtherBoats):[];
 
     // 2着・3着候補（除外: 10%未満）
-    var place2=rows.filter(function(r){return r2(r)>=10;}).sort(function(a,b){return r2(b)-r2(a);});
-    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){return r3(b)-r3(a);});
+    var place2=rows.filter(function(r){return r2(r)>=10;}).sort(function(a,b){return totalScore2(b)-totalScore2(a);});
+    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){return totalScore3(b)-totalScore3(a);});
 
     // 案B: スジ候補かつ着率高い→最優先、どちらか片方→優先、着率のみ→候補
     function classify2(r){
@@ -1624,7 +1650,18 @@ function App() {
 
             {yoso&&(
               <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:10}}>🎯 着順予想</div>
+                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8}}>🎯 着順予想</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
+                  {RCATS.map(function(cat){
+                    var active=racerCat===cat;
+                    var hasData=rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});
+                    return (
+                      <button key={cat} onClick={function(){setRacerCat(cat);}} style={{padding:"4px 8px",fontSize:10,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":hasData?"#9db5cc":"#3a4f63",border:active?"1px solid #5a87b8":"1px solid #2c4762",opacity:hasData?1:0.5}}>
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div style={{display:"grid",gap:10}}>
                   <div>
                     <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>
