@@ -1323,7 +1323,7 @@ function App() {
                 <button onClick={function(){setNowTime(new Date());}} style={{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1d3149",color:"#7db4e8",border:"1px solid #2c4762",fontWeight:700}}>🔄 更新</button>
                 <span style={{fontSize:9,color:"#7da3c8"}}>{nowTime.getHours()}:{String(nowTime.getMinutes()).padStart(2,"0")}</span>
               </div>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
                 {top4.map(function(item){
                   var isActive=venue===item.vname&&curRace===item.rnum;
                   return (
