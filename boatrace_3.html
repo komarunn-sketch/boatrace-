@@ -431,10 +431,13 @@ function parseRowByIndex(d){
 
   var motors={};
   for(var b=1;b<=6;b++){
+    var motorRankStr=g(d,378+b);
+    var motorRankNum=motorRankStr?parseInt(motorRankStr):null;
     motors[b]={
       rate:pf(g(d,392+b)),
       ren2:pf(g(d,406+b)),
       ren3:pf(g(d,413+b)),
+      rank:isNaN(motorRankNum)?null:motorRankNum,
     };
   }
 
@@ -731,6 +734,7 @@ function App() {
     for(var b=1;b<=6;b++){if(rd.motors[b]&&rd.motors[b].ren2!=null)motorEntries.push([b,rd.motors[b].ren2]);}
     motorEntries.sort(function(a,b){return b[1]-a[1];});
     var motorTop2={};for(var i=0;i<Math.min(2,motorEntries.length);i++)motorTop2[motorEntries[i][0]]=true;
+    var motorRank={};for(var i=0;i<motorEntries.length;i++)motorRank[motorEntries[i][0]]=i+1;
 
     var r1Vals=[],r3Vals=[];
     for(var b=1;b<=6;b++){
@@ -755,8 +759,11 @@ function App() {
       if(stAvg!=null&&effSt[r.boat]!=null&&effSt[r.boat]-stAvg>=0.03)warns.push("ST遅め注意");
       if(rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0)warns.push("チルト跳ね・伸び警戒");
       if(stAvg!=null&&effSt[r.boat]!=null&&stAvg-effSt[r.boat]>=0.03)plus.push("スリット先行候補");
-      var score=goods*10+(r.racerR1final!=null&&r1Avg!=null?(r.racerR1final-r1Avg)*0.3:0)+r.diff*5+(m&&m.ren2!=null&&motorAvg!=null?(m.ren2-motorAvg)*0.1:0)+r.windAdj*0.5+r.final1*0.05;
-      return Object.assign({},r,{crit:crit,goods:goods,mark:mark,warns:warns,plus:plus,score:score});
+      var score=goods*10+(r.racerR1final!=null&&r1Avg!=null?(r.racerR1final-r1Avg)*0.3:0)+r.diff*5+(m&&m.ren2!=null&&motorAvg!=null?(m.ren2-motorAvg)*0.3:0)+r.windAdj*0.5+r.final1*0.05;
+      var mRankCSV=m&&m.rank!=null?m.rank:null;
+      var mRankCalc=motorRank[r.boat]||null;
+      var mRank=mRankCSV!=null?mRankCSV:mRankCalc;
+      return Object.assign({},r,{crit:crit,goods:goods,mark:mark,warns:warns,plus:plus,score:score,motorRank:mRank,motorRen2:m&&m.ren2!=null?m.ren2:null});
     });
 
     var km=rd.kimari?rd.kimari[kimariPeriod]:null;
@@ -1763,6 +1770,7 @@ function App() {
                         </div>
                         <div style={{fontSize:16,fontWeight:800,lineHeight:1.2,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":r.mark==="△"?"#7db4e8":"#9db5cc"}}>{r.mark}</div>
                         <div style={{fontSize:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
+                        {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>モーター順位 {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
                       </div>
                     );
                   })}
