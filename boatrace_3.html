@@ -847,7 +847,14 @@ function App() {
       return Math.min(10,total/rcVal*10);
     }
     // 総合スコア（1着）
-    function totalScore1(r){return r1(r)*0.6+classScore(r.boat)*2+rankScore(r.boat)*0.5+kimariScore(r)*0.3;}
+    function totalScore1(r){
+      var base=r1(r)*0.6+classScore(r.boat)*2+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.4;
+      // 1号艇の差が0以下（展示が平均以上）なのに評価を下げる
+      if(r.boat===1&&r.diff!=null&&r.diff<=0){
+        base=base-10; // ペナルティ
+      }
+      return base;
+    }
     // 総合スコア（2着）
     // モーター2連対率スコア（場平均比較、最大5点）
     function motorScore(b){
@@ -877,10 +884,8 @@ function App() {
       rows.forEach(function(r){
         if(r.boat===1)return;
         var kt=kimariTotal(r);
-        var hasKimari=kt==null||kt>=1; // データなしは除外しない
-        if(r1(r)>=thresholds[r.boat]&&hasKimari){
-          firstCandidates.push(r.boat);
-        }
+        var hasKimari=kt==null||kt>=1;
+        if(r1(r)>=thresholds[r.boat]&&hasKimari){firstCandidates.push(r.boat);}
       });
       // 候補がなければ1号艇も含める
       if(firstCandidates.length===0)firstCandidates=[1];
@@ -892,9 +897,7 @@ function App() {
         if(r.boat===1)return;
         var kt=kimariTotal(r);
         var hasKimari=kt==null||kt>=1;
-        if(r1(r)>=thresholds[r.boat]&&hasKimari){
-          firstCandidates.push(r.boat);
-        }
+        if(r1(r)>=thresholds[r.boat]&&hasKimari){firstCandidates.push(r.boat);}
       });
     }
 
@@ -1020,14 +1023,10 @@ function App() {
       return null;
     }
     function classify3(r){
-      var isSuji=sujiP3Boats.indexOf(r.boat)>=0;
       var rate=r3(r);
-      // 3着は3着率重視：着率が高ければスジなしでも最優先
-      if(rate>=30)return "top";               // 3着率30%以上→最優先
-      if(rate>=20&&isSuji)return "top";       // 3着率20%以上＋スジ→最優先
-      if(rate>=20)return "mid";               // 3着率20%以上→優先
-      if(rate>=10&&isSuji)return "mid";       // 3着率10%以上＋スジ→優先
-      if(rate>=10)return "rest";              // 3着率10%以上→候補
+      if(rate>=30)return "top";
+      if(rate>=20)return "mid";
+      if(rate>=10)return "rest";
       return null;
     }
     var p2top=place2.filter(function(r){return classify2(r)==="top";}).map(function(r){return r.boat;});
@@ -1282,7 +1281,8 @@ function App() {
   return (
     <div style={wrapS}>
       <div style={innerS}>
-        <div style={{fontSize:18,fontWeight:900,color:"#7db4e8",marginBottom:12}}>🚤 ボートレース予想ツール</div>
+        <div style={{fontSize:18,fontWeight:900,color:"#7db4e8",marginBottom:12}}>🚤 予想ツール</div>
+
 
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 CSVから全レース一括取り込み</div>
@@ -1294,6 +1294,50 @@ function App() {
             {csvMsg&&<span style={{fontSize:12,color:csvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{csvMsg}</span>}
           </div>
         </div>
+
+        {(function(){
+          var now=new Date();
+          var nowMin=now.getHours()*60+now.getMinutes();
+          var items=[];
+          Object.keys(races).forEach(function(key){
+            var r=races[key];
+            if(!r.shimekiri)return;
+            var parts=r.shimekiri.split(":");
+            if(parts.length!==2)return;
+            var t=parseInt(parts[0])*60+parseInt(parts[1]);
+            var remaining=t-nowMin;
+            if(remaining<0||remaining>60)return;
+            var sp=key.split("_");
+            var vname=sp.slice(0,-1).join("_");
+            var rnum=parseInt(sp[sp.length-1]);
+            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining});
+          });
+          items.sort(function(a,b){return a.remaining-b.remaining;});
+          var top4=items.slice(0,4);
+          if(top4.length===0)return null;
+          return (
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:10,color:"#f9c513",marginBottom:5,fontWeight:700}}>⏰ 締切直前</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                {top4.map(function(item){
+                  var isActive=venue===item.vname&&curRace===item.rnum;
+                  return (
+                    <button key={item.vname+"_"+item.rnum}
+                      onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                      style={{padding:"6px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                        background:isActive?"#2c4762":"#16273c",
+                        color:item.remaining<=10?"#ff8a80":item.remaining<=20?"#f9c513":"#5dd39e",
+                        border:isActive?"2px solid #5a87b8":"1px solid #2c4762",textAlign:"left"}}>
+                      <div style={{fontSize:10,color:"#9db5cc",marginBottom:1}}>{item.vname}</div>
+                      <div>{item.rnum}R {item.shimekiri}</div>
+                      <div style={{fontSize:10,marginTop:1}}>残{item.remaining}分</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{marginBottom:16}}>
           <div id="section-venue" style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
