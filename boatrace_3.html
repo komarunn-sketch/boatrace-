@@ -458,6 +458,7 @@ function App() {
   const [races,setRaces]=useState(initRaces);
   const [openPanel,setOpenPanel]=useState(null);
   const [openAiEval,setOpenAiEval]=useState(false);
+  const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
 
@@ -1296,7 +1297,7 @@ function App() {
         </div>
 
         {(function(){
-          var now=new Date();
+          var now=nowTime;
           var nowMin=now.getHours()*60+now.getMinutes();
           var items=[];
           Object.keys(races).forEach(function(key){
@@ -1317,20 +1318,24 @@ function App() {
           if(top4.length===0)return null;
           return (
             <div style={{marginBottom:12}}>
-              <div style={{fontSize:10,color:"#f9c513",marginBottom:5,fontWeight:700}}>⏰ 締切直前</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                <div style={{fontSize:10,color:"#f9c513",fontWeight:700}}>⏰ 締切直前</div>
+                <button onClick={function(){setNowTime(new Date());}} style={{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1d3149",color:"#7db4e8",border:"1px solid #2c4762",fontWeight:700}}>🔄 更新</button>
+                <span style={{fontSize:9,color:"#7da3c8"}}>{nowTime.getHours()}:{String(nowTime.getMinutes()).padStart(2,"0")}</span>
+              </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {top4.map(function(item){
                   var isActive=venue===item.vname&&curRace===item.rnum;
                   return (
                     <button key={item.vname+"_"+item.rnum}
                       onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
-                      style={{padding:"6px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                      style={{padding:"8px 12px",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700,
                         background:isActive?"#2c4762":"#16273c",
                         color:item.remaining<=10?"#ff8a80":item.remaining<=20?"#f9c513":"#5dd39e",
                         border:isActive?"2px solid #5a87b8":"1px solid #2c4762",textAlign:"left"}}>
-                      <div style={{fontSize:10,color:"#9db5cc",marginBottom:1}}>{item.vname}</div>
+                      <div style={{fontSize:11,color:"#9db5cc",marginBottom:2}}>{item.vname}</div>
                       <div>{item.rnum}R {item.shimekiri}</div>
-                      <div style={{fontSize:10,marginTop:1}}>残{item.remaining}分</div>
+                      <div style={{fontSize:11,marginTop:2}}>残{item.remaining}分</div>
                     </button>
                   );
                 })}
