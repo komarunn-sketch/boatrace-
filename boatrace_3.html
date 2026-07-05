@@ -1311,7 +1311,20 @@ function App() {
             var sp=key.split("_");
             var vname=sp.slice(0,-1).join("_");
             var rnum=parseInt(sp[sp.length-1]);
-            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining});
+            var itemWave=false,itemStrong=false;
+            if(r.kimariCount&&r.racerRaceCount){
+              var kc2=r.kimariCount;
+              var rc2=r.racerRaceCount[0];
+              if(rc2!=null&&rc2>9){
+                var tot2=0;
+                var arrs2=[kc2.nige,kc2.sashi,kc2.makuri,kc2.makurizashi];
+                for(var ai2=0;ai2<arrs2.length;ai2++){if(arrs2[ai2]&&arrs2[ai2][0]!=null)tot2+=arrs2[ai2][0];}
+                var ratio2=tot2/rc2;
+                if(ratio2<0.45)itemWave=true;
+                else if(ratio2>=0.75)itemStrong=true;
+              }
+            }
+            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining,isWave:itemWave,isStrong:itemStrong});
           });
           items.sort(function(a,b){return a.remaining-b.remaining;});
           var top4=items.slice(0,4);
@@ -1330,9 +1343,9 @@ function App() {
                     <button key={item.vname+"_"+item.rnum}
                       onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                       style={{padding:"8px 12px",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700,
-                        background:isActive?"#2c4762":"#16273c",
+                        background:isActive?"#2c4762":item.isStrong?"#1a3b2a":item.isWave?"#3b1a3b":"#16273c",
                         color:item.remaining<=10?"#ff8a80":item.remaining<=20?"#f9c513":"#5dd39e",
-                        border:isActive?"2px solid #5a87b8":"1px solid #2c4762",textAlign:"left"}}>
+                        border:isActive?"2px solid #5a87b8":item.isStrong?"1px solid #2e9e6b":item.isWave?"1px solid #8b3a8b":"1px solid #2c4762",textAlign:"left"}}>
                       <div style={{fontSize:11,color:"#9db5cc",marginBottom:2}}>{item.vname}</div>
                       <div>{item.rnum}R {item.shimekiri}</div>
                       <div style={{fontSize:11,marginTop:2}}>残{item.remaining}分</div>
