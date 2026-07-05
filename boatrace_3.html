@@ -458,6 +458,7 @@ function App() {
   const [races,setRaces]=useState(initRaces);
   const [openPanel,setOpenPanel]=useState(null);
   const [openAiEval,setOpenAiEval]=useState(false);
+  const [openBaseRate,setOpenBaseRate]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
@@ -1718,8 +1719,11 @@ function App() {
               </table>
             </div>
 
-            <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>場平均で見る1着率</div>
-            <div style={{display:"grid",gap:6,marginBottom:28}}>
+            <div onClick={function(){setOpenBaseRate(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openBaseRate?8:16,cursor:"pointer",userSelect:"none"}}>
+              <span style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8"}}>場平均で見る1着率</span>
+              <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
+            </div>
+            {openBaseRate&&<div style={{display:"grid",gap:6,marginBottom:28}}>
               {result.rows.slice().sort(function(a,b){return(b.baseRate+b.windAdj)-(a.baseRate+a.windAdj);}).map(function(r,i){
                 var v=r.baseRate+r.windAdj;
                 var maxV=Math.max.apply(null,result.rows.map(function(x){return x.baseRate+x.windAdj;}));
@@ -1739,48 +1743,31 @@ function App() {
                   </div>
                 );
               })}
-            </div>
+            </div>}
 
             {aiEval&&(
               <div style={{marginBottom:16}}>
-                <div onClick={function(){setOpenAiEval(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openAiEval?10:0,cursor:"pointer",userSelect:"none"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <span style={{fontSize:12,letterSpacing:"0.2em",color:"#7da3c8"}}>総合AI評価</span>
                   <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
-                  <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>{openAiEval?"▲ 閉じる":"▼ 開く"}</span>
                 </div>
-                {openAiEval&&<div style={{display:"grid",gap:8}}>
+                <div style={{display:"grid",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4}}>
                   {aiEval.ranked.map(function(r){
-                    var max=Math.max.apply(null,aiEval.ranked.map(function(x){return x.score;}));
-                    var min=Math.min.apply(null,aiEval.ranked.map(function(x){return x.score;}));
-                    var w=Math.max(4,((r.score-min)/Math.max(max-min,0.01))*100);
+                    var isHonmei=r.rankPos===1;
                     return (
-                      <div key={r.boat} style={{background:"#16273c",borderRadius:10,padding:"10px 12px",border:r.rankPos===1?"1px solid #3d7ab8":"1px solid transparent"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                          <span style={{fontSize:13,color:"#7da3c8",width:18}}>{r.rankPos}.</span>
-                          <span style={{fontSize:22,fontWeight:800,width:28,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":"#e8eef5"}}>{r.mark}</span>
+                      <div key={r.boat} style={{background:"#0e1b2c",borderRadius:8,padding:"6px 6px",border:isHonmei?"2px solid #f9c513":"1px solid #2c4762",textAlign:"center"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginBottom:4}}>
                           <LB b={r.boat}/>
-                          <span style={{fontSize:12,color:"#7da3c8"}}>{r.course}C進入</span>
-                          <span style={{fontSize:12,color:"#7da3c8",marginLeft:"auto"}}>参考 {fmt(r.final1,1)}%</span>
+                          <span style={{fontSize:12,fontWeight:700,color:"#9db5cc"}}>{r.rankPos}位</span>
                         </div>
-                        <div style={{height:6,background:"#0e1b2c",borderRadius:3,overflow:"hidden",marginTop:8}}>
-                          <div style={{width:w+"%",height:"100%",background:r.rankPos===1?"#f9c513":r.rankPos<=3?"#3d7ab8":"#2c4762"}}/>
-                        </div>
-                        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
-                          {[["展示タイム",r.crit.time],["モーター",r.crit.motor],["風",r.crit.wind]].map(function(item){
-                            var label=item[0],v=item[1];
-                            return <span key={label} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:v===true?"rgba(46,158,107,0.22)":v===false?"#1d3149":"transparent",color:v===true?"#5dd39e":v===false?"#7a8da0":"#4a5d70",border:v===null?"1px dashed #2c4762":"1px solid transparent"}}>{v===true?"✓":v===false?"✗":"−"} {label}</span>;
-                          })}
-                        </div>
-                        {(r.warns.length>0||r.plus.length>0)&&(
-                          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                            {r.warns.map(function(w){return <span key={w} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(249,197,19,0.15)",color:"#f9c513"}}>⚠ {w}</span>;})}
-                            {r.plus.map(function(p){return <span key={p} style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:6,background:"rgba(61,122,184,0.2)",color:"#7db4e8"}}>＋ {p}</span>;})}
-                          </div>
-                        )}
+                        <div style={{fontSize:16,fontWeight:800,lineHeight:1.2,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":r.mark==="△"?"#7db4e8":"#9db5cc"}}>{r.mark}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
                       </div>
                     );
                   })}
-                </div>}
+                  </div>
+                </div>
               </div>
             )}
           </div>
