@@ -462,6 +462,7 @@ function App() {
   const [openPanel,setOpenPanel]=useState(null);
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
+  const [openMotorB1,setOpenMotorB1]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
@@ -1397,6 +1398,58 @@ function App() {
           );
         })()}
 
+        {(function(){
+          var items=[];
+          Object.keys(races).forEach(function(key){
+            var r=races[key];
+            if(!r.racerClass||!r.motors)return;
+            var sp=key.split("_");
+            var vname=sp.slice(0,-1).join("_");
+            var rnum=parseInt(sp[sp.length-1]);
+            var hasB1Motor=false;
+            for(var b=1;b<=6;b++){
+              var course=r.courses?r.courses[b]:b;
+              if(course===1)continue;
+              var cl=r.racerClass[b-1];
+              if(cl!=="B1")continue;
+              var m=r.motors[b];
+              if(m&&m.rank!=null&&m.rank>=1&&m.rank<=10){hasB1Motor=true;break;}
+            }
+            if(!hasB1Motor)return;
+            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri||null});
+          });
+          items.sort(function(a,b){
+            var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
+            var tb=b.shimekiri?parseInt(b.shimekiri.split(":")[0])*60+parseInt(b.shimekiri.split(":")[1]):9999;
+            return ta-tb||(a.rnum-b.rnum);
+          });
+          if(items.length===0)return null;
+          return (
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openMotorB1?5:0}}>
+                <div style={{fontSize:10,color:"#c084fc",fontWeight:700}}>⚙ モーターB1軸あり</div>
+                <button onClick={function(){setOpenMotorB1(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1d3149",color:"#c084fc",border:"1px solid #4a2c6b",fontWeight:700}}>{openMotorB1?"▲ 閉じる":"▼ 開く"}</button>
+              </div>
+              {openMotorB1&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+                {items.map(function(item){
+                  var isActive=venue===item.vname&&curRace===item.rnum;
+                  return (
+                    <button key={item.vname+"_"+item.rnum}
+                      onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                      style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                        background:isActive?"#2c4762":"#16273c",
+                        color:"#c084fc",
+                        border:isActive?"2px solid #c084fc":"1px solid #4a2c6b",textAlign:"left"}}>
+                      <div style={{fontSize:9,color:"#9db5cc",marginBottom:1}}>{item.vname}</div>
+                      <div>{item.rnum}R{item.shimekiri&&" "+item.shimekiri}</div>
+                    </button>
+                  );
+                })}
+              </div>}
+            </div>
+          );
+        })()}
+
         <div style={{marginBottom:16}}>
           <div id="section-venue" style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
@@ -1802,7 +1855,7 @@ function App() {
                         </div>
                         <div style={{fontSize:16,fontWeight:800,lineHeight:1.2,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":r.mark==="△"?"#7db4e8":"#9db5cc"}}>{r.mark}</div>
                         <div style={{fontSize:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
-                        {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>モーター順位 {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
+                        {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>モーター {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
                       </div>
                     );
                   })}
