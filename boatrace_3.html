@@ -1167,6 +1167,38 @@ function App() {
     var anaBoatRow=taikoCourseNum?rows.filter(function(r){return r.course===taikoCourseNum+1;})[0]:null;
     var anaBeat=anaBoatRow?anaBoatRow.boat:null;
     var ana4=makeBet(anaBeat,6);
+
+    // 特殊買目：1コース以外・モーターランク1〜10位・B1階級の艇を2着・3着に流す
+    var motorB1Beats=rows.filter(function(r){
+      if(r.course===1)return false;
+      var cl=rd.racerClass?rd.racerClass[r.boat-1]:null;
+      if(cl!=="B1")return false;
+      var m=rd.motors[r.boat];
+      if(!m||m.rank==null)return false;
+      return m.rank>=1&&m.rank<=10;
+    });
+    var motorB1Boats=motorB1Beats.map(function(r){return r.boat;});
+    // 本命1着固定でB1艇を2着に（3着は通常候補）
+    function makeB1as2(axis,b1boat,maxN){
+      if(!axis||!b1boat||axis===b1boat)return{text:"",count:0};
+      var p3c=[].concat(p3top,p3mid,p3rest).filter(function(b){return b!==axis&&b!==b1boat;});
+      var used3={},count=0;
+      for(var j=0;j<p3c.length&&count<maxN;j++){used3[p3c[j]]=1;count++;}
+      var s3=Object.keys(used3).sort().join("");
+      return{text:axis+"-"+b1boat+"-"+s3,count:count};
+    }
+    // 本命1着固定でB1艇を3着に（2着は通常候補）
+    function makeB1as3(axis,b1boat,maxN){
+      if(!axis||!b1boat||axis===b1boat)return{text:"",count:0};
+      var p2c=[].concat(p2top,p2mid,p2rest).filter(function(b){return b!==axis&&b!==b1boat;});
+      var used2={},count=0;
+      for(var j=0;j<p2c.length&&count<maxN;j++){used2[p2c[j]]=1;count++;}
+      var s2=Object.keys(used2).sort().join("");
+      return{text:axis+"-"+s2+"-"+b1boat,count:count};
+    }
+    var motorB1Bets=motorB1Boats.map(function(b1boat){
+      return {b1:makeBet(b1boat,6),b2:makeB1as2(honmei,b1boat,6),b3:makeB1as3(honmei,b1boat,6)};
+    });
     var ana10=makeBet(anaBeat,10);
     var ana6=ana4; // 後方互換
 
@@ -1256,7 +1288,7 @@ function App() {
       honmei4:honmei4,honmei10:honmei10,honmei6:honmei6,
       taiko4:taiko4,taiko10:taiko10,taiko24:taiko24,taiko210:taiko210,taiko6:taiko6,taiko2:taiko2,
       ana4:ana4,ana10:ana10,ana6:ana6,
-      suichi:suichi,anaBeat:anaBeat,nukemeA:nukemeA,nukemeB:nukemeB,
+      suichi:suichi,anaBeat:anaBeat,nukemeA:nukemeA,nukemeB:nukemeB,motorB1Boats:motorB1Boats,motorB1Bets:motorB1Bets,
       sujiP2:sujiP2Boats,sujiP3:sujiP3Boats,honmeiKimari:honmeiKimari,sujiLabel:sujiLabel,
       rentan:rentan,sanrentan:sanrentan,nagashi2:nagashi2,
       excludedBoats:[],
@@ -1924,6 +1956,38 @@ function App() {
                 </div>
               </div>
             )}
+                  {yoso&&yoso.motorB1Boats&&yoso.motorB1Boats.length>0&&(
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:11,color:"#c084fc",marginBottom:6,fontWeight:700}}>
+                        ⚙ モーターB1軸（{yoso.motorB1Boats.map(function(b){return b+"号艇";}).join("・")}）
+                      </div>
+                      {yoso.motorB1Bets.map(function(bet,i){
+                        var b1boat=yoso.motorB1Boats[i];
+                        return (
+                          <div key={i} style={{marginBottom:8}}>
+                            {bet.b1&&bet.b1.count>0&&(
+                              <div style={{marginBottom:4}}>
+                                <div style={{fontSize:10,color:"#9db5cc",marginBottom:2}}>{b1boat}号艇1着固定 {bet.b1.count}点</div>
+                                <span style={{background:"#0e1b2c",borderRadius:6,padding:"6px 14px",fontSize:16,fontWeight:800,color:"#c084fc",letterSpacing:"0.05em"}}>{bet.b1.text}</span>
+                              </div>
+                            )}
+                            {bet.b2&&bet.b2.count>0&&(
+                              <div style={{marginBottom:4}}>
+                                <div style={{fontSize:10,color:"#9db5cc",marginBottom:2}}>{b1boat}号艇を2着に {bet.b2.count}点</div>
+                                <span style={{background:"#0e1b2c",borderRadius:6,padding:"6px 14px",fontSize:16,fontWeight:800,color:"#c084fc",letterSpacing:"0.05em"}}>{bet.b2.text}</span>
+                              </div>
+                            )}
+                            {bet.b3&&bet.b3.count>0&&(
+                              <div>
+                                <div style={{fontSize:10,color:"#9db5cc",marginBottom:2}}>{b1boat}号艇を3着に {bet.b3.count}点</div>
+                                <span style={{background:"#0e1b2c",borderRadius:6,padding:"6px 14px",fontSize:16,fontWeight:800,color:"#c084fc",opacity:0.8,letterSpacing:"0.05em"}}>{bet.b3.text}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
       </div>
     </div>
   );
