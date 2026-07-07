@@ -292,7 +292,7 @@ const VW={
 
 function emptyRace() {
   return {
-    pText:"",pMsg:"",shimekiri:null,
+    pText:"",pMsg:"",shimekiri:null,playerNums:null,playerAreas:null,
     motors:{1:null,2:null,3:null,4:null,5:null,6:null},
     racerStats:null,racerRaceCount:null,racerClass:null,
     stTable:null,stScore:null,
@@ -447,7 +447,13 @@ function parseRowByIndex(d){
   base.kimari=kimari;base.kimariCount=kimariCount;base.nigeSim=nigeSim;
   var shimekiriMatch=(g(d,0)||"").match(/締切(\d{1,2}:\d{2})/);
   var shimekiri=shimekiriMatch?shimekiriMatch[1]:null;
-  base.motors=motors;base.shimekiri=shimekiri;base.pMsg="✓ CSVから読み込みました";
+  // 選手番号（d[450]〜d[455]：1〜6号艇）
+  var playerNums=[null,null,null,null,null,null];
+  for(var b=1;b<=6;b++){var pn=g(d,449+b);if(pn&&pn.trim())playerNums[b-1]=pn.trim();}
+  // 登録地（d[456]〜d[461]：1〜6号艇、"91期\n岡山"形式）
+  var playerAreas=[null,null,null,null,null,null];
+  for(var b=1;b<=6;b++){var pa=g(d,455+b);if(pa&&pa.trim()){var parts=pa.trim().split("\n");playerAreas[b-1]=parts[parts.length-1]||null;}}
+  base.motors=motors;base.shimekiri=shimekiri;base.playerNums=playerNums;base.playerAreas=playerAreas;base.pMsg="✓ CSVから読み込みました";
   return base;
 }
 
@@ -921,6 +927,12 @@ function App() {
       return base;
     }
     // 総合スコア（2着）
+    // 同一支部補正（本命と同じ支部の艇は2着・3着に来やすい）
+    var honmeiArea=rd.playerAreas&&honmei?rd.playerAreas[honmei-1]:null;
+    function sameAreaBonus(b){
+      if(!honmeiArea||!rd.playerAreas)return 0;
+      return rd.playerAreas[b-1]===honmeiArea&&b!==honmei?2:0;
+    }
     // モーター2連対率スコア（場平均比較、最大5点）
     function motorScore(b){
       var m=rd.motors[b];
@@ -931,9 +943,9 @@ function App() {
       var avg=motorVals.reduce(function(a,c){return a+c;},0)/motorVals.length;
       return Math.min(5,Math.max(0,(m.ren2-avg)/10));
     }
-    function totalScore2(r){return r2(r)*0.5+classScore(r.boat)*1.5+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.5;}
+    function totalScore2(r){return r2(r)*0.5+classScore(r.boat)*1.5+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.5+sameAreaBonus(r.boat);}
     // 総合スコア（3着）
-    function totalScore3(r){return r3(r)*0.7+classScore(r.boat)*1+kimariScore(r)*0.2+motorScore(r.boat)*0.3;}
+    function totalScore3(r){return r3(r)*0.7+classScore(r.boat)*1+kimariScore(r)*0.2+motorScore(r.boat)*0.3+sameAreaBonus(r.boat)*0.5;}
 
     var b1row=rows.filter(function(r){return r.boat===1;})[0];
     var b1r1=b1row?r1(b1row):0;
@@ -1023,8 +1035,21 @@ function App() {
       },
     };
     function getMainKimari(boatRow){
-      if(!kc)return null;
       var ci=boatRow.course-1;
+      // 個人の決まり手率（直近1年優先、なければ直近6ヶ月）
+      var personalKim=rd.kimari&&rd.kimari["直近1年"]?rd.kimari["直近1年"]:rd.kimari&&rd.kimari["直近6ヶ月"]?rd.kimari["直近6ヶ月"]:null;
+      if(personalKim&&ci>0){
+        var pVals={
+          sashi:personalKim.sashi&&personalKim.sashi[ci-1]!=null?personalKim.sashi[ci-1]:0,
+          makuri:personalKim.makuri&&personalKim.makuri[ci-1]!=null?personalKim.makuri[ci-1]:0,
+          makurizashi:personalKim.makurizashi&&personalKim.makurizashi[ci-1]!=null?personalKim.makurizashi[ci-1]:0,
+        };
+        var pBest=null,pBestV=0;
+        Object.keys(pVals).forEach(function(k){if(pVals[k]>pBestV){pBestV=pVals[k];pBest=k;}});
+        if(pBestV>0)return pBest;
+      }
+      // フォールバック：場の決まり手集計
+      if(!kc)return null;
       var vals={sashi:kc.sashi&&kc.sashi[ci]!=null?kc.sashi[ci]:0,makuri:kc.makuri&&kc.makuri[ci]!=null?kc.makuri[ci]:0,makurizashi:kc.makurizashi&&kc.makurizashi[ci]!=null?kc.makurizashi[ci]:0};
       var best=null,bestV=0;
       Object.keys(vals).forEach(function(k){if(vals[k]>bestV){bestV=vals[k];best=k;}});
@@ -1071,9 +1096,34 @@ function App() {
     var sujiP2Boats=sujiData?(sujiData.p2.length>0?sujiData.p2.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):allOtherBoats):[];
     var sujiP3Boats=sujiData?(sujiData.p3.length>0?sujiData.p3.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):allOtherBoats):[];
 
+    // 逃げシミュレーション補正（本命1コースの時）
+    var ns=rd.nigeSim;
+    function nigeAdj2(r){
+      // 1号艇逃げ時の各コース進入艇の2着率補正
+      if(!ns||!ns.second)return 0;
+      var ci=r.course-2; // 2コース=index0
+      if(ci<0||ci>=ns.second.length)return 0;
+      var v=ns.second[ci];
+      return v!=null?v*0.3:0; // 重み30%
+    }
+    function nigeAdj3(r){
+      if(!ns||!ns.third)return 0;
+      var ci=r.course-2;
+      if(ci<0||ci>=ns.third.length)return 0;
+      var v=ns.third[ci];
+      return v!=null?v*0.3:0;
+    }
     // 2着・3着候補（除外: 10%未満）
-    var place2=rows.filter(function(r){return r2(r)>=10;}).sort(function(a,b){return totalScore2(b)-totalScore2(a);});
-    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){return totalScore3(b)-totalScore3(a);});
+    var place2=rows.filter(function(r){return r2(r)>=10;}).sort(function(a,b){
+      var sa=totalScore2(a)+(honmeiCourse===1?nigeAdj2(a):0);
+      var sb=totalScore2(b)+(honmeiCourse===1?nigeAdj2(b):0);
+      return sb-sa;
+    });
+    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){
+      var sa=totalScore3(a)+(honmeiCourse===1?nigeAdj3(a):0);
+      var sb=totalScore3(b)+(honmeiCourse===1?nigeAdj3(b):0);
+      return sb-sa;
+    });
 
     // 案B: スジ候補かつ着率高い→最優先、どちらか片方→優先、着率のみ→候補
     function classify2(r){
@@ -1284,7 +1334,17 @@ function App() {
       for(var si=0;si<p2all.length;si++){
         for(var sj=0;sj<p3all.length;sj++){
           if(p2all[si].boat===p3all[sj].boat)continue;
-          var score=r2(p2all[si])*r3(p3all[sj]);
+          // 1コース逃げの場合は逃げ出目確率も加味
+          var nigeBonus=0;
+          if(honmeiCourse===1&&ns&&ns.deme){
+            var demeIdx=ns.deme.indexOf?null:null;
+            // 出目確率：deme[0]=1-2, [1]=1-3, [2]=1-4, [3]=1-5, [4]=1-6
+            var c2=p2all[si].course,c3=p3all[sj].course;
+            var demeMap={2:0,3:1,4:2,5:3,6:4};
+            var di=demeMap[c2];
+            if(di!=null&&ns.deme[di]!=null)nigeBonus+=ns.deme[di]*0.5;
+          }
+          var score=r2(p2all[si])*r3(p3all[sj])+nigeBonus;
           if(score>bestScore){bestScore=score;suichi=honmei+"-"+p2all[si].boat+"-"+p3all[sj].boat;}
         }
       }
@@ -1349,7 +1409,7 @@ function App() {
       rentan:rentan,sanrentan:sanrentan,nagashi2:nagashi2,
       excludedBoats:[],
     };
-  },[result,rd.inputs,rd.stScore,rd.courses,rd.kimariCount,rd.racerRaceCount]);
+  },[result,rd.inputs,rd.stScore,rd.courses,rd.kimariCount,rd.racerRaceCount,rd.playerAreas]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
@@ -1635,6 +1695,8 @@ function App() {
                       {m&&m.ren2!=null&&<div>2連 <b style={{color:"#fff"}}>{m.ren2}%</b></div>}
                       {hasSt&&<div>ST <b style={{color:"#fff"}}>{rd.sts[b]}</b></div>}
                       {rd.tilts[b]!==""&&<div style={{color:parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#9db5cc"}}>チルト <b>{rd.tilts[b]}</b></div>}
+                      {rd.playerAreas&&rd.playerAreas[b-1]&&<div style={{color:"#7db4e8"}}>{rd.playerAreas[b-1]}</div>}
+                      {rd.playerNums&&rd.playerNums[b-1]&&<div style={{color:"#5a7a9a",fontSize:9}}>{rd.playerNums[b-1]}</div>}
                     </div>
                   </div>
                 );
