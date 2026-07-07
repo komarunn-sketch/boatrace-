@@ -395,8 +395,7 @@ function parseRowByIndex(d){
     return o;
   }
   var ren2adj=adjS(ren2raw,win1raw);
-  var ren3adj=adjS(ren3raw,ren2raw);
-  var racerStats={win1:cleanS(win1raw),ren2:cleanS(ren2adj),ren3:cleanS(ren3adj)};
+  var racerStats={win1:cleanS(win1raw),ren2:cleanS(ren2adj),ren3:cleanS(ren3raw)};
 
   var racerRaceCount=[91,92,93,94,95,96].map(function(i){
     var m=(g(d,i)).match(/\((\d+)\)/);return m?parseInt(m[1]):null;
@@ -682,7 +681,63 @@ function App() {
       });
     }
     var hasRacer=false;
+
+    // 総合3連対率計算（枠別3連対率＋モーター補正＋階級補正）
+    var motorRen3Vals=[];
+    for(var b=1;b<=6;b++){if(rd.motors[b]&&rd.motors[b].ren3!=null)motorRen3Vals.push(rd.motors[b].ren3);}
+    var motorRen3Avg=motorRen3Vals.length>=2?motorRen3Vals.reduce(function(a,c){return a+c;},0)/motorRen3Vals.length:null;
+    for(var i=0;i<rows.length;i++){
+      var rr=rows[i];
+      var rs2=rd.racerStats;
+      var base3=rs2&&rs2.ren3&&rs2.ren3[racerCat]?rs2.ren3[racerCat][rr.boat-1]:null;
+      if(base3!=null){
+        var m3=rd.motors[rr.boat];
+        var motorAdj3=m3&&m3.ren3!=null&&motorRen3Avg!=null?(m3.ren3-motorRen3Avg)*0.1:0;
+        var cl3=rd.racerClass?rd.racerClass[rr.boat-1]:null;
+        var classAdj3=cl3==="A1"?2:cl3==="A2"?1:cl3==="B1"?0:-1;
+        rows[i].ren3total=Math.max(0,+(base3+motorAdj3+classAdj3).toFixed(1));
+      } else {
+        rows[i].ren3total=null;
+      }
+    }
     for(var i=0;i<rows.length;i++){if(rows[i].racerR1final!=null||rows[i].racerR3final!=null)hasRacer=true;}
+
+    // AIスコアから予測確率を算出（各スコアを正規化）
+    // totalScore関数はyoso内で定義されているため、ここで同等の計算を行う
+    (function(){
+      // 各スコア計算（result.rowsを使用）
+      var motorVals2=[];
+      for(var b=1;b<=6;b++){if(rd.motors[b]&&rd.motors[b].ren2!=null)motorVals2.push({b:b,v:rd.motors[b].ren2});}
+      var mAvg2=motorVals2.length>=2?motorVals2.reduce(function(a,c){return a+c.v;},0)/motorVals2.length:null;
+      function cScore(b){var cl=rd.racerClass?rd.racerClass[b-1]:null;return cl==="A1"?4:cl==="A2"?3:cl==="B1"?2:1;}
+      function rScore(b){var rank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[b-1]:null;return rank!=null?Math.max(0,7-rank):0;}
+      function mScore(b){var m=rd.motors[b];if(!m||m.ren2==null||mAvg2==null)return 0;return Math.min(5,Math.max(0,(m.ren2-mAvg2)/10));}
+      function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var ci=r.course-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
+      var b1r=rows.filter(function(r){return r.boat===1;})[0];
+      var b1diff=b1r&&b1r.diff!=null&&b1r.diff<=0;
+      var s1=[],s2=[],s3=[];
+      for(var i=0;i<rows.length;i++){
+        var r=rows[i];
+        var r1v=r.racerR1final!=null?r.racerR1final:r.final1;
+        var r2v=r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;
+        var r3v=r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;
+        var ts1=r1v*0.6+cScore(r.boat)*2+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4;
+        if(r.boat===1&&b1diff)ts1-=10;
+        var ts2=r2v*0.5+cScore(r.boat)*1.5+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.5;
+        var ts3=r3v*0.7+cScore(r.boat)*1+kScore(r)*0.2+mScore(r.boat)*0.3;
+        s1.push({boat:r.boat,s:Math.max(0,ts1)});
+        s2.push({boat:r.boat,s:Math.max(0,ts2)});
+        s3.push({boat:r.boat,s:Math.max(0,ts3)});
+      }
+      var sum1=s1.reduce(function(a,c){return a+c.s;},0)||1;
+      var sum2=s2.reduce(function(a,c){return a+c.s;},0)||1;
+      var sum3=s3.reduce(function(a,c){return a+c.s;},0)||1;
+      for(var i=0;i<rows.length;i++){
+        rows[i].aiP1=+(s1[i].s/sum1*100).toFixed(1);
+        rows[i].aiP2=+(s2[i].s/sum2*100).toFixed(1);
+        rows[i].aiP3=+(s3[i].s/sum3*100).toFixed(1);
+      }
+    })();
     var sorted=null;
     if(hasRacer){
       sorted=rows.slice().sort(function(a,b){
@@ -1726,6 +1781,10 @@ function App() {
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想1着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想2着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想3着率</th>}
+                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#c084fc"}}>3連対率</th>}
+                        <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#f9c513"}}>AI1着</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#5dd39e"}}>AI2着</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#7db4e8"}}>AI3着</th>
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>逃げ</th>}
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>差し</th>}
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>捲り</th>}
@@ -1773,6 +1832,10 @@ function App() {
                             {result.racerRank&&pctC(r.racerR1final)}
                             {result.racerRank&&pctC(r.racerR2final)}
                             {result.racerRank&&pctC(r.racerR3final)}
+                            {result.racerRank&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:r.ren3total!=null?"#c084fc":"#4a5d70"}}>{r.ren3total!=null?(fmt(r.ren3total,1)+"%"):"―"}</td>}
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#f9c513"}}>{r.aiP1!=null?r.aiP1+"%":"―"}</td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#5dd39e"}}>{r.aiP2!=null?r.aiP2+"%":"―"}</td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#7db4e8"}}>{r.aiP3!=null?r.aiP3+"%":"―"}</td>
                             {kimariByBoat&&numC(kc?kc.nige:null)}
                             {kimariByBoat&&numC(kc?kc.sashi:null)}
                             {kimariByBoat&&numC(kc?kc.makuri:null)}
