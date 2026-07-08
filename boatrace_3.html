@@ -27,6 +27,12 @@
 const { useState, useMemo, useCallback } = React;
 
 
+const PLACE_NO = {
+  "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
+  "蒲郡":7,"常滑":8,"津":9,"三国":10,"びわこ":11,"住之江":12,
+  "尼崎":13,"鳴門":14,"丸亀":15,"児島":16,"宮島":17,"徳山":18,
+  "下関":19,"若松":20,"芦屋":21,"福岡":22,"唐津":23,"大村":24,
+};
 const VENUES = {
   "桐生":[50.2,11.8,13.6,13.7,8.6,2.4],"戸田":[44.5,16.2,16.1,14.1,6.7,2.7],"江戸川":[47.0,18.4,14.5,11.8,6.6,2.6],
   "平和島":[46.8,15.6,14.7,13.1,7.4,3.1],"多摩川":[53.0,14.0,13.3,10.7,7.1,2.3],"浜名湖":[52.6,13.3,15.5,10.6,7.0,1.6],
@@ -395,20 +401,24 @@ function parseRowByIndex(d){
     return o;
   }
   var ren2adj=adjS(ren2raw,win1raw);
-  var racerStats={win1:cleanS(win1raw),ren2:cleanS(ren2adj),ren3:cleanS(ren3raw)};
+  var ren3adj=adjS(ren3raw,ren2raw); // 3着率 = 3連対率 - 2連対率
+  var racerStats={win1:cleanS(win1raw),ren2:cleanS(ren2adj),ren3:cleanS(ren3adj),ren3raw:cleanS(ren3raw)};
 
   var racerRaceCount=[91,92,93,94,95,96].map(function(i){
     var m=(g(d,i)).match(/\((\d+)\)/);return m?parseInt(m[1]):null;
   });
 
   function pKim(base){
+    // base=ラベル行, base+2=逃げ率, base+4=逃し率, base+6=差され率
+    // base+8〜12=差し率(2〜6C), base+14=捲られ率
+    // base+16〜20=捲り率(2〜6C), base+22=捲られ差率, base+24〜28=捲り差し率(2〜6C)
     return {
-      nige:pf(g(d,base)),nigashi:pf(g(d,base+2)),sasare:pf(g(d,base+4)),
-      sashi:[1,2,3,4,5].map(function(j){return pf(g(d,base+5+j));}),
-      makurare:pf(g(d,base+12)),
-      makuri:[1,2,3,4,5].map(function(j){return pf(g(d,base+13+j));}),
-      makuraresashi:pf(g(d,base+20)),
-      makurizashi:[1,2,3,4,5].map(function(j){return pf(g(d,base+21+j));}),
+      nige:pf(g(d,base+2)),nigashi:pf(g(d,base+4)),sasare:pf(g(d,base+6)),
+      sashi:[0,1,2,3,4].map(function(j){return pf(g(d,base+8+j));}),
+      makurare:pf(g(d,base+14)),
+      makuri:[0,1,2,3,4].map(function(j){return pf(g(d,base+16+j));}),
+      makuraresashi:pf(g(d,base+22)),
+      makurizashi:[0,1,2,3,4].map(function(j){return pf(g(d,base+24+j));}),
     };
   }
   var kimari={"直近6ヶ月":pKim(254),"直近1年":pKim(283)};
@@ -695,7 +705,7 @@ function App() {
     for(var i=0;i<rows.length;i++){
       var rr=rows[i];
       var rs2=rd.racerStats;
-      var base3=rs2&&rs2.ren3&&rs2.ren3[racerCat]?rs2.ren3[racerCat][rr.boat-1]:null;
+      var base3=rs2&&rs2.ren3raw&&rs2.ren3raw[racerCat]?rs2.ren3raw[racerCat][rr.boat-1]:null;
       if(base3!=null){
         var m3=rd.motors[rr.boat];
         var motorAdj3=m3&&m3.ren3!=null&&motorRen3Avg!=null?(m3.ren3-motorRen3Avg)*0.1:0;
@@ -707,6 +717,14 @@ function App() {
       }
     }
     for(var i=0;i<rows.length;i++){if(rows[i].racerR1final!=null||rows[i].racerR3final!=null)hasRacer=true;}
+
+    // 展示タイム順位をrowsに格納（小さいほど速い）
+    var sumEntries=[];
+    for(var b=1;b<=6;b++){if(sums[b]!=null)sumEntries.push({b:b,s:sums[b]});}
+    sumEntries.sort(function(a,bb){return a.s-bb.s;});
+    var tjRankMap={};
+    for(var ti=0;ti<sumEntries.length;ti++)tjRankMap[sumEntries[ti].b]=ti+1;
+    for(var i=0;i<rows.length;i++){rows[i].tjRank=tjRankMap[rows[i].boat]||null;}
 
     // AIスコアから予測確率を算出（各スコアを正規化）
     // totalScore関数はyoso内で定義されているため、ここで同等の計算を行う
@@ -920,20 +938,24 @@ function App() {
     // 総合スコア（1着）
     function totalScore1(r){
       var base=r1(r)*0.6+classScore(r.boat)*2+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.4;
-      // 1号艇の差が0以下（展示が平均以上）なのに評価を下げる
-      if(r.boat===1&&r.diff!=null&&r.diff<=0){
-        base=base-10; // ペナルティ
-      }
+      if(r.boat===1&&r.diff!=null&&r.diff<=0){base=base-10;}
+      // ST×展示複合ボーナス（ST1位×展示1位→3着内79%、1着46%）
+      var stRank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[r.boat-1]:null;
+      var tjRank=r.tjRank||null;
+      if(stRank===1&&tjRank===1)base+=8;
+      else if(stRank===1&&tjRank<=2)base+=5;
+      else if(stRank<=2&&tjRank===1)base+=4;
+      else if(tjRank===1)base+=2;
+      else if(stRank===1)base+=2;
       return base;
     }
-    // 総合スコア（2着）
-    // 同一支部補正（本命と同じ支部の艇は2着・3着に来やすい）
+    // 同一支部補正
     var honmeiArea=rd.playerAreas&&honmei?rd.playerAreas[honmei-1]:null;
     function sameAreaBonus(b){
       if(!honmeiArea||!rd.playerAreas)return 0;
       return rd.playerAreas[b-1]===honmeiArea&&b!==honmei?2:0;
     }
-    // モーター2連対率スコア（場平均比較、最大5点）
+    // モーター2連対率スコア
     function motorScore(b){
       var m=rd.motors[b];
       if(!m||m.ren2==null)return 0;
@@ -943,9 +965,22 @@ function App() {
       var avg=motorVals.reduce(function(a,c){return a+c;},0)/motorVals.length;
       return Math.min(5,Math.max(0,(m.ren2-avg)/10));
     }
-    function totalScore2(r){return r2(r)*0.5+classScore(r.boat)*1.5+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.5+sameAreaBonus(r.boat);}
-    // 総合スコア（3着）
-    function totalScore3(r){return r3(r)*0.7+classScore(r.boat)*1+kimariScore(r)*0.2+motorScore(r.boat)*0.3+sameAreaBonus(r.boat)*0.5;}
+    // 展示タイム順位スコア（1位→5点、6位→0点）
+    function tenjiRankScore(b){
+      var rr=rows.filter(function(x){return x.boat===b;})[0];
+      if(!rr||rr.tjRank==null)return 0;
+      return Math.max(0,6-rr.tjRank);
+    }
+    function totalScore2(r){
+      return r2(r)*0.6+classScore(r.boat)*1.5+rankScore(r.boat)*0.5
+            +kimariScore(r)*0.3+motorScore(r.boat)*0.5
+            +tenjiRankScore(r.boat)*0.3+sameAreaBonus(r.boat);
+    }
+    function totalScore3(r){
+      return r3(r)*0.8+classScore(r.boat)*1+kimariScore(r)*0.2
+            +motorScore(r.boat)*0.3+tenjiRankScore(r.boat)*0.2
+            +sameAreaBonus(r.boat)*0.5;
+    }
 
     var b1row=rows.filter(function(r){return r.boat===1;})[0];
     var b1r1=b1row?r1(b1row):0;
@@ -1035,14 +1070,14 @@ function App() {
       },
     };
     function getMainKimari(boatRow){
-      var ci=boatRow.course-1;
+      var ci=boatRow.course-2; // 2コース→index0
       // 個人の決まり手率（直近1年優先、なければ直近6ヶ月）
       var personalKim=rd.kimari&&rd.kimari["直近1年"]?rd.kimari["直近1年"]:rd.kimari&&rd.kimari["直近6ヶ月"]?rd.kimari["直近6ヶ月"]:null;
-      if(personalKim&&ci>0){
+      if(personalKim&&ci>=0){
         var pVals={
-          sashi:personalKim.sashi&&personalKim.sashi[ci-1]!=null?personalKim.sashi[ci-1]:0,
-          makuri:personalKim.makuri&&personalKim.makuri[ci-1]!=null?personalKim.makuri[ci-1]:0,
-          makurizashi:personalKim.makurizashi&&personalKim.makurizashi[ci-1]!=null?personalKim.makurizashi[ci-1]:0,
+          sashi:personalKim.sashi&&personalKim.sashi[ci]!=null?personalKim.sashi[ci]:0,
+          makuri:personalKim.makuri&&personalKim.makuri[ci]!=null?personalKim.makuri[ci]:0,
+          makurizashi:personalKim.makurizashi&&personalKim.makurizashi[ci]!=null?personalKim.makurizashi[ci]:0,
         };
         var pBest=null,pBestV=0;
         Object.keys(pVals).forEach(function(k){if(pVals[k]>pBestV){pBestV=pVals[k];pBest=k;}});
@@ -1094,7 +1129,8 @@ function App() {
     // p2/p3が空=全艇候補（金）
     var allOtherBoats=rows.filter(function(r){return r.boat!==honmei;}).map(function(r){return r.boat;});
     var sujiP2Boats=sujiData?(sujiData.p2.length>0?sujiData.p2.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):allOtherBoats):[];
-    var sujiP3Boats=sujiData?(sujiData.p3.length>0?sujiData.p3.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):allOtherBoats):[];
+    // p3が空配列の場合はスジを3着に反映しない（通常の3着率ベースのみ）
+    var sujiP3Boats=sujiData&&sujiData.p3.length>0?sujiData.p3.map(courseToBeat).filter(function(b){return b!=null&&b!==honmei;}):[];
 
     // 逃げシミュレーション補正（本命1コースの時）
     var ns=rd.nigeSim;
@@ -1275,13 +1311,20 @@ function App() {
     var ana4=makeBet(anaBeat,6);
 
     // 特殊買目：1コース以外・モーターランク1〜10位・B1階級の艇を2着・3着に流す
+    // ren3totalの最小値（最下位判定）
+    var ren3totals=rows.map(function(r){return r.ren3total!=null?r.ren3total:null;}).filter(function(v){return v!=null;});
+    var ren3Min=ren3totals.length>0?Math.min.apply(null,ren3totals):null;
+
     var motorB1Beats=rows.filter(function(r){
       if(r.course===1)return false;
       var cl=rd.racerClass?rd.racerClass[r.boat-1]:null;
       if(cl!=="B1")return false;
       var m=rd.motors[r.boat];
       if(!m||m.rank==null)return false;
-      return m.rank>=1&&m.rank<=10;
+      if(!(m.rank>=1&&m.rank<=10))return false;
+      // ren3totalが最下位の場合は除外
+      if(ren3Min!=null&&r.ren3total!=null&&r.ren3total<=ren3Min)return false;
+      return true;
     });
     var motorB1Boats=motorB1Beats.map(function(r){return r.boat;});
     // 本命1着固定でB1艇を2着に（3着は通常候補）
@@ -1406,6 +1449,22 @@ function App() {
       ana4:ana4,ana10:ana10,ana6:ana6,
       suichi:suichi,anaBeat:anaBeat,nukemeA:nukemeA,nukemeB:nukemeB,motorB1Boats:motorB1Boats,motorB1Bets:motorB1Bets,
       sujiP2:sujiP2Boats,sujiP3:sujiP3Boats,honmeiKimari:honmeiKimari,sujiLabel:sujiLabel,
+      courseKimari:(function(){
+        var result2={};
+        rows.forEach(function(r){
+          if(r.course<=1)return;
+          var ci=r.course-2;
+          var kim=rd.kimari&&rd.kimari["直近1年"]?rd.kimari["直近1年"]:rd.kimari&&rd.kimari["直近6ヶ月"]?rd.kimari["直近6ヶ月"]:null;
+          if(!kim)return;
+          var vals={
+            sashi:kim.sashi&&kim.sashi[ci]!=null?kim.sashi[ci]:0,
+            makuri:kim.makuri&&kim.makuri[ci]!=null?kim.makuri[ci]:0,
+            makurizashi:kim.makurizashi&&kim.makurizashi[ci]!=null?kim.makurizashi[ci]:0,
+          };
+          result2[r.boat]={course:r.course,vals:vals};
+        });
+        return result2;
+      })(),
       rentan:rentan,sanrentan:sanrentan,nagashi2:nagashi2,
       excludedBoats:[],
     };
@@ -1521,17 +1580,30 @@ function App() {
             var sp=key.split("_");
             var vname=sp.slice(0,-1).join("_");
             var rnum=parseInt(sp[sp.length-1]);
-            var hasB1Motor=false;
+            // ren3totalの最下位を計算（racerStats.ren3rawから）
+            var rs2=r.racerStats;
+            var ren3vals2=[];
+            for(var b=1;b<=6;b++){
+              var v=rs2&&rs2.ren3raw&&rs2.ren3raw["直近1年"]?rs2.ren3raw["直近1年"][b-1]:null;
+              if(v!=null)ren3vals2.push({b:b,v:v});
+            }
+            var ren3min2=ren3vals2.length>0?Math.min.apply(null,ren3vals2.map(function(x){return x.v;})):null;
+
+            var b1motorBoats=[];
             for(var b=1;b<=6;b++){
               var course=r.courses?r.courses[b]:b;
               if(course===1)continue;
               var cl=r.racerClass[b-1];
               if(cl!=="B1")continue;
               var m=r.motors[b];
-              if(m&&m.rank!=null&&m.rank>=1&&m.rank<=10){hasB1Motor=true;break;}
+              if(!m||m.rank==null||!(m.rank>=1&&m.rank<=10))continue;
+              // ren3total最下位チェック
+              var bren3=rs2&&rs2.ren3raw&&rs2.ren3raw["直近1年"]?rs2.ren3raw["直近1年"][b-1]:null;
+              if(ren3min2!=null&&bren3!=null&&bren3<=ren3min2)continue;
+              b1motorBoats.push(b);
             }
-            if(!hasB1Motor)return;
-            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri||null});
+            if(b1motorBoats.length===0)return;
+            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri||null,boats:b1motorBoats});
           });
           items.sort(function(a,b){
             var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -1555,8 +1627,8 @@ function App() {
                         background:isActive?"#2c4762":"#16273c",
                         color:"#c084fc",
                         border:isActive?"2px solid #c084fc":"1px solid #4a2c6b",textAlign:"left"}}>
-                      <div style={{fontSize:9,color:"#9db5cc",marginBottom:1}}>{item.vname}</div>
-                      <div>{item.rnum}R{item.shimekiri&&" "+item.shimekiri}</div>
+                      <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.boats.join("・")}号艇</div>
+                      <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                     </button>
                   );
                 })}
@@ -1654,6 +1726,17 @@ function App() {
         )}
         {openPanel==="tenji"&&(
           <div style={{background:"#16273c",borderRadius:10,padding:12,marginBottom:12}}>
+            {venue&&PLACE_NO[venue]&&(function(){
+              var today=new Date();
+              var y=today.getFullYear();
+              var mo=String(today.getMonth()+1).padStart(2,"0");
+              var dy=String(today.getDate()).padStart(2,"0");
+              var hiduke=y+mo+dy;
+              var url="https://kyoteibiyori.com/race_shusso.php?place_no="+PLACE_NO[venue]+"&race_no="+curRace+"&hiduke="+hiduke+"&slider=4";
+              return <a href={url} target="_blank" rel="noreferrer" style={{display:"block",marginBottom:8,padding:"8px 12px",background:"#1d3149",borderRadius:8,border:"1px solid #3d7ab8",color:"#7db4e8",fontSize:13,fontWeight:700,textAlign:"center",textDecoration:"none"}}>
+                🌐 展示情報を開く（{venue} {curRace}R）
+              </a>;
+            })()}
             <textarea value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" rows={5} style={{width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:8,padding:10,fontSize:13,resize:"vertical"}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
               <button onClick={parseTenji} style={btnS("#3d7ab8","#fff")}>解析して入力</button>
@@ -2025,6 +2108,28 @@ function App() {
                         スジ（{yoso.sujiLabel}）
                         {yoso.sujiP2.length>0&&<span> 2着: {yoso.sujiP2.join("・")}号艇</span>}
                         {yoso.sujiP3.length>0&&<span> 3着: {yoso.sujiP3.join("・")}号艇</span>}
+                      </div>
+                    )}
+                    {yoso.courseKimari&&Object.keys(yoso.courseKimari).length>0&&(
+                      <div style={{marginTop:8,background:"#0e1b2c",borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{fontSize:10,color:"#7da3c8",marginBottom:5,fontWeight:700}}>予想決まり手（個人成績）</div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4}}>
+                          {Object.keys(yoso.courseKimari).map(function(boat){
+                            var ck=yoso.courseKimari[boat];
+                            var best=null,bestV=0;
+                            Object.keys(ck.vals).forEach(function(k){if(ck.vals[k]>bestV){bestV=ck.vals[k];best=k;}});
+                            var label=best==="sashi"?"差し":best==="makuri"?"捲り":best==="makurizashi"?"捲り差し":"―";
+                            return (
+                              <div key={boat} style={{display:"flex",alignItems:"center",gap:5}}>
+                                <LB b={parseInt(boat)}/>
+                                <div>
+                                  <div style={{fontSize:11,fontWeight:700,color:best==="sashi"?"#5dd39e":best==="makuri"?"#f9c513":"#c084fc"}}>{label}</div>
+                                  {bestV>0&&<div style={{fontSize:9,color:"#7da3c8"}}>{bestV.toFixed(1)}%</div>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
