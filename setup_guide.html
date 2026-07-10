@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>展示コピー機能 導入ガイド</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: #0e1b2c; color: #fff; font-family: -apple-system, sans-serif; }
+  .header { background: #1d3149; padding: 20px 16px; text-align: center; border-bottom: 2px solid #3d7ab8; }
+  .header h1 { margin: 0; font-size: 20px; color: #7db4e8; }
+  .header p { margin: 8px 0 0; font-size: 13px; color: #9db5cc; }
+  .section { padding: 20px 16px; border-bottom: 1px solid #1d3149; }
+  .section h2 { font-size: 15px; color: #7db4e8; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .step { background: #16273c; border-radius: 10px; padding: 14px; margin-bottom: 10px; border-left: 3px solid #3d7ab8; }
+  .step-num { display: inline-block; background: #3d7ab8; color: #fff; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 13px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+  .step-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; }
+  .step-desc { font-size: 13px; color: #9db5cc; line-height: 1.6; }
+  .step-desc b { color: #fff; }
+  .code-box { background: #0e1b2c; border: 1px solid #2c4762; border-radius: 8px; padding: 12px; margin-top: 8px; font-family: monospace; font-size: 12px; color: #5dd39e; word-break: break-all; line-height: 1.5; }
+  .copy-btn { display: block; width: 100%; margin-top: 8px; padding: 10px; background: #1d4a7a; border: 1px solid #3d7ab8; border-radius: 8px; color: #7db4e8; font-size: 13px; font-weight: 700; text-align: center; cursor: pointer; }
+  .copy-btn:active { background: #2a5a8a; }
+  .tag { display: inline-block; background: #1d4a7a; color: #7db4e8; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+  .usage-flow { display: flex; flex-direction: column; gap: 8px; }
+  .flow-item { background: #16273c; border-radius: 8px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+  .flow-icon { font-size: 24px; flex-shrink: 0; }
+  .flow-text { font-size: 13px; line-height: 1.5; }
+  .flow-text b { color: #5dd39e; }
+  .arrow { text-align: center; color: #3d7ab8; font-size: 18px; }
+  .note { background: #1a2f1a; border: 1px solid #2d5a2d; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #7db57d; line-height: 1.6; }
+  .warning { background: #2f1a1a; border: 1px solid #5a2d2d; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #b57d7d; line-height: 1.6; }
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1a3a5c; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: bold; z-index: 9999; border: 1px solid #3d7ab8; display: none; white-space: nowrap; }
+  .dl-btn { display: block; width: 100%; padding: 14px; background: #1d4a7a; border: 2px solid #3d7ab8; border-radius: 10px; color: #fff; font-size: 15px; font-weight: 700; text-align: center; text-decoration: none; margin-top: 12px; }
+  .tab { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn { flex: 1; padding: 10px; border: 1px solid #2c4762; border-radius: 8px; background: #16273c; color: #9db5cc; font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; }
+  .tab-btn.active { background: #1d4a7a; border-color: #3d7ab8; color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 展示コピー機能 導入ガイド</h1>
+  <p>ボートレース日和の展示データをワンタップでコピー</p>
+</div>
+
+<div class="section">
+  <h2>🎯 できること</h2>
+  <div class="usage-flow">
+    <div class="flow-item">
+      <div class="flow-icon">🌐</div>
+      <div class="flow-text">予想ツールの「展示情報を開く」をタップ</div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="flow-item">
+      <div class="flow-icon">📄</div>
+      <div class="flow-text">「直前情報」タブをタップして展示データを表示</div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="flow-item">
+      <div class="flow-icon">📋</div>
+      <div class="flow-text">右下の「<b>展示コピー</b>」ボタンをタップ</div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="flow-item">
+      <div class="flow-icon">✅</div>
+      <div class="flow-text">予想ツールに戻って貼り付け → <b>自動解析</b>完了！</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>⚙️ 導入方法を選んでください</h2>
+  <div class="tab">
+    <div class="tab-btn active" onclick="switchTab('userscripts')">Userscripts<br><span style="font-size:11px;font-weight:400;">推奨・自動実行</span></div>
+    <div class="tab-btn" onclick="switchTab('bookmark')">ブックマークレット<br><span style="font-size:11px;font-weight:400;">アプリ不要</span></div>
+  </div>
+
+  <!-- Userscripts タブ -->
+  <div id="tab-userscripts" class="tab-content active">
+    <div class="step">
+      <div class="step-title"><span class="step-num">1</span>Userscriptsアプリをインストール</div>
+      <div class="step-desc">App Storeで「<b>Userscripts</b>」を検索してインストール（無料）</div>
+      <a href="https://apps.apple.com/jp/app/userscripts/id1463298887" class="dl-btn">📲 App Storeで開く</a>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2</span>Safariで拡張機能を有効化</div>
+      <div class="step-desc">
+        <b>設定</b> → <b>Safari</b> → <b>機能拡張</b> → <b>Userscripts</b> → オンにする
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3</span>スクリプトファイルを保存するフォルダを作成</div>
+      <div class="step-desc">
+        「<b>ファイル</b>」アプリを開く → iCloud Drive内に「<b>Userscripts</b>」フォルダを新規作成
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">4</span>Userscriptsアプリでフォルダを指定</div>
+      <div class="step-desc">
+        Userscriptsアプリを開く → 「<b>Change Userscripts Directory</b>」をタップ → 手順3で作ったフォルダを選択
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">5</span>スクリプトファイルをフォルダに入れる</div>
+      <div class="step-desc">
+        下のボタンでスクリプトをダウンロード → 「ファイル」アプリで手順3のフォルダに移動
+      </div>
+      <a href="boatrace_tenji.user.js" download class="dl-btn">⬇️ スクリプトをダウンロード</a>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">6</span>Safariで展示ページを開いて許可</div>
+      <div class="step-desc">
+        展示ページを開く → アドレスバー左の「<b>ぁあ</b>」→「<b>Userscripts</b>」→ 許可する<br>
+        右下に「📋 展示コピー」ボタンが表示されれば完了！
+      </div>
+    </div>
+
+    <div class="note">
+      ✅ 一度設定すればボートレース日和の展示ページを開くたびに自動でボタンが表示されます
+    </div>
+  </div>
+
+  <!-- ブックマークレット タブ -->
+  <div id="tab-bookmark" class="tab-content">
+    <div class="step">
+      <div class="step-title"><span class="step-num">1</span>Safariで適当なページをブックマーク登録</div>
+      <div class="step-desc">
+        任意のページで「共有」→「ブックマークを追加」→ 名前を「<b>展示コピー</b>」に変更して保存
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2</span>ブックマークのURLを書き換える</div>
+      <div class="step-desc">
+        ブックマーク一覧を開く → 「展示コピー」を長押し → 「編集」→ URLを以下に書き換えて保存
+      </div>
+      <div class="code-box" id="bookmarklet-code">javascript:(function(){var rowOrder=['進入','展示','周回','周り足','直線','ST','体重','調整重量','チルト'];var rows={};document.querySelectorAll('td.shusso_title.komoku_title').forEach(function(td){var label=td.textContent.trim();if(!rowOrder.includes(label))return;var tr=td.closest('tr');if(!tr)return;var cells=tr.querySelectorAll('td.font100.center');var values=Array.from(cells).map(function(c){return c.textContent.trim().replace(/[^\d.\-F]/g,'');}).filter(function(v){return v!=='';});if(values.length>0)rows[label]=values;});if(Object.keys(rows).length===0){alert('展示データが見つかりません。直前情報タブを開いてから実行してください。');return;}var lines=['展示情報','進入\t1\t2\t3\t4\t5\t6'];rowOrder.forEach(function(label){if(rows[label])lines.push(label+'\t'+rows[label].join('\t'));});var text=lines.join('\n');var ta=document.createElement('textarea');ta.value=text;ta.style='position:fixed;opacity:0;top:0;left:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');alert('✅ コピーしました！予想ツールに貼り付けてください');}catch(e){alert(text);}document.body.removeChild(ta);})();</div>
+      <button class="copy-btn" onclick="copyBookmarklet()">📋 URLをコピー</button>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3</span>展示ページで実行</div>
+      <div class="step-desc">
+        展示ページの「直前情報」タブを開く → ブックマーク一覧から「展示コピー」をタップ → 予想ツールに貼り付け
+      </div>
+    </div>
+
+    <div class="warning">
+      ⚠️ iOSのSafariではブックマークレットが動作しない場合があります。その場合はUserscripts方式をお試しください。
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>❓ うまくいかない場合</h2>
+  <div class="step">
+    <div class="step-title">「展示データが見つかりません」と表示される</div>
+    <div class="step-desc">「<b>直前情報</b>」タブをタップしてから再度「展示コピー」をタップしてください</div>
+  </div>
+  <div class="step">
+    <div class="step-title">ボタンが表示されない（Userscripts）</div>
+    <div class="step-desc">アドレスバー左の「ぁあ」→「Userscripts」→ 許可する、を確認してください</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✅ コピーしました！</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.closest('.tab-btn').classList.add('active');
+}
+
+function copyBookmarklet() {
+  const text = document.getElementById('bookmarklet-code').textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast());
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast();
+  }
+}
+
+function showToast() {
+  const t = document.getElementById('toast');
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2000);
+}
+</script>
+</body>
+</html>
