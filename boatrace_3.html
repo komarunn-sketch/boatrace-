@@ -277,7 +277,7 @@ const FIELDS=[{key:"tenji",label:"展示"},{key:"isshu",label:"周回"},{key:"ma
 const emptyInput=function(){return{tenji:"",isshu:"",mawari:"",chokusen:""};};
 const ST_OPT=Array.from({length:41},function(_,i){return(i/100).toFixed(2);});
 const TILT_OPT=["-0.5","0.0","0.5","1.0","1.5","2.0","2.5","3.0"];
-const RCATS=["今期","直近1年","直近6ヶ月","直近3ヶ月","直近1ヶ月","当地","一般戦","SG/G1","女子戦"];
+const RCATS=["今期","直近1年","直近6ヶ月","直近3ヶ月","直近1ヶ月","当地","全期間","一般戦","SG/G1","女子戦"];
 const STPS=["今期","今節","直近3ヶ月","直近1ヶ月","初日","最終日","ナイター"];
 const KPERIODS=["直近6ヶ月","直近1年"];
 const RNUMS=[1,2,3,4,5,6,7,8,9,10,11,12];
@@ -339,6 +339,118 @@ function parseCSVFull(text){
   }
   if(cur||row.length){row.push(cur);for(var k=0;k<row.length;k++){if(row[k].trim()){rows.push(row.slice());break;}}}
   return rows;
+}
+
+function parseNewCSV(allRows){
+  function pf(v){var n=parseFloat((v||"").replace(/%/g,"").trim());return isNaN(n)?null:n;}
+  function pi(v){var n=parseInt(v);return isNaN(n)?null:n;}
+  var raceMap={};
+  for(var ri=1;ri<allRows.length;ri++){
+    var row=allRows[ri];
+    if(row.length<20)continue;
+    var vname=(row[15]||"").trim();
+    var rnum=pi(row[16]);
+    if(!vname||!rnum||rnum<1||rnum>12)continue;
+    if(!VENUES[vname])continue;
+    var key=rk(vname,rnum);
+    if(!raceMap[key]){raceMap[key]={vname:vname,rnum:rnum,shimekiri:(row[18]||"").trim()||null,boats:[]};}
+    raceMap[key].boats.push(row);
+  }
+  var updated={};
+  var keys=Object.keys(raceMap);
+  for(var ki=0;ki<keys.length;ki++){
+    var key=keys[ki];
+    var rd=raceMap[key];
+    var boats=rd.boats;
+    if(boats.length<1)continue;
+    var base=emptyRace();
+    base.shimekiri=rd.shimekiri;
+    base.pMsg="✓ CSVから読み込みました";
+    var racerClass=[null,null,null,null,null,null];
+    var playerNums=[null,null,null,null,null,null];
+    var playerAreas=[null,null,null,null,null,null];
+    var win1_1y=[null,null,null,null,null,null];
+    var ren2_1y=[null,null,null,null,null,null];
+    var ren3_1y=[null,null,null,null,null,null];
+    var ren3raw_1y=[null,null,null,null,null,null];
+    var st_1y=[null,null,null,null,null,null];
+    var kc_nige=[null,null,null,null,null,null];
+    var kc_sashi=[null,null,null,null,null,null];
+    var kc_makuri=[null,null,null,null,null,null];
+    var kc_makurizashi=[null,null,null,null,null,null];
+    var raceCount=[null,null,null,null,null,null];
+    // 期間別データ格納用
+    var PERIOD_COLS={
+      "直近1ヶ月":[19,21,23,25,27,29,31,33,35],
+      "直近3ヶ月":[39,41,43,45,47,49,51,53,55],
+      "直近6ヶ月":[59,61,63,65,67,69,71,73,75],
+      "直近1年":  [79,81,83,85,87,89,91,93,95],
+      "全期間":   [99,101,103,105,107,109,111,113,115],
+      "当地":     [80,82,84,86,88,90,92,94,96],
+    };
+    var periodData={};
+    var catNames=Object.keys(PERIOD_COLS);
+    for(var ci=0;ci<catNames.length;ci++){
+      periodData[catNames[ci]]={
+        win1:[null,null,null,null,null,null],
+        ren2:[null,null,null,null,null,null],
+        ren3:[null,null,null,null,null,null],
+        ren3raw:[null,null,null,null,null,null],
+        raceCount:[null,null,null,null,null,null],
+      };
+    }
+    for(var bi=0;bi<boats.length;bi++){
+      var row=boats[bi];
+      var b=pi(row[0]);
+      if(!b||b<1||b>6)continue;
+      var idx=b-1;
+      racerClass[idx]=(row[6]||"").trim()||null;
+      playerNums[idx]=(row[1]||"").trim()||null;
+      playerAreas[idx]=(row[4]||"").trim()||null;
+      // 各期間のデータを格納
+      for(var ci=0;ci<catNames.length;ci++){
+        var cat=catNames[ci];
+        var cols=PERIOD_COLS[cat];
+        var w1=pf(row[cols[1]]);
+        var r2=pf(row[cols[2]]);
+        var r3raw=pf(row[cols[3]]);
+        periodData[cat].raceCount[idx]=pi(row[cols[0]]);
+        periodData[cat].win1[idx]=w1;
+        periodData[cat].ren2[idx]=(w1!=null&&r2!=null)?Math.max(0,+(r2-w1).toFixed(1)):r2;
+        periodData[cat].ren3raw[idx]=r3raw;
+        periodData[cat].ren3[idx]=(r2!=null&&r3raw!=null)?Math.max(0,+(r3raw-r2).toFixed(1)):r3raw;
+      }
+      // 直近1年のST・決まり手（スコア計算用）
+      st_1y[idx]=pf(row[87]);
+      kc_nige[idx]=pi(row[89]);
+      kc_sashi[idx]=pi(row[91]);
+      kc_makuri[idx]=pi(row[93]);
+      kc_makurizashi[idx]=pi(row[95]);
+      raceCount[idx]=pi(row[79]);
+      base.motors[b]={ren2:pf(row[122]),ren3:pf(row[123]),rank:pi(row[119]),rate:pf(row[121])};
+    }
+    base.racerClass=racerClass;
+    base.playerNums=playerNums;
+    base.playerAreas=playerAreas;
+    base.racerRaceCount=raceCount;
+    base.kimariCount={nige:kc_nige,sashi:kc_sashi,makuri:kc_makuri,makurizashi:kc_makurizashi};
+    base.racerStats={win1:{},ren2:{},ren3:{},ren3raw:{}};
+    for(var ci=0;ci<catNames.length;ci++){
+      var cat=catNames[ci];
+      base.racerStats.win1[cat]=periodData[cat].win1;
+      base.racerStats.ren2[cat]=periodData[cat].ren2;
+      base.racerStats.ren3[cat]=periodData[cat].ren3;
+      base.racerStats.ren3raw[cat]=periodData[cat].ren3raw;
+    }
+    base.stScore={rate:st_1y,rank:[null,null,null,null,null,null],st1y:st_1y};
+    var stEntries=[];
+    for(var bi2=0;bi2<6;bi2++){if(st_1y[bi2]!=null)stEntries.push({idx:bi2,v:st_1y[bi2]});}
+    stEntries.sort(function(a,bv){return a.v-bv.v;});
+    for(var si=0;si<stEntries.length;si++){base.stScore.rank[stEntries[si].idx]=si+1;}
+    if(!updated[rd.vname])updated[rd.vname]={};
+    updated[rd.vname][rd.rnum]=base;
+  }
+  return updated;
 }
 
 function parseRowByIndex(d){
@@ -501,27 +613,38 @@ function App() {
         var allRows=parseCSVFull(ev.target.result);
         if(allRows.length<2){setCsvMsg("データ行が見つかりません");return;}
         var headers=allRows[0];
-        var idxV=headers.indexOf("場所3");
+        var isNewFormat=headers[15]==="場名"&&headers[16]==="レース番号";
         var imported=0,updated={},skipLog={};
-        for(var ri=1;ri<allRows.length;ri++){
-          var row=allRows[ri];
-          if(row.length<10){skipLog["列数不足"]=(skipLog["列数不足"]||0)+1;continue;}
-          var vname=(row[idxV]||"").trim();
-          if(!vname||!VENUES[vname]){skipLog["場名:"+vname]=(skipLog["場名:"+vname]||0)+1;continue;}
-          var rtxt=(row[5]||"").trim();
-          var rm=rtxt.match(/^(\d+)R/);
-          var rnum=rm?parseInt(rm[1]):null;
-          if(!rnum||rnum<1||rnum>12){skipLog["raceNo不明"]=(skipLog["raceNo不明"]||0)+1;continue;}
-          try{
-            var parsed=parseRowByIndex(row.slice(5));
-            var col3=(row[3]||"").trim();
-            if(/^\d{1,2}:\d{2}$/.test(col3))parsed.shimekiri=col3;
-            if(!updated[vname])updated[vname]={};
-            updated[vname][rnum]=parsed;
-            imported++;
-          }catch(err){
-            var ek="エラー:"+err.message.slice(0,30);
-            skipLog[ek]=(skipLog[ek]||0)+1;
+        if(isNewFormat){
+          // 新フォーマット: 1行=1艇
+          updated=parseNewCSV(allRows);
+          var vkeys=Object.keys(updated);
+          for(var vi=0;vi<vkeys.length;vi++){
+            imported+=Object.keys(updated[vkeys[vi]]).length;
+          }
+        } else {
+          // 旧フォーマット: 1行=1レース（ボートレース日和）
+          var idxV=headers.indexOf("場所3");
+          for(var ri=1;ri<allRows.length;ri++){
+            var row=allRows[ri];
+            if(row.length<10){skipLog["列数不足"]=(skipLog["列数不足"]||0)+1;continue;}
+            var vname=(row[idxV]||"").trim();
+            if(!vname||!VENUES[vname]){skipLog["場名:"+vname]=(skipLog["場名:"+vname]||0)+1;continue;}
+            var rtxt=(row[5]||"").trim();
+            var rm=rtxt.match(/^(\d+)R/);
+            var rnum=rm?parseInt(rm[1]):null;
+            if(!rnum||rnum<1||rnum>12){skipLog["raceNo不明"]=(skipLog["raceNo不明"]||0)+1;continue;}
+            try{
+              var parsed=parseRowByIndex(row.slice(5));
+              var col3=(row[3]||"").trim();
+              if(/^\d{1,2}:\d{2}$/.test(col3))parsed.shimekiri=col3;
+              if(!updated[vname])updated[vname]={};
+              updated[vname][rnum]=parsed;
+              imported++;
+            }catch(err){
+              var ek="エラー:"+err.message.slice(0,30);
+              skipLog[ek]=(skipLog[ek]||0)+1;
+            }
           }
         }
         if(imported===0){setCsvMsg("取り込めませんでした");setCsvDebug({log:JSON.stringify(skipLog)});return;}
