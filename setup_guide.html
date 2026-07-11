@@ -111,7 +111,8 @@
       <div class="step-desc">
         下のボタンでスクリプトをダウンロード → 「ファイル」アプリで手順3のフォルダに移動
       </div>
-      <a href="boatrace_tenji.user.js" download class="dl-btn">⬇️ スクリプトをダウンロード</a>
+      <button class="copy-btn" onclick="copyScript()" style="font-size:14px;padding:14px;">📋 スクリプトをコピー</button>
+      <div class="step-desc" style="margin-top:8px;">コピーしたら「ファイル」アプリで新規テキストファイルを作成し、内容を貼り付けて<b>boatrace_tenji.user.js</b>という名前でUserscriptsフォルダに保存してください</div>
     </div>
 
     <div class="step">
@@ -173,6 +174,176 @@
 <div class="toast" id="toast">✅ コピーしました！</div>
 
 <script>
+const SCRIPT_CONTENT = `// ==UserScript==
+// @name         ボートレース展示情報コピー
+// @namespace    https://kyoteibiyori.com/
+// @version      1.1
+// @description  ボートレース日和の展示情報を自動でコピー用テキストに整形
+// @match        https://kyoteibiyori.com/race_shusso.php*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+  'use strict';
+
+  if (document.getElementById('tenji-copy-btn')) return;
+
+  function extractTenji() {
+    const rowOrder = ['進入','展示','周回','周り足','直線','ST','体重','調整重量','チルト'];
+    const rows = {};
+
+    // shusso_title komoku_titleクラスのtdを全取得
+    const labelCells = document.querySelectorAll('td.shusso_title.komoku_title');
+
+    labelCells.forEach(td => {
+      const label = td.textContent.trim();
+      if (!rowOrder.includes(label)) return;
+      const tr = td.closest('tr');
+      if (!tr) return;
+      // 数値セル：font100 centerクラス
+      const cells = tr.querySelectorAll('td.font100.center');
+      const values = Array.from(cells).map(c => {
+        // %などの記号を含む場合は数値部分だけ取得
+        return c.textContent.trim().replace(/[^\\d.\\-F]/g, '') || c.textContent.trim();
+      }).filter(v => v !== '');
+      if (values.length > 0) rows[label] = values;
+    });
+
+    if (Object.keys(rows).length === 0) {
+      alert('展示データが見つかりませんでした。\\n直前情報タブを開いてから再度タップしてください。');
+      return null;
+    }
+
+    // テキスト整形（予想ツールのペースト形式に合わせる）
+    const lines = ['展示情報'];
+    const header = ['進入','1','2','3','4','5','6'].join('\\t');
+    lines.push(header);
+    rowOrder.forEach(label => {
+      if (rows[label]) {
+        lines.push([label, ...rows[label]].join('\\t'));
+      }
+    });
+
+    return lines.join('\\n');
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('✅ コピーしました！予想ツールに貼り付けてください');
+      }).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('✅ コピーしました！予想ツールに貼り付けてください');
+    } catch(e) {
+      showTextArea(text);
+    }
+    document.body.removeChild(ta);
+  }
+
+  function showToast(msg) {
+    const toast = document.createElement('div');
+    toast.textContent = msg;
+    toast.style.cssText = \`
+      position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+      background:#1a3a5c;color:#fff;padding:12px 20px;
+      border-radius:8px;font-size:14px;font-weight:bold;
+      z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.4);
+      border:1px solid #3d7ab8;white-space:nowrap;
+    \`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function showTextArea(text) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = \`
+      position:fixed;top:0;left:0;right:0;bottom:0;
+      background:rgba(0,0,0,0.7);z-index:99998;
+      display:flex;align-items:center;justify-content:center;
+    \`;
+    const box = document.createElement('div');
+    box.style.cssText = \`
+      background:#0e1b2c;border:1px solid #3d7ab8;border-radius:12px;
+      padding:16px;width:90%;max-width:400px;
+    \`;
+    box.innerHTML = \`
+      <div style="color:#7db4e8;font-size:13px;margin-bottom:8px;">全選択してコピーしてください</div>
+      <textarea id="tenji-ta" style="width:100%;height:160px;background:#16273c;color:#fff;
+        border:1px solid #2c4762;border-radius:6px;padding:8px;font-size:12px;
+        box-sizing:border-box;">\${text}</textarea>
+      <button id="tenji-close" style="margin-top:8px;width:100%;padding:10px;
+        background:#3d7ab8;color:#fff;border:none;border-radius:6px;
+        font-size:14px;cursor:pointer;">閉じる</button>
+    \`;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    document.getElementById('tenji-ta').select();
+    document.getElementById('tenji-close').onclick = () => overlay.remove();
+    overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  }
+
+  // フローティングボタン
+  const btn = document.createElement('button');
+  btn.id = 'tenji-copy-btn';
+  btn.textContent = '📋 展示コピー';
+  btn.style.cssText = \`
+    position:fixed;bottom:20px;right:16px;
+    background:#1d3d6b;color:#fff;
+    border:2px solid #3d7ab8;border-radius:24px;
+    padding:12px 20px;font-size:15px;font-weight:bold;
+    cursor:pointer;z-index:99997;
+    box-shadow:0 4px 12px rgba(0,0,0,0.4);
+    -webkit-tap-highlight-color:transparent;
+  \`;
+
+  btn.addEventListener('click', () => {
+    const text = extractTenji();
+    if (text) copyToClipboard(text);
+  });
+
+  // 動的コンテンツ対応（MutationObserver）
+  function addButton() {
+    if (!document.getElementById('tenji-copy-btn')) {
+      document.body.appendChild(btn);
+    }
+  }
+
+  const observer = new MutationObserver(() => addButton());
+  observer.observe(document.body, { childList: true, subtree: true });
+  addButton();
+
+})();
+`;
+
+function copyScript() {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(SCRIPT_CONTENT).then(() => showToast('✅ スクリプトをコピーしました！'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = SCRIPT_CONTENT;
+    ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ スクリプトをコピーしました！');
+  }
+}
+
+
+
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -196,10 +367,11 @@ function copyBookmarklet() {
   }
 }
 
-function showToast() {
+function showToast(msg) {
   const t = document.getElementById('toast');
+  t.textContent = msg || '✅ コピーしました！';
   t.style.display = 'block';
-  setTimeout(() => t.style.display = 'none', 2000);
+  setTimeout(() => t.style.display = 'none', 2500);
 }
 </script>
 </body>
