@@ -312,6 +312,7 @@ function emptyRace() {
     weights:{1:"",2:"",3:"",4:"",5:"",6:""},
     courses:{1:1,2:2,3:3,4:4,5:5,6:6},
     wind:"無風",
+    tokuten:null,
   };
 }
 function rk(v,r){return v+"_"+r;}
@@ -383,11 +384,11 @@ function parseNewCSV(allRows){
     // 期間別データ格納用
     var PERIOD_COLS={
       "直近1ヶ月":[19,21,23,25,27,29,31,33,35],
-      "直近3ヶ月":[39,41,43,45,47,49,51,53,55],
-      "直近6ヶ月":[59,61,63,65,67,69,71,73,75],
-      "直近1年":  [79,81,83,85,87,89,91,93,95],
-      "全期間":   [99,101,103,105,107,109,111,113,115],
-      "当地":     [80,82,84,86,88,90,92,94,96],
+      "直近3ヶ月":[43,45,47,49,51,53,55,57,59],
+      "直近6ヶ月":[67,69,71,73,75,81,83,85,87],
+      "直近1年":  [91,93,95,97,99,103,105,107,109],
+      "全期間":   [115,117,119,121,123,127,129,131,133],
+      "当地":     [92,94,96,98,100,104,106,108,110],
     };
     var periodData={};
     var catNames=Object.keys(PERIOD_COLS);
@@ -422,14 +423,16 @@ function parseNewCSV(allRows){
         periodData[cat].ren3[idx]=(r2!=null&&r3raw!=null)?Math.max(0,+(r3raw-r2).toFixed(1)):r3raw;
       }
       // 直近1年のST・決まり手（スコア計算用）
-      st_1y[idx]=pf(row[87]);
-      kc_nige[idx]=pi(row[69]);
-      kc_sashi[idx]=pi(row[71]);
-      kc_makuri[idx]=pi(row[73]);
-      kc_makurizashi[idx]=pi(row[75]);
-      kc_nuki[idx]=pi(row[77]);
-      raceCount[idx]=pi(row[59]);
-      base.motors[b]={ren2:pf(row[122]),ren3:pf(row[123]),rank:pi(row[119]),rate:pf(row[121])};
+      st_1y[idx]=pf(row[99]);
+      kc_nige[idx]=pi(row[81]);
+      kc_sashi[idx]=pi(row[83]);
+      kc_makuri[idx]=pi(row[85]);
+      kc_makurizashi[idx]=pi(row[87]);
+      kc_nuki[idx]=pi(row[89]);
+      raceCount[idx]=pi(row[67]);
+      if(!base.tokuten)base.tokuten={};
+      base.tokuten[b]={rate:pf(row[149]),score:pf(row[150]),minus:pf(row[151]),nodes:pi(row[152])};
+      base.motors[b]={ren2:pf(row[142]),ren3:pf(row[143]),rank:pi(row[139]),rate:pf(row[141])};
     }
     base.racerClass=racerClass;
     base.playerNums=playerNums;
@@ -445,7 +448,7 @@ function parseNewCSV(allRows){
       base.racerStats.ren3raw[cat]=periodData[cat].ren3raw;
     }
     // 全期間の平均STを格納
-    var ST_COLS={"直近1ヶ月":27,"直近3ヶ月":47,"直近6ヶ月":67,"直近1年":87,"全期間":107};
+    var ST_COLS={"直近1ヶ月":27,"直近3ヶ月":51,"直近6ヶ月":75,"直近1年":99,"全期間":123};
     var stByPeriod={};
     var stPeriodKeys=Object.keys(ST_COLS);
     for(var spi=0;spi<stPeriodKeys.length;spi++){
@@ -469,9 +472,17 @@ function parseNewCSV(allRows){
       for(var si=0;si<ents.length;si++){rank[ents[si].idx]=si+1;}
       return rank;
     }
+    // 平均スタート順位（全国直近1年 col101）
+    var avgStRank=[null,null,null,null,null,null];
+    for(var bi4=0;bi4<boats.length;bi4++){
+      var brow4=boats[bi4];
+      var bb4=pi(brow4[0]);
+      if(!bb4||bb4<1||bb4>6)continue;
+      avgStRank[bb4-1]=pf(brow4[101]);
+    }
     base.stScore={
       rate:stDefault,rank:calcStRank(stDefault),st1y:stDefault,
-      byPeriod:stByPeriod,calcRank:null,
+      byPeriod:stByPeriod,calcRank:null,avgStRank:avgStRank,
     };
     if(!updated[rd.vname])updated[rd.vname]={};
     updated[rd.vname][rd.rnum]=base;
@@ -775,7 +786,7 @@ function App() {
             tenji:tenjiRow[i]>=5.5&&tenjiRow[i]<=7.8?String(tenjiRow[i]):rd.inputs[b].tenji,
             isshu:isshuRow[i]>=15&&isshuRow[i]<=45?String(isshuRow[i]):rd.inputs[b].isshu,
             mawari:mawariRow[i]>=4.5&&mawariRow[i]<=15?String(mawariRow[i]):rd.inputs[b].mawari,
-            chokusen:chokusenRow&&chokusenRow[i]!=null&&chokusenRow[i]>=5.5&&chokusenRow[i]<=8.5?String(chokusenRow[i]):rd.inputs[b].chokusen,
+            chokusen:chokusenRow&&chokusenRow[i]!=null&&chokusenRow[i]>=5.5&&chokusenRow[i]<=10.0?String(chokusenRow[i]):rd.inputs[b].chokusen,
           };
         }
         if(shinnyu&&shinnyu.every(function(v){return v>=1&&v<=6&&Number.isInteger(v);}))
@@ -1989,7 +2000,7 @@ function App() {
                   <span style={{width:22,flexShrink:0}}></span>
                   <div style={{flex:1}}></div>
                   <span style={{width:34,fontSize:9,color:"#d96b63",textAlign:"right",flexShrink:0}}>ST</span>
-                  {rd.stScore&&rd.stScore.st1y&&<span style={{width:44,fontSize:9,color:"#7db4e8",textAlign:"right",flexShrink:0}}>ST順1年</span>}
+                  {rd.stScore&&rd.stScore.avgStRank&&<span style={{width:38,fontSize:9,color:"#c084fc",textAlign:"right",flexShrink:0}}>ST順位</span>}
                   <span style={{width:44,fontSize:9,color:"#9db5cc",textAlign:"right",flexShrink:0}}>展示差</span>
                 </div>
               </div>
@@ -2005,16 +2016,18 @@ function App() {
                       <span style={{width:22,fontSize:10,color:"#7da3c8",flexShrink:0}}>{r.course}C</span>
                       <div style={{flex:1,position:"relative",height:26}}>
                         <div style={{position:"absolute",left:0,top:"50%",width:(p*100)+"%",height:3,transform:"translateY(-50%)",background:"#2c4762",borderRadius:2}}/>
+                        {/* スタートライン */}
+                        <div style={{position:"absolute",right:0,top:0,bottom:0,width:2,background:"#f9c513",opacity:0.7}}/>
                         <div style={{position:"absolute",top:"50%",left:"calc("+(p*100)+"% - 13px)",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:3}}>
                           <LB b={r.boat}/>
-                          {r.mark&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":r.mark==="平均"?"#1d4a7a":"#6b5a1d",color:"#fff"}}>{r.mark}</span>}
+                          {r.mark&&r.mark!=="平均"&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":"#6b5a1d",color:"#fff"}}>{r.mark}</span>}
                           {rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0&&<span>⚡</span>}
                         </div>
                       </div>
                       <span style={{width:34,fontSize:11,color:"#9db5cc",textAlign:"right",flexShrink:0}}>.{r.st.toFixed(2).split(".")[1]}</span>
-                      {rd.stScore&&rd.stScore.st1y&&(
-                        <span style={{width:44,fontSize:10,color:"#7db4e8",textAlign:"right",flexShrink:0}}>
-                          {rd.stScore.st1y[r.boat-1]!=null?rd.stScore.st1y[r.boat-1].toFixed(1)+"位":"―"}
+                      {rd.stScore&&rd.stScore.avgStRank&&(
+                        <span style={{width:38,fontSize:10,color:"#c084fc",textAlign:"right",flexShrink:0,fontWeight:700}}>
+                          {rd.stScore.avgStRank[r.boat-1]!=null?rd.stScore.avgStRank[r.boat-1].toFixed(2):"―"}
                         </span>
                       )}
                       <span style={{width:44,fontSize:10,textAlign:"right",flexShrink:0,color:tenjDiff==null?"#4a5d70":tenjDiff>0?"#5dd39e":"#fff"}}>
@@ -2110,8 +2123,8 @@ function App() {
                         <th style={{padding:"6px 8px",textAlign:"left",borderBottom:"1px solid #2c4762"}}>艇</th>
                         <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>SSA</th>
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>合計／出走数</th>}
-                        {rd.stScore&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>得点率</th>}
-                        {rd.stScore&&rd.stScore.rank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>順位</th>}
+                        {rd.tokuten&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#f9c513"}}>得点率</th>}
+                        {rd.tokuten&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#5dd39e"}}>得点</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想1着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想2着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想3着率</th>}
@@ -2146,8 +2159,12 @@ function App() {
                             var inTenji=inInp?parseFloat(inInp.tenji):NaN;
                             var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
                             var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
+                            var myAvgRank=rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null;
+                            var inAvgRank=rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null;
                             var tenjOk=!isNaN(myTenji)&&!isNaN(inTenji)&&(inTenji-myTenji)>=0.1;
-                            var stOk=mySt==null||inSt==null||(inSt-mySt)>=0.5;
+                            // 平均スタート順位が内側より良い（数字が小さい）
+                            var stOk=(myAvgRank!=null&&inAvgRank!=null)?(myAvgRank<inAvgRank):
+                                     (mySt!=null&&inSt!=null)?(inSt-mySt>=0.05):true;
                             if(tenjOk&&stOk)showThunder=true;
                           }
                         }
@@ -2162,8 +2179,18 @@ function App() {
                             </td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontSize:16}}>{showThunder?"⚡":""}</td>
                             {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff"}}>{nc!=null?nc:"―"}<span style={{color:"#7da3c8",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
-                            {rd.stScore&&numC(rd.stScore.rate[r.boat-1])}
-                            {rd.stScore&&rd.stScore.rank&&<td style={{padding:"7px 8px",textAlign:"center",color:"#9db5cc"}}>{rd.stScore.rank[r.boat-1]!=null?rd.stScore.rank[r.boat-1]+"位":"―"}</td>}
+                            {rd.tokuten&&(function(){
+                              var tk=rd.tokuten[r.boat];
+                              var rate=tk&&tk.rate!=null?tk.rate:null;
+                              var col=rate!=null?(rate>=6.0?"#f9c513":rate>=5.0?"#5dd39e":"#9db5cc"):"#4a5d70";
+                              return <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:col}}>{rate!=null?rate:"―"}</td>;
+                            })()}
+                            {rd.tokuten&&(function(){
+                              var tk=rd.tokuten[r.boat];
+                              var net=tk&&tk.score!=null?tk.score:null;
+                              var col=net!=null?(net>=50?"#f9c513":net>=40?"#5dd39e":"#9db5cc"):"#4a5d70";
+                              return <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:col}}>{net!=null?net:"―"}</td>;
+                            })()}
                             {result.racerRank&&pctC(r.racerR1final)}
                             {result.racerRank&&pctC(r.racerR2final)}
                             {result.racerRank&&pctC(r.racerR3final)}
