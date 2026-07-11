@@ -378,6 +378,7 @@ function parseNewCSV(allRows){
     var kc_sashi=[null,null,null,null,null,null];
     var kc_makuri=[null,null,null,null,null,null];
     var kc_makurizashi=[null,null,null,null,null,null];
+    var kc_nuki=[null,null,null,null,null,null];
     var raceCount=[null,null,null,null,null,null];
     // 期間別データ格納用
     var PERIOD_COLS={
@@ -422,18 +423,19 @@ function parseNewCSV(allRows){
       }
       // 直近1年のST・決まり手（スコア計算用）
       st_1y[idx]=pf(row[87]);
-      kc_nige[idx]=pi(row[89]);
-      kc_sashi[idx]=pi(row[91]);
-      kc_makuri[idx]=pi(row[93]);
-      kc_makurizashi[idx]=pi(row[95]);
-      raceCount[idx]=pi(row[79]);
+      kc_nige[idx]=pi(row[69]);
+      kc_sashi[idx]=pi(row[71]);
+      kc_makuri[idx]=pi(row[73]);
+      kc_makurizashi[idx]=pi(row[75]);
+      kc_nuki[idx]=pi(row[77]);
+      raceCount[idx]=pi(row[59]);
       base.motors[b]={ren2:pf(row[122]),ren3:pf(row[123]),rank:pi(row[119]),rate:pf(row[121])};
     }
     base.racerClass=racerClass;
     base.playerNums=playerNums;
     base.playerAreas=playerAreas;
     base.racerRaceCount=raceCount;
-    base.kimariCount={nige:kc_nige,sashi:kc_sashi,makuri:kc_makuri,makurizashi:kc_makurizashi};
+    base.kimariCount={nige:kc_nige,sashi:kc_sashi,makuri:kc_makuri,makurizashi:kc_makurizashi,nuki:kc_nuki};
     base.racerStats={win1:{},ren2:{},ren3:{},ren3raw:{}};
     for(var ci=0;ci<catNames.length;ci++){
       var cat=catNames[ci];
@@ -442,11 +444,35 @@ function parseNewCSV(allRows){
       base.racerStats.ren3[cat]=periodData[cat].ren3;
       base.racerStats.ren3raw[cat]=periodData[cat].ren3raw;
     }
-    base.stScore={rate:st_1y,rank:[null,null,null,null,null,null],st1y:st_1y};
-    var stEntries=[];
-    for(var bi2=0;bi2<6;bi2++){if(st_1y[bi2]!=null)stEntries.push({idx:bi2,v:st_1y[bi2]});}
-    stEntries.sort(function(a,bv){return a.v-bv.v;});
-    for(var si=0;si<stEntries.length;si++){base.stScore.rank[stEntries[si].idx]=si+1;}
+    // 全期間の平均STを格納
+    var ST_COLS={"直近1ヶ月":27,"直近3ヶ月":47,"直近6ヶ月":67,"直近1年":87,"全期間":107};
+    var stByPeriod={};
+    var stPeriodKeys=Object.keys(ST_COLS);
+    for(var spi=0;spi<stPeriodKeys.length;spi++){
+      var spk=stPeriodKeys[spi];
+      var stArr=[null,null,null,null,null,null];
+      for(var bi3=0;bi3<boats.length;bi3++){
+        var brow=boats[bi3];
+        var bb=pi(brow[0]);
+        if(!bb||bb<1||bb>6)continue;
+        stArr[bb-1]=pf(brow[ST_COLS[spk]]);
+      }
+      stByPeriod[spk]=stArr;
+    }
+    // デフォルトは直近1年
+    var stDefault=stByPeriod["直近1年"]||st_1y;
+    function calcStRank(arr){
+      var rank=[null,null,null,null,null,null];
+      var ents=[];
+      for(var bi2=0;bi2<6;bi2++){if(arr[bi2]!=null)ents.push({idx:bi2,v:arr[bi2]});}
+      ents.sort(function(a,bv){return a.v-bv.v;});
+      for(var si=0;si<ents.length;si++){rank[ents[si].idx]=si+1;}
+      return rank;
+    }
+    base.stScore={
+      rate:stDefault,rank:calcStRank(stDefault),st1y:stDefault,
+      byPeriod:stByPeriod,calcRank:null,
+    };
     if(!updated[rd.vname])updated[rd.vname]={};
     updated[rd.vname][rd.rnum]=base;
   }
@@ -859,7 +885,7 @@ function App() {
       function cScore(b){var cl=rd.racerClass?rd.racerClass[b-1]:null;return cl==="A1"?4:cl==="A2"?3:cl==="B1"?2:1;}
       function rScore(b){var rank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[b-1]:null;return rank!=null?Math.max(0,7-rank):0;}
       function mScore(b){var m=rd.motors[b];if(!m||m.ren2==null||mAvg2==null)return 0;return Math.min(5,Math.max(0,(m.ren2-mAvg2)/10));}
-      function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var ci=r.course-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
+      function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var ci=r.course-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi,rd.kimariCount.nuki];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
       var b1r=rows.filter(function(r){return r.boat===1;})[0];
       var b1diff=b1r&&b1r.diff!=null&&b1r.diff<=0;
       var s1=[],s2=[],s3=[];
@@ -907,21 +933,34 @@ function App() {
       var sashi=r.course!==1?(kc.sashi?kc.sashi[ci]:null):null;
       var makuri=r.course!==1?(kc.makuri?kc.makuri[ci]:null):null;
       var mkz=r.course!==1?(kc.makurizashi?kc.makurizashi[ci]:null):null;
-      var total=[nige,sashi,makuri,mkz].reduce(function(s,v){return s+(v!=null?v:0);},0);
-      return{boat:r.boat,course:r.course,nige:nige,sashi:sashi,makuri:makuri,makurizashi:mkz,total:total};
+      var nuki=kc.nuki?kc.nuki[ci]:null;
+      var total=[nige,sashi,makuri,mkz,nuki].reduce(function(s,v){return s+(v!=null?v:0);},0);
+      return{boat:r.boat,course:r.course,nige:nige,sashi:sashi,makuri:makuri,makurizashi:mkz,nuki:nuki,total:total};
     });
   },[rd.kimariCount,result]);
 
   const slit=useMemo(function(){
     var rows=[];
+    var hasManual=Object.values(rd.sts).some(function(v){return v!=="";});
+    var hasCsvSt=rd.stScore&&rd.stScore.st1y&&rd.stScore.st1y.some(function(v){return v!=null;});
+    if(!hasManual&&!hasCsvSt)return null;
     for(var b=1;b<=6;b++){
-      if(rd.sts[b]==="")return null;
-      var st=parseFloat(rd.sts[b]),mark=null;
-      if(rd.fHold[b]){if(rd.fSts[b]!==""){st=parseFloat(rd.fSts[b]);mark="F";}else mark="F?";}
+      var st=null,mark=null;
+      if(rd.sts[b]!==""){
+        // 手入力優先
+        st=parseFloat(rd.sts[b]);
+        if(rd.fHold[b]){if(rd.fSts[b]!==""){st=parseFloat(rd.fSts[b]);mark="F";}else mark="F?";}
+      } else if(hasCsvSt&&rd.stScore.st1y[b-1]!=null){
+        // CSV平均STをフォールバック
+        st=rd.stScore.st1y[b-1];
+        mark="平均";
+      } else {
+        return null; // 1艇でもデータなければnull
+      }
       rows.push({boat:b,course:rd.courses[b],st:st,mark:mark});
     }
     return rows.sort(function(a,b){return a.course-b.course;});
-  },[rd.sts,rd.fHold,rd.fSts,rd.courses]);
+  },[rd.sts,rd.fHold,rd.fSts,rd.courses,rd.stScore]);
 
   const aiEval=useMemo(function(){
     if(!result)return null;
@@ -1028,7 +1067,7 @@ function App() {
       if(!kc)return null;
       var ci=r.course-1;
       var total=0;
-      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
+      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
       var hasAny=false;
       for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null){total+=arrs[ai][ci];hasAny=true;}}
       return hasAny?total:null;
@@ -1054,7 +1093,7 @@ function App() {
       var rcVal=rc[r.boat-1];
       if(rcVal==null||rcVal===0)return 5;
       var ci=r.course-1,total=0;
-      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
+      var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
       for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)total+=arrs[ai][ci];}
       return Math.min(10,total/rcVal*10);
     }
@@ -1655,7 +1694,7 @@ function App() {
               var rc2=r.racerRaceCount[0];
               if(rc2!=null&&rc2>9){
                 var tot2=0;
-                var arrs2=[kc2.nige,kc2.sashi,kc2.makuri,kc2.makurizashi];
+                var arrs2=[kc2.nige,kc2.sashi,kc2.makuri,kc2.makurizashi,kc2.nuki];
                 for(var ai2=0;ai2<arrs2.length;ai2++){if(arrs2[ai2]&&arrs2[ai2][0]!=null)tot2+=arrs2[ai2][0];}
                 var ratio2=tot2/rc2;
                 if(ratio2<0.45)itemWave=true;
@@ -1795,7 +1834,7 @@ function App() {
                 var rc=r.racerRaceCount[0];
                 if(rc!=null&&rc>9){
                   var total=0;
-                  var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi];
+                  var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
                   for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][0]!=null)total+=arrs[ai][0];}
                   var ratio=total/rc;
                   if(ratio<0.45)isWave=true;
@@ -1869,21 +1908,49 @@ function App() {
           </div>
         )}
 
-        {[
-          {label:"平均STの期間",value:stPeriod,opts:STPS,onChange:function(v){setStPeriod(v);if(rd.stTable){var ap=applyStTbl(rd.stTable,v,rd);updateRd(function(prev){return Object.assign({},prev,ap);});}},loaded:rd.stTable},
-          {label:"選手成績の区分",value:racerCat,opts:RCATS,onChange:function(v){setRacerCat(v);},loaded:rd.racerStats},
-          {label:"決まり手の期間",value:kimariPeriod,opts:KPERIODS,onChange:function(v){setKimariPeriod(v);},loaded:rd.kimari},
-        ].map(function(item){
-          return (
-            <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:11,color:"#7da3c8"}}>{item.label}</span>
-              <select value={item.value} onChange={function(e){item.onChange(e.target.value);}} style={selS()}>
-                {item.opts.map(function(o){return <option key={o} value={o}>{o}</option>;})}
-              </select>
-              <span style={{fontSize:11,color:item.loaded?"#5dd39e":"#7da3c8"}}>{item.loaded?"✓ 読込済":"※CSVまたは貼り付けで有効"}</span>
-            </div>
-          );
-        })}
+        {(function(){
+          // データがある期間だけ選択肢に表示
+          var stOpts=rd.stTable?STPS.filter(function(o){return rd.stTable[o]!=null;}):rd.stScore&&rd.stScore.byPeriod?Object.keys(rd.stScore.byPeriod).filter(function(o){return rd.stScore.byPeriod[o].some(function(v){return v!=null;});}):[];
+          var rcOpts=rd.racerStats&&rd.racerStats.win1?RCATS.filter(function(o){return rd.racerStats.win1[o]&&rd.racerStats.win1[o].some(function(v){return v!=null;});}):[];
+          var kmOpts=rd.kimari?KPERIODS.filter(function(o){return rd.kimari[o]!=null;}):[];
+          var items=[
+            {label:"平均STの期間",value:stPeriod,opts:stOpts,loaded:stOpts.length>0,onChange:function(v){
+              setStPeriod(v);
+              if(rd.stTable){
+                var ap=applyStTbl(rd.stTable,v,rd);
+                updateRd(function(prev){return Object.assign({},prev,ap);});
+              } else if(rd.stScore&&rd.stScore.byPeriod&&rd.stScore.byPeriod[v]){
+                var newArr=rd.stScore.byPeriod[v];
+                var ents=[];
+                for(var bi=0;bi<6;bi++){if(newArr[bi]!=null)ents.push({idx:bi,v:newArr[bi]});}
+                ents.sort(function(a,b){return a.v-b.v;});
+                var newRank=[null,null,null,null,null,null];
+                for(var si=0;si<ents.length;si++){newRank[ents[si].idx]=si+1;}
+                updateRd(function(prev){var n=Object.assign({},prev);n.stScore=Object.assign({},prev.stScore,{rate:newArr,rank:newRank,st1y:newArr});return n;});
+              }
+            }},
+            {label:"選手成績の区分",value:racerCat,opts:rcOpts,loaded:rcOpts.length>0,onChange:function(v){setRacerCat(v);}},
+            {label:"決まり手の期間",value:kimariPeriod,opts:kmOpts,loaded:kmOpts.length>0,onChange:function(v){setKimariPeriod(v);}},
+          ];
+          return items.map(function(item){
+            return (
+              <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"#7da3c8"}}>{item.label}</span>
+                {item.opts.length>0?(
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {item.opts.map(function(o){
+                      var active=item.value===o;
+                      return <button key={o} onClick={function(){item.onChange(o);}} style={{padding:"4px 10px",fontSize:11,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":"#9db5cc",border:active?"1px solid #5a87b8":"1px solid #2c4762"}}>{o}</button>;
+                    })}
+                    <span style={{fontSize:11,color:"#5dd39e"}}>✓ 読込済</span>
+                  </div>
+                ):(
+                  <span style={{fontSize:11,color:"#7da3c8"}}>※CSVまたは貼り付けで有効</span>
+                )}
+              </div>
+            );
+          });
+        })()}
 
         <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
@@ -1940,7 +2007,7 @@ function App() {
                         <div style={{position:"absolute",left:0,top:"50%",width:(p*100)+"%",height:3,transform:"translateY(-50%)",background:"#2c4762",borderRadius:2}}/>
                         <div style={{position:"absolute",top:"50%",left:"calc("+(p*100)+"% - 13px)",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:3}}>
                           <LB b={r.boat}/>
-                          {r.mark&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":"#6b5a1d",color:"#fff"}}>{r.mark}</span>}
+                          {r.mark&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":r.mark==="平均"?"#1d4a7a":"#6b5a1d",color:"#fff"}}>{r.mark}</span>}
                           {rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0&&<span>⚡</span>}
                         </div>
                       </div>
@@ -2026,11 +2093,10 @@ function App() {
                 </div>
                 {rd.racerStats!=null&&(
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
-                    {RCATS.map(function(cat){
+                    {RCATS.filter(function(cat){return rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});}).map(function(cat){
                       var active=racerCat===cat;
-                      var hasData=rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});
                       return (
-                        <button key={cat} onClick={function(){setRacerCat(cat);}} style={{padding:"5px 10px",fontSize:11,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":hasData?"#9db5cc":"#3a4f63",border:active?"1px solid #5a87b8":"1px solid #2c4762",opacity:hasData?1:0.5}}>
+                        <button key={cat} onClick={function(){setRacerCat(cat);}} style={{padding:"5px 10px",fontSize:11,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":"#9db5cc",border:active?"1px solid #5a87b8":"1px solid #2c4762"}}>
                           {cat}
                         </button>
                       );
@@ -2057,6 +2123,7 @@ function App() {
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>差し</th>}
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>捲り</th>}
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>捲差</th>}
+                        {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>抜き</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -2108,6 +2175,7 @@ function App() {
                             {kimariByBoat&&numC(kc?kc.sashi:null)}
                             {kimariByBoat&&numC(kc?kc.makuri:null)}
                             {kimariByBoat&&numC(kc?kc.makurizashi:null)}
+                            {kimariByBoat&&numC(kc?kc.nuki:null)}
                           </tr>
                         );
                       })}
@@ -2204,11 +2272,10 @@ function App() {
                   <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
-                  {RCATS.map(function(cat){
+                  {RCATS.filter(function(cat){return rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});}).map(function(cat){
                     var active=racerCat===cat;
-                    var hasData=rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});
                     return (
-                      <button key={cat} onClick={function(){setRacerCat(cat);}} style={{padding:"4px 8px",fontSize:10,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":hasData?"#9db5cc":"#3a4f63",border:active?"1px solid #5a87b8":"1px solid #2c4762",opacity:hasData?1:0.5}}>
+                      <button key={cat} onClick={function(){setRacerCat(cat);}} style={{padding:"4px 8px",fontSize:10,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":"#9db5cc",border:active?"1px solid #5a87b8":"1px solid #2c4762"}}>
                         {cat}
                       </button>
                     );
