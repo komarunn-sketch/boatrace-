@@ -1,4 +1,31 @@
-import { useState, useMemo, useCallback } from "react";
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ボートレース予想ツール</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: #0e1b2c; overflow-x: hidden; width: 100%; overscroll-behavior-y: none; }
+  body { -webkit-font-smoothing: antialiased; }
+  input, select, button, textarea { font-family: inherit; }
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  ::-webkit-scrollbar { height: 6px; width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  #root { min-height: 100vh; overflow-x: hidden; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useCallback } = React;
+
 
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
@@ -612,7 +639,7 @@ function parseRowByIndex(d){
   return base;
 }
 
-export default function App() {
+function App() {
   const [venue,setVenue]=useState("");
   const [racerCat,setRacerCat]=useState("直近1年");
   const [stPeriod,setStPeriod]=useState("今期");
@@ -2559,3 +2586,11 @@ export default function App() {
     </div>
   );
 }
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+
+</script>
+</body>
+</html>
