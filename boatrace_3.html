@@ -312,6 +312,7 @@ function emptyRace() {
     weights:{1:"",2:"",3:"",4:"",5:"",6:""},
     courses:{1:1,2:2,3:3,4:4,5:5,6:6},
     wind:"無風",
+    weather:"",waveHeight:"",
     tokuten:null,
   };
 }
@@ -724,6 +725,18 @@ function App() {
     };
   }
 
+  // 「ラベル 値」という1行から、値（テキストそのまま）を取り出す（風・天候・波高など単一値のフィールド用）
+  function parseSingleLine(text,label){
+    var lines=text.split("\n");
+    for(var i=0;i<lines.length;i++){
+      var l=lines[i].trim();
+      if(l.indexOf(label+" ")===0){
+        return l.slice(label.length+1).trim();
+      }
+    }
+    return null;
+  }
+
   function applyStTbl(table,period,cur){
     var row=table[period],ns=Object.assign({},cur.sts);
     if(row)for(var b=1;b<=6;b++){var v=row[b-1];if(v!=null&&v>=0&&v<=0.6)ns[b]=Math.min(0.4,v).toFixed(2);}
@@ -793,7 +806,13 @@ function App() {
           for(var b=1;b<=6;b++)nc[b]=shinnyu[b-1];
         if(weightRow)for(var b=1;b<=6;b++){var v=weightRow[b-1];if(v&&v>=40&&v<=70)nw[b]=String(v);}
         if(tiltRow)for(var b=1;b<=6;b++){if(tiltRow[b-1]==null)continue;var s=(Math.round(tiltRow[b-1]*2)/2).toFixed(1);if(tiltSet.indexOf(Number(s))>=0)nt[b]=s;}
-        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.tenjiMsg="✓ 6艇分を読み取りました";return n;});
+        // 風向を貼り付けテキストから自動反映（プルダウンの手動選択が不要に）
+        var windLine=parseSingleLine(text,"風");
+        var newWind=(windLine&&WIND[windLine])?windLine:rd.wind;
+        // 天候・波高は将来の機能追加用に保持（現時点ではスコア計算には未使用）
+        var weatherLine=parseSingleLine(text,"天候");
+        var waveLine=parseSingleLine(text,"波高");
+        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
         return;
       }
       updateRd(function(prev){var n=Object.assign({},prev);n.tenjiMsg="タイムが見つかりません";return n;});
@@ -1942,6 +1961,7 @@ function App() {
               <button onClick={parseTenji} style={btnS("#3d7ab8","#fff")}>解析して入力</button>
               <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText="";n.tenjiMsg="";return n;});}} style={btnS("#0e1b2c","#9db5cc",{border:"1px solid #2c4762"})}>クリア</button>
               {rd.tenjiMsg&&<span style={{fontSize:12,color:rd.tenjiMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80"}}>{rd.tenjiMsg}</span>}
+              {(rd.weather||rd.waveHeight)&&<div style={{fontSize:11,color:"#9db5cc",marginTop:4}}>{rd.weather&&("天候:"+rd.weather)}{rd.weather&&rd.waveHeight&&"　"}{rd.waveHeight&&("波高:"+rd.waveHeight)}</div>}
             </div>
           </div>
         )}
