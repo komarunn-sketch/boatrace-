@@ -1,31 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>ボートレース予想ツール</title>
-<style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: #0e1b2c; overflow-x: hidden; width: 100%; overscroll-behavior-y: none; }
-  body { -webkit-font-smoothing: antialiased; }
-  input, select, button, textarea { font-family: inherit; }
-  input[type=number] { -moz-appearance: textfield; }
-  input[type=number]::-webkit-outer-spin-button,
-  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  ::-webkit-scrollbar { height: 6px; width: 6px; }
-  ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 3px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  #root { min-height: 100vh; overflow-x: hidden; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-<script type="text/babel" data-presets="react">
-const { useState, useMemo, useCallback } = React;
-
+import { useState, useMemo, useCallback } from "react";
 
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
@@ -51,6 +24,28 @@ const WIND = {
   "左横風2m":[58.0,13.6,11.2,10.6,5.1,1.5],"左横風3m以上":[55.8,13.8,12.2,11.2,5.5,1.6],"右横風1m":[57.5,13.4,11.5,10.3,5.6,1.7],
   "右横風2m":[54.3,13.9,12.7,10.4,6.7,2.0],"右横風3m以上":[52.0,15.1,13.3,11.6,5.6,2.4],
 };
+// 波高・天候の影響（6,283R実データより算出。各値はコース別1着率%、風テーブルと同じ使い方で基準値との差分を調整に使う）
+const WAVE = {
+  "0cm":[58.3,11.3,14.0,8.4,6.7,1.2],"1-2cm":[56.7,13.7,11.3,10.1,6.0,2.2],"3cm+":[53.3,14.4,15.2,10.0,5.1,2.0],
+};
+const WEATHER = {
+  "晴":[56.7,12.9,12.1,10.4,5.8,2.1],"曇り":[55.8,14.4,13.1,9.2,5.4,2.1],"雨":[53.1,14.4,14.0,10.4,6.2,1.9],
+};
+function waveBucket(raw){
+  if(!raw)return null;
+  var m=String(raw).match(/(\d+)/);
+  if(!m)return null;
+  var cm=parseInt(m[1],10);
+  return cm===0?"0cm":(cm<=2?"1-2cm":"3cm+");
+}
+function weatherBucket(raw){
+  if(!raw)return null;
+  var s=String(raw);
+  if(s.indexOf("雨")>=0)return "雨";
+  if(s.indexOf("曇")>=0)return "曇り";
+  if(s.indexOf("晴")>=0)return "晴";
+  return null;
+}
 const DEFAULT_TABLES = {
   1:[[-Infinity,-0.4,-24,4,-5,-25],[-0.4,-0.2,-20,0,1,-19],[-0.2,0,-12,4,1,-7],[0,0.2,-10,4,1,-5],[0.2,0.4,-4,1,0,-3],[0.4,0.6,2,0,0,2],[0.6,0.8,6,-3,1,5],[0.8,Infinity,10,-2,-2,6]],
   2:[[-Infinity,-0.4,-1,-9,-3,-14],[-0.4,-0.2,-6,-2,5,-3],[-0.2,0,-2,-2,-1,-5],[0,0.2,-4,0,1,-3],[0.2,0.4,1,0,1,3],[0.4,0.6,6,4,-1,9],[0.6,0.8,10,5,-3,12],[0.8,Infinity,8,11,1,20]],
@@ -617,7 +612,7 @@ function parseRowByIndex(d){
   return base;
 }
 
-function App() {
+export default function App() {
   const [venue,setVenue]=useState("");
   const [racerCat,setRacerCat]=useState("直近1年");
   const [stPeriod,setStPeriod]=useState("今期");
@@ -809,7 +804,7 @@ function App() {
         // 風向を貼り付けテキストから自動反映（プルダウンの手動選択が不要に）
         var windLine=parseSingleLine(text,"風");
         var newWind=(windLine&&WIND[windLine])?windLine:rd.wind;
-        // 天候・波高は将来の機能追加用に保持（現時点ではスコア計算には未使用）
+        // 天候・波高を貼り付けテキストから自動反映（final1のスコア計算にも反映される）
         var weatherLine=parseSingleLine(text,"天候");
         var waveLine=parseSingleLine(text,"波高");
         updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
@@ -854,6 +849,9 @@ function App() {
       var course=rd.courses[b];
       var baseRate=base[course-1];
       var windAdj=+(WIND[rd.wind][course-1]-WIND["無風"][course-1]).toFixed(1);
+      var wb=waveBucket(rd.waveHeight),wtb=weatherBucket(rd.weather);
+      var waveAdj=wb&&WAVE[wb]?+(WAVE[wb][course-1]-WAVE["0cm"][course-1]).toFixed(1):0;
+      var weatherAdj=wtb&&WEATHER[wtb]?+(WEATHER[wtb][course-1]-WEATHER["晴"][course-1]).toFixed(1):0;
       var diff=0,adj={w1:0,w2:0,w3:0,top3:0};
       if(avg!=null&&sums[b]!=null){
         diff=avg-sums[b];
@@ -866,8 +864,8 @@ function App() {
       rows.push({
         boat:b,course:course,
         sum:sums[b],diff:diff,
-        baseRate:baseRate,windAdj:windAdj,
-        final1:baseRate+adj.w1+windAdj,
+        baseRate:baseRate,windAdj:windAdj,waveAdj:waveAdj,weatherAdj:weatherAdj,
+        final1:baseRate+adj.w1+windAdj+waveAdj+weatherAdj,
         racerR1final:rW1!=null?rW1+adj.w1:null,
         racerR2final:rR2!=null?rR2+adj.w1+adj.w2:null,
         racerR3final:rR3!=null?rR3+adj.top3:null,
@@ -2289,9 +2287,9 @@ function App() {
               <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
             </div>
             {openBaseRate&&<div style={{display:"grid",gap:6,marginBottom:28}}>
-              {result.rows.slice().sort(function(a,b){return(b.baseRate+b.windAdj)-(a.baseRate+a.windAdj);}).map(function(r,i){
-                var v=r.baseRate+r.windAdj;
-                var maxV=Math.max.apply(null,result.rows.map(function(x){return x.baseRate+x.windAdj;}));
+              {result.rows.slice().sort(function(a,b){return(b.baseRate+b.windAdj+b.waveAdj+b.weatherAdj)-(a.baseRate+a.windAdj+a.waveAdj+a.weatherAdj);}).map(function(r,i){
+                var v=r.baseRate+r.windAdj+r.waveAdj+r.weatherAdj;
+                var maxV=Math.max.apply(null,result.rows.map(function(x){return x.baseRate+x.windAdj+x.waveAdj+x.weatherAdj;}));
                 return (
                   <div key={r.boat} style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{width:18,fontSize:12,color:"#7da3c8"}}>{i+1}.</span>
@@ -2301,7 +2299,7 @@ function App() {
                         <div style={{width:Math.max((v/maxV)*100,0)+"%",height:"100%",background:"#3d7ab8"}}/>
                       </div>
                       <div style={{fontSize:10,color:"#7da3c8",marginTop:2}}>
-                        {r.course}C ／ {r.baseRate}%{r.windAdj!==0&&<span> 風<span style={{color:col(r.windAdj)}}>{sign(r.windAdj)}%</span></span>}
+                        {r.course}C ／ {r.baseRate}%{r.windAdj!==0&&<span> 風<span style={{color:col(r.windAdj)}}>{sign(r.windAdj)}%</span></span>}{r.waveAdj!==0&&<span> 波<span style={{color:col(r.waveAdj)}}>{sign(r.waveAdj)}%</span></span>}{r.weatherAdj!==0&&<span> 天<span style={{color:col(r.weatherAdj)}}>{sign(r.weatherAdj)}%</span></span>}
                       </div>
                     </div>
                     <span style={{width:56,textAlign:"right",fontWeight:800,fontSize:16}}>{fmt(v,1)}%</span>
@@ -2561,11 +2559,3 @@ function App() {
     </div>
   );
 }
-
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
-
-</script>
-</body>
-</html>
