@@ -1919,9 +1919,23 @@ function App() {
               var dy=String(today.getDate()).padStart(2,"0");
               var hiduke=y+mo+dy;
               var url="https://kyoteibiyori.com/race_shusso.php?place_no="+PLACE_NO[venue]+"&race_no="+curRace+"&hiduke="+hiduke+"&slider=4";
-              return <button onClick={function(){window.open(url,"_blank","noopener");}} style={{display:"block",width:"100%",marginBottom:8,padding:"8px 12px",background:"#1d3149",borderRadius:8,border:"1px solid #3d7ab8",color:"#7db4e8",fontSize:13,fontWeight:700,textAlign:"center",cursor:"pointer"}}>
-                🌐 展示情報を開く（{venue} {curRace}R）
-              </button>;
+              var boatcastUrl="https://race.boatcast.jp/?jo="+String(PLACE_NO[venue]).padStart(2,"0");
+              // iOSのホーム画面ショートカット（スタンドアロンモード）で開いている場合、
+              // 通常のwindow.openだと内蔵ブラウザで開いてしまい拡張機能(Userscripts等)が使えないため、
+              // x-safari-スキームで強制的にSafari.appに渡す。PC/通常のブラウザでは無害な通常リンクにする。
+              var isIosStandalone=(typeof window!=="undefined"&&window.navigator&&window.navigator.standalone===true);
+              var openExternal=function(u){
+                if(isIosStandalone){ window.location.href="x-safari-"+u; }
+                else{ window.open(u,"_blank","noopener"); }
+              };
+              return <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <button onClick={function(){openExternal(url);}} style={{flex:1,padding:"8px 12px",background:"#1d3149",borderRadius:8,border:"1px solid #3d7ab8",color:"#7db4e8",fontSize:13,fontWeight:700,textAlign:"center",cursor:"pointer"}}>
+                  🌐 展示情報を開く（{venue} {curRace}R）
+                </button>
+                <button onClick={function(){openExternal(boatcastUrl);}} title="場のトップページが開きます。レース・タブは手動で選んでください" style={{flex:1,padding:"8px 12px",background:"#1d3149",borderRadius:8,border:"1px solid #3d7ab8",color:"#7db4e8",fontSize:13,fontWeight:700,textAlign:"center",cursor:"pointer"}}>
+                  🎥 BOATCASTを開く（{venue}）
+                </button>
+              </div>;
             })()}
             <textarea value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" rows={5} style={{width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:8,padding:10,fontSize:13,resize:"vertical"}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
