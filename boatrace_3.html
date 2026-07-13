@@ -722,20 +722,29 @@ const NAV_ITEMS=[
   {id:"section-yoso",label:"着順予想",icon:"🎯"},
 ];
 function QuickNav(){
-  function jump(id){
+  const [msg,setMsg]=useState("");
+  function jump(id,label){
     var el=document.getElementById(id);
-    if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+    if(el){
+      el.scrollIntoView({behavior:"smooth",block:"start"});
+    }else{
+      setMsg(label+"はまだ表示できません（場・レースを選択してください）");
+      setTimeout(function(){setMsg("");},2200);
+    }
   }
   return (
-    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#0e1b2c",borderBottom:"1px solid #2c4762",padding:"6px 4px",display:"flex",gap:6,overflowX:"auto",alignItems:"center"}}>
-      <span style={{fontSize:13,fontWeight:900,color:"#7db4e8",flexShrink:0,marginRight:2}}>🚤</span>
-      {NAV_ITEMS.map(function(item){
-        return (
-          <button key={item.id} onClick={function(){jump(item.id);}} style={{display:"flex",alignItems:"center",gap:4,padding:"6px 10px",borderRadius:8,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-            <span>{item.icon}</span><span>{item.label}</span>
-          </button>
-        );
-      })}
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999}}>
+      <div style={{background:"#0e1b2c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
+        {NAV_ITEMS.map(function(item){
+          return (
+            <button key={item.id} onClick={function(){jump(item.id,item.label);}} style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:"5px 2px",borderRadius:7,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:9,fontWeight:700,cursor:"pointer",overflow:"hidden"}}>
+              <span style={{fontSize:14,lineHeight:1}}>{item.icon}</span>
+              <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {msg&&<div style={{background:"#e05252",color:"#fff",fontSize:11,fontWeight:700,textAlign:"center",padding:"6px 8px"}}>{msg}</div>}
     </div>
   );
 }
@@ -1857,7 +1866,7 @@ function App() {
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
   var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px",overflowX:"hidden",maxWidth:"100vw"};
-  var innerS={maxWidth:760,margin:"0 auto",paddingTop:48};
+  var innerS={maxWidth:760,margin:"0 auto",paddingTop:44};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
   var inpS={width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 8px",fontSize:15};
