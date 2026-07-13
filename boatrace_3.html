@@ -1457,10 +1457,10 @@ function App() {
     var idealN=honmeiR1v<40?6:(honmeiR1v<70?5:4);
     var idealBet=makeBet(honmei,idealN);
     var idealBetReason=honmeiR1v<40?"本命がやや不安定なため広めに":(honmeiR1v<70?"標準的な信頼度":"本命が堅いため絞り込み");
-    // 信頼度：過去2,442R実績から算出（本命信頼度r1の帯ごとに集計）
-    // r1<40(6点): 本命的中40%/買い目全体的中22% r1 40-70(5点): 本命57%/全体32% r1>=70(4点): 本命75%/全体33%
-    var idealBetHonmeiConf=honmeiR1v<40?39.5:(honmeiR1v<70?56.6:74.5);
-    var idealBetTotalConf=honmeiR1v<40?22.2:(honmeiR1v<70?31.9:33.4);
+    // 信頼度：過去3,164R実績から算出（本命信頼度r1の帯ごとに集計・2026-07-13時点で更新）
+    // r1<40(6点): 本命的中38.4%/買い目的中21.5% r1 40-70(5点): 本命56.6%/買い目31.5% r1>=70(4点): 本命75.8%/買い目35.8%
+    var idealBetHonmeiConf=honmeiR1v<40?38.4:(honmeiR1v<70?56.6:75.8);
+    var idealBetTotalConf=honmeiR1v<40?21.5:(honmeiR1v<70?31.5:35.8);
 
     // 対抗1・2をまとめた買目（1着欄に両方）
     // 僅差の場合は対抗1・2を別々に、それ以外はまとめる
@@ -2424,7 +2424,7 @@ function App() {
                           </div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度は過去2,442R実績（本命の信頼度帯ごとの的中率）に基づく参考値。個別レースの確約ではありません</div>
+                      <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度は過去3,164R実績（本命の信頼度帯ごとの的中率）に基づく参考値。個別レースの確約ではありません</div>
                     </div>
                   )}
                   {yoso.taiko4&&yoso.taiko4.count>0&&(
