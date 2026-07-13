@@ -1372,7 +1372,7 @@ function App() {
       var sb=totalScore2(b)+(honmeiCourse===1?nigeAdj2(b):0);
       return sb-sa;
     });
-    var place3=rows.filter(function(r){return r3(r)>=10;}).sort(function(a,b){
+    var place3=rows.filter(function(r){return r3(r)>=5;}).sort(function(a,b){
       var sa=totalScore3(a)+(honmeiCourse===1?nigeAdj3(a):0);
       var sb=totalScore3(b)+(honmeiCourse===1?nigeAdj3(b):0);
       return sb-sa;
@@ -1394,7 +1394,7 @@ function App() {
       var rate=r3(r);
       if(rate>=30)return "top";
       if(rate>=20)return "mid";
-      if(rate>=10)return "rest";
+      if(rate>=5)return "rest";
       return null;
     }
     var p2top=place2.filter(function(r){return classify2(r)==="top";}).map(function(r){return r.boat;});
