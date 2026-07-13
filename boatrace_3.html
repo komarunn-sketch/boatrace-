@@ -949,7 +949,7 @@ function App() {
         var r1v=r.racerR1final!=null?r.racerR1final:r.final1;
         var r2v=r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;
         var r3v=r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;
-        var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4;
+        var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3;
         if(r.boat===1&&b1diff)ts1-=10;
         var ts2=r2v*0.5+cScore(r.boat)*1.5+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.5;
         var ts3=r3v*0.7+cScore(r.boat)*1+kScore(r)*0.2+mScore(r.boat)*0.3;
@@ -1154,7 +1154,7 @@ function App() {
     }
     // 総合スコア（1着）
     function totalScore1(r){
-      var base=r1(r)*0.6+classScore(r.boat)*1+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.4;
+      var base=r1(r)*0.6+classScore(r.boat)*1+rankScore(r.boat)*0.5+kimariScore(r)*0.3+motorScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3;
       if(r.boat===1&&r.diff!=null&&r.diff<=0){base=base-10;}
       // ST×展示複合ボーナス（ST1位×展示1位→3着内79%、1着46%）
       var stRank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[r.boat-1]:null;
