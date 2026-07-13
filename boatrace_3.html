@@ -1495,16 +1495,19 @@ function App() {
     var honmei10=makeBet(honmei,10);
     var honmei6=honmei4; // 後方互換
     // 理想買目：本命の信頼度（r1）に応じて点数を可変にする
-    // 実データ検証(2,442R)：本命r1<40→6点が最良回収(151.7%)、40-70→4-5点、70以上→4点が最良回収
-    // 固定6点(回収112.9%)に対し、本理想買目は回収120.0%（平均4.97点）を実現
+    // 実データ検証(6,283R・2026-07-13時点)：本命r1<40→6点、40-70→5点、70以上→4点
     var honmeiR1v=fc[0]?r1(fc[0]):0;
     var idealN=honmeiR1v<40?6:(honmeiR1v<70?5:4);
     var idealBet=makeBet(honmei,idealN);
-    var idealBetReason=honmeiR1v<40?"本命がやや不安定なため広めに":(honmeiR1v<70?"標準的な信頼度":"本命が堅いため絞り込み");
-    // 信頼度：過去3,164R実績から算出（本命信頼度r1の帯ごとに集計・2026-07-13時点で更新）
-    // r1<40(6点): 本命的中38.4%/買い目的中21.5% r1 40-70(5点): 本命56.6%/買い目31.5% r1>=70(4点): 本命75.8%/買い目35.8%
-    var idealBetHonmeiConf=honmeiR1v<40?38.4:(honmeiR1v<70?56.6:75.8);
-    var idealBetTotalConf=honmeiR1v<40?21.5:(honmeiR1v<70?31.5:35.8);
+    var idealBetReason=honmeiR1v<40?"本命がやや不安定なため広めに":(honmeiR1v<70?"中間ゾーン：見送りも検討を":"本命が堅いため絞り込み");
+    // 信頼度：過去6,283R実績から算出（本命信頼度r1の帯ごとに集計・2026-07-13時点で更新）
+    // r1<40(6点): 本命39.4%/買い目22.9%/回収137.1% r1 40-70(5点): 本命58.4%/買い目33.0%/回収103.0%(見送り推奨) r1>=70(4点): 本命75.7%/買い目37.0%/回収112.1%
+    var idealBetHonmeiConf=honmeiR1v<40?39.4:(honmeiR1v<70?58.4:75.7);
+    var idealBetTotalConf=honmeiR1v<40?22.9:(honmeiR1v<70?33.0:37.0);
+    var idealBetReturnRate=honmeiR1v<40?137.1:(honmeiR1v<70?103.0:112.1);
+    // 中間ゾーン(40-70%)は資金配分シミュレーションで判明した「見送り推奨」帯
+    // 6,283R検証：中間ゾーンを除外すると回収率116.0%→126.5%、最大ドローダウンはほぼ変わらず
+    var idealBetSkipRecommended=(honmeiR1v>=40&&honmeiR1v<70);
 
     // 対抗1・2をまとめた買目（1着欄に両方）
     // 僅差の場合は対抗1・2を別々に、それ以外はまとめる
@@ -1675,6 +1678,7 @@ function App() {
       honmei4:honmei4,honmei10:honmei10,honmei6:honmei6,
       idealBet:idealBet,idealN:idealN,idealBetReason:idealBetReason,
       idealBetHonmeiConf:idealBetHonmeiConf,idealBetTotalConf:idealBetTotalConf,
+      idealBetReturnRate:idealBetReturnRate,idealBetSkipRecommended:idealBetSkipRecommended,
       taiko4:taiko4,taiko10:taiko10,taiko24:taiko24,taiko210:taiko210,taiko6:taiko6,taiko2:taiko2,
       ana4:ana4,ana10:ana10,ana6:ana6,
       suichi:suichi,anaBeat:anaBeat,nukemeA:nukemeA,nukemeB:nukemeB,motorB1Boats:motorB1Boats,motorB1Bets:motorB1Bets,
@@ -2465,8 +2469,13 @@ function App() {
                     </div>
                   )}
                   {yoso.idealBet&&yoso.idealBet.count>0&&(
-                    <div style={{marginTop:10,background:"linear-gradient(135deg,#2a1f4d,#1a2f4d)",borderRadius:8,padding:"10px 12px",border:"1px solid #7c6ae8"}}>
-                      <div style={{fontSize:11,color:"#b9a6ff",marginBottom:4,fontWeight:700}}>💡 理想買目（本命の信頼度で点数を可変）</div>
+                    <div style={{marginTop:10,background:yoso.idealBetSkipRecommended?"linear-gradient(135deg,#4d1f1f,#3d1414)":"linear-gradient(135deg,#2a1f4d,#1a2f4d)",borderRadius:8,padding:"10px 12px",border:yoso.idealBetSkipRecommended?"1px solid #e05252":"1px solid #7c6ae8"}}>
+                      {yoso.idealBetSkipRecommended&&(
+                        <div style={{background:"#e05252",color:"#fff",borderRadius:6,padding:"6px 10px",fontSize:12,fontWeight:800,marginBottom:8,textAlign:"center"}}>
+                          ⚠️ 見送り推奨：本命信頼度が中間ゾーン（40〜70%）です
+                        </div>
+                      )}
+                      <div style={{fontSize:11,color:yoso.idealBetSkipRecommended?"#ff9b9b":"#b9a6ff",marginBottom:4,fontWeight:700}}>💡 理想買目（本命の信頼度で点数を可変）</div>
                       <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
                         <div>
                           <div style={{fontSize:10,color:"#9db5cc",marginBottom:3}}>{yoso.idealBet.count}点・{yoso.idealBetReason}</div>
@@ -2481,9 +2490,13 @@ function App() {
                             <div style={{fontSize:9,color:"#9db5cc"}}>買い目的中信頼度</div>
                             <div style={{fontSize:15,fontWeight:800,color:"#5dd39e"}}>{yoso.idealBetTotalConf.toFixed(1)}%</div>
                           </div>
+                          <div style={{background:"#1a2f4d",borderRadius:6,padding:"5px 10px",textAlign:"center"}}>
+                            <div style={{fontSize:9,color:"#9db5cc"}}>参考回収率</div>
+                            <div style={{fontSize:15,fontWeight:800,color:yoso.idealBetReturnRate>=100?"#5dd39e":"#ff8a80"}}>{yoso.idealBetReturnRate.toFixed(1)}%</div>
+                          </div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度は過去3,164R実績（本命の信頼度帯ごとの的中率）に基づく参考値。個別レースの確約ではありません</div>
+                      <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度・回収率は過去6,283R実績（本命の信頼度帯ごとの集計）に基づく参考値。個別レースの確約ではありません。中間ゾーン(40〜70%)は資金配分シミュレーションで最もドローダウンリスクが高いと判明したため見送りを推奨しています</div>
                     </div>
                   )}
                   {yoso.taiko4&&yoso.taiko4.count>0&&(
