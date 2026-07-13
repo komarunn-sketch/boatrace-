@@ -291,6 +291,26 @@ function lookup(venue, course, diff) {
     var row = rows[i];
     if (diff >= row[0] && diff < row[1]) return {w1:row[2],w2:row[3],w3:row[4],top3:row[5]};
   }
+
+  // 24場の風向（方位）→向かい風/追い風/左横風/右横風 変換テーブル（結果CSVの生方位から風カテゴリを算出するため）
+  const VENUE_WIND_DIR = {"桐生": {"北": "追い風", "北東": "左横風", "東": "向かい風", "南東": "向かい風", "南": "向かい風", "南西": "右横風", "西": "追い風", "北西": "追い風"}, "戸田": {"北": "左横風", "北東": "向かい風", "東": "向かい風", "南東": "向かい風", "南": "右横風", "南西": "追い風", "西": "追い風", "北西": "追い風"}, "江戸川": {"北": "向かい風", "北東": "向かい風", "東": "右横風", "南東": "追い風", "南": "追い風", "南西": "追い風", "西": "左横風", "北西": "向かい風"}, "平和島": {"北": "向かい風", "北東": "向かい風", "東": "右横風", "南東": "追い風", "南": "追い風", "南西": "追い風", "西": "左横風", "北西": "向かい風"}, "津": {"北": "向かい風", "北東": "向かい風", "東": "右横風", "南東": "追い風", "南": "追い風", "南西": "追い風", "西": "左横風", "北西": "向かい風"}, "多摩川": {"西": "向かい風", "南西": "向かい風", "北西": "向かい風", "東": "追い風", "北東": "追い風", "南東": "追い風", "北": "右横風", "南": "左横風"}, "蒲郡": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "西": "右横風", "北西": "右横風", "東": "左横風"}, "浜名湖": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "三国": {"北": "追い風", "北東": "追い風", "東": "左横風", "南東": "向かい風", "南": "向かい風", "南西": "向かい風", "西": "右横風", "北西": "追い風"}, "常滑": {"北": "右横風", "北東": "追い風", "東": "追い風", "南東": "追い風", "南": "左横風", "南西": "向かい風", "西": "向かい風", "北西": "向かい風"}, "鳴門": {"北": "追い風", "北東": "左横風", "東": "向かい風", "南東": "向かい風", "南": "向かい風", "南西": "右横風", "西": "追い風", "北西": "追い風"}, "びわこ": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "住之江": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "尼崎": {"南西": "向かい風", "南": "向かい風", "西": "向かい風", "北東": "追い風", "北": "追い風", "東": "追い風", "北西": "右横風", "南東": "左横風"}, "徳山": {"東": "追い風", "北東": "追い風", "南東": "追い風", "西": "向かい風", "南西": "向かい風", "北西": "向かい風", "北": "右横風", "南": "左横風"}, "唐津": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "丸亀": {"西": "向かい風", "南西": "向かい風", "北西": "向かい風", "東": "追い風", "北東": "追い風", "南東": "追い風", "北": "右横風", "南": "左横風"}, "児島": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "宮島": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "下関": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "若松": {"南": "向かい風", "南東": "向かい風", "南西": "向かい風", "北": "追い風", "北東": "追い風", "北西": "追い風", "東": "左横風", "西": "右横風"}, "芦屋": {"北": "向かい風", "北東": "向かい風", "北西": "向かい風", "南": "追い風", "南東": "追い風", "南西": "追い風", "東": "右横風", "西": "左横風"}, "福岡": {"北東": "向かい風", "北": "向かい風", "東": "向かい風", "南西": "追い風", "南": "追い風", "西": "追い風", "南東": "右横風", "北西": "左横風"}, "大村": {"北": "向かい風", "北東": "向かい風", "北西": "向かい風", "南": "追い風", "南東": "追い風", "南西": "追い風", "東": "右横風", "西": "左横風"}};
+  function windKeyFromCompass(venue, dirRaw, speedRaw){
+    if(!dirRaw || !speedRaw) return "無風";
+    var d = String(dirRaw).trim();
+    if(d==="" || d==="無風" || d==="無\u3000風") return "無風";
+    var table = VENUE_WIND_DIR[venue];
+    if(!table || !table[d]) return "無風";
+    var cat = table[d];
+    var sm = String(speedRaw).match(/(\d+)/);
+    var speed = sm ? parseInt(sm[1],10) : 0;
+    if(speed===0) return "無風";
+    if(cat==="向かい風" || cat==="追い風"){
+      return speed>=5 ? (cat+"5m以上") : (cat+speed+"m");
+    } else {
+      return speed>=3 ? (cat+"3m以上") : (cat+speed+"m");
+    }
+  }
+
   return {w1:0,w2:0,w3:0,top3:0};
 }
 
@@ -513,6 +533,59 @@ function parseNewCSV(allRows){
   return updated;
 }
 
+// 結果CSV（1行=1艇：進入コース・展示タイム・ST・天候・風向・風速・波高を含む）から
+// 展示情報を一括取り込みする。既存のレースデータ(races)にマージする形で更新分だけ返す。
+function parseResultsCSV(allRows, existingRaces){
+  function pf(v){var n=parseFloat((v||"").replace(/%/g,"").trim());return isNaN(n)?null:n;}
+  function pi(v){var n=parseInt(v);return isNaN(n)?null:n;}
+  var raceMap={};
+  for(var ri=1;ri<allRows.length;ri++){
+    var row=allRows[ri];
+    if(row.length<19)continue;
+    var vname=(row[11]||"").trim();
+    var rnum=pi(row[12]);
+    if(!vname||!rnum||rnum<1||rnum>12)continue;
+    if(!VENUES[vname])continue;
+    var key=rk(vname,rnum);
+    if(!raceMap[key]){raceMap[key]={vname:vname,rnum:rnum,boats:[]};}
+    raceMap[key].boats.push(row);
+  }
+  var updated={};
+  var keys=Object.keys(raceMap);
+  for(var ki=0;ki<keys.length;ki++){
+    var key=keys[ki];
+    var rm=raceMap[key];
+    if(rm.boats.length<6)continue;
+    var base=existingRaces&&existingRaces[key]?Object.assign({},existingRaces[key]):emptyRace();
+    var ni=Object.assign({},base.inputs),nc=Object.assign({},base.courses);
+    var weatherRaw=null,windDirRaw=null,windSpeedRaw=null,waveRaw=null;
+    for(var bi=0;bi<rm.boats.length;bi++){
+      var brow=rm.boats[bi];
+      var b=pi(brow[2]);
+      if(!b||b<1||b>6)continue;
+      var course=pi(brow[8]);
+      if(course&&course>=1&&course<=6)nc[b]=course;
+      var tenji=pf(brow[7]);
+      if(tenji!=null&&tenji>=5.5&&tenji<=7.8){
+        ni[b]=Object.assign({},ni[b],{tenji:String(tenji)});
+      }
+      if(weatherRaw==null)weatherRaw=(brow[15]||"").trim();
+      if(windDirRaw==null)windDirRaw=(brow[16]||"").trim();
+      if(windSpeedRaw==null)windSpeedRaw=(brow[17]||"").trim();
+      if(waveRaw==null)waveRaw=(brow[18]||"").trim();
+    }
+    var windKey=windKeyFromCompass(rm.vname,windDirRaw,windSpeedRaw);
+    if(!updated[rm.vname])updated[rm.vname]={};
+    var out=Object.assign({},base);
+    out.inputs=ni;out.courses=nc;
+    out.wind=windKey;
+    out.weather=weatherRaw||base.weather;
+    out.waveHeight=waveRaw||base.waveHeight;
+    updated[rm.vname][rm.rnum]=out;
+  }
+  return updated;
+}
+
 function parseRowByIndex(d){
   function pf(s){var n=parseFloat((s||"").replace(/%/g,"").trim());return isNaN(n)?null:n;}
   function ps(s){var v=(s||"").trim();return(v==="-"||v==="")?null:v;}
@@ -639,6 +712,32 @@ function parseRowByIndex(d){
   return base;
 }
 
+const NAV_ITEMS=[
+  {id:"section-venue",label:"場選択",icon:"🏟"},
+  {id:"section-tenji",label:"展示",icon:"📋"},
+  {id:"section-slit",label:"スリット",icon:"🚦"},
+  {id:"section-baserate",label:"場平均",icon:"📊"},
+  {id:"section-yoso",label:"着順予想",icon:"🎯"},
+];
+function QuickNav(){
+  function jump(id){
+    var el=document.getElementById(id);
+    if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#0e1b2c",borderBottom:"1px solid #2c4762",padding:"6px 4px",display:"flex",gap:6,overflowX:"auto",alignItems:"center"}}>
+      <span style={{fontSize:13,fontWeight:900,color:"#7db4e8",flexShrink:0,marginRight:2}}>🚤</span>
+      {NAV_ITEMS.map(function(item){
+        return (
+          <button key={item.id} onClick={function(){jump(item.id);}} style={{display:"flex",alignItems:"center",gap:4,padding:"6px 10px",borderRadius:8,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+            <span>{item.icon}</span><span>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function App() {
   const [venue,setVenue]=useState("");
   const [racerCat,setRacerCat]=useState("直近1年");
@@ -652,6 +751,7 @@ function App() {
   const [openMotorB1,setOpenMotorB1]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
+  const [resultsCsvMsg,setResultsCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
 
   const rd=races[rk(venue,curRace)]||emptyRace();
@@ -725,6 +825,39 @@ function App() {
         setCsvDebug(null);
         setCsvMsg("✓ "+Object.keys(updated).length+"場 "+imported+"レース分を取り込みました");
       }catch(err){setCsvMsg("解析失敗: "+err.message);}
+      e.target.value="";
+    };
+    reader.readAsText(file,"UTF-8");
+  }
+
+  function handleResultsCSV(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var allRows=parseCSVFull(ev.target.result);
+        if(allRows.length<2){setResultsCsvMsg("データ行が見つかりません");return;}
+        var headers=allRows[0];
+        var isResultsFormat=headers[0]==="着順"&&headers[11]==="場名";
+        if(!isResultsFormat){setResultsCsvMsg("結果CSVの形式ではないようです（1列目=着順、12列目=場名を期待）");return;}
+        var updated=parseResultsCSV(allRows,races);
+        var vkeys=Object.keys(updated);
+        var imported=0;
+        for(var vi=0;vi<vkeys.length;vi++){imported+=Object.keys(updated[vkeys[vi]]).length;}
+        if(imported===0){setResultsCsvMsg("取り込めませんでした");return;}
+        setRaces(function(prev){
+          var next=Object.assign({},prev);
+          for(var i=0;i<vkeys.length;i++){
+            var v=vkeys[i];
+            var rnums=Object.keys(updated[v]);
+            for(var j=0;j<rnums.length;j++){
+              next[rk(v,rnums[j])]=updated[v][rnums[j]];
+            }
+          }
+          return next;
+        });
+        setResultsCsvMsg("✓ "+vkeys.length+"場 "+imported+"レース分の展示情報（進入コース・展示タイム・風・天候・波高）を取り込みました");
+      }catch(err){setResultsCsvMsg("解析失敗: "+err.message);}
       e.target.value="";
     };
     reader.readAsText(file,"UTF-8");
@@ -1722,7 +1855,7 @@ function App() {
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
   var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px",overflowX:"hidden",maxWidth:"100vw"};
-  var innerS={maxWidth:760,margin:"0 auto"};
+  var innerS={maxWidth:760,margin:"0 auto",paddingTop:48};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
   var inpS={width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 8px",fontSize:15};
@@ -1730,9 +1863,9 @@ function App() {
 
   return (
     <div style={wrapS}>
+      <QuickNav/>
       <div style={innerS}>
-        <div style={{fontSize:18,fontWeight:900,color:"#7db4e8",marginBottom:12}}>🚤 予想ツール</div>
-
+        
 
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 CSVから全レース一括取り込み</div>
@@ -1742,6 +1875,18 @@ function App() {
               <input type="file" accept=".csv" onChange={handleCSV} style={{display:"none"}}/>
             </label>
             {csvMsg&&<span style={{fontSize:12,color:csvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{csvMsg}</span>}
+          </div>
+        </div>
+
+        <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 結果CSVから展示情報を一括取り込み</div>
+          <div style={{fontSize:10,color:"#7da3c8",marginBottom:8}}>進入コース・展示タイム・風向・天候・波高を取り込みます（1行=1艇の結果CSV形式）</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <label style={{padding:"9px 18px",borderRadius:8,cursor:"pointer",background:"#3d7ab8",color:"#fff",fontSize:13,fontWeight:700}}>
+              結果CSVを選択して取り込む
+              <input type="file" accept=".csv" onChange={handleResultsCSV} style={{display:"none"}}/>
+            </label>
+            {resultsCsvMsg&&<span style={{fontSize:12,color:resultsCsvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{resultsCsvMsg}</span>}
           </div>
         </div>
 
@@ -2064,7 +2209,7 @@ function App() {
             </div>
           </div>
 
-        <div style={{marginBottom:24}}>
+        <div id="section-slit" style={{marginBottom:24}}>
           <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>スリット予測</div>
           {!slit?(
             <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#7da3c8",fontSize:12}}>6艇すべての平均STを選択するとスリット隊形を表示します</div>
@@ -2313,7 +2458,7 @@ function App() {
               </table>
             </div>
 
-            <div onClick={function(){setOpenBaseRate(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openBaseRate?8:16,cursor:"pointer",userSelect:"none"}}>
+            <div id="section-baserate" onClick={function(){setOpenBaseRate(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openBaseRate?8:16,cursor:"pointer",userSelect:"none"}}>
               <span style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8"}}>場平均で見る1着率</span>
               <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
             </div>
@@ -2369,7 +2514,7 @@ function App() {
         )}
 
             {yoso&&(
-              <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
+              <div id="section-yoso" style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                   <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🎯 着順予想</div>
                   <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
