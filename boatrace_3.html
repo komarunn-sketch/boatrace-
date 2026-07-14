@@ -2753,7 +2753,7 @@ function App() {
                           {yoso.valueBets.map(function(v,vi){
                             return (
                               <div key={vi} style={{display:"flex",justifyContent:"space-between",fontSize:10,color:v.isValue?"#5dd39e":"#7da3c8",padding:"2px 0"}}>
-                                <span>{honmei}-{v.pair[0]}-{v.pair[1]}</span>
+                                <span>{yoso.honmei}-{v.pair[0]}-{v.pair[1]}</span>
                                 <span>オッズ{v.odds}倍 ／ 期待値{v.ev.toFixed(0)}円{v.isValue&&" ★"}</span>
                               </div>
                             );
