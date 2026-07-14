@@ -97,13 +97,34 @@
 
   <h2>② スクリプトの保存</h2>
   <div class="step-desc" style="margin-bottom:12px;">
-    下のボタンでスクリプトの中身をコピーし、<b>Documentsアプリ</b>で新規テキストファイルを作成 → 中身を貼り付け → ファイル名を指定の名前で保存 → 手順4の<span class="script-name">Userscripts</span>フォルダへ移動、を2つとも行ってください。
+    下のボタンでスクリプトの中身をコピーし、<b>Documentsアプリ</b>で以下の手順を2つのスクリプトとも行ってください。
+  </div>
+
+  <div class="step">
+    <div class="step-title"><span class="step-num">①</span>Documentsに新規ファイル作成→貼り付け→名前変更</div>
+    <div class="step-desc">
+      Documentsアプリで新規テキストファイルを作成 → コピーしたスクリプトの中身を貼り付けて保存 → ファイル名を指定の名前（<span class="script-name">boatrace_tenji_boatcast.user.js</span>など）に変更する。<b>名前を変更すると、正しい拡張子のファイルとして開けるようになります。</b>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-title"><span class="step-num">②</span>「Documents」をタップしてiCloud同期をON</div>
+    <div class="step-desc">
+      Documentsアプリの一覧画面で「<b>Documents</b>」という項目（iCloud同期先）をタップしてオンにする。<b>これを押さないとiCloud Driveと同期されず、次の手順でUserscriptsフォルダへ移動できません。</b>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-title"><span class="step-num">③</span>「ファイル」アプリに戻ってUserscriptsへ移動</div>
+    <div class="step-desc">
+      「ファイル」アプリを開き、<b>Documents</b>フォルダ内に保存したスクリプトファイルを見つける → 手順4で作った<span class="script-name">Userscripts</span>フォルダへドラッグ（または「移動」操作）する。
+    </div>
   </div>
 
   <div class="step">
     <div class="step-title"><span class="step-num">A</span>BOATCAST版（メイン・推奨）</div>
     <div class="step-desc">
-      展示タイム・ST・風向・天候・波高まで公式BOATCASTから取得。保存名：<span class="script-name">boatrace_tenji_boatcast.user.js</span>
+      展示タイム・ST・風向・天候・波高・オッズ全120通りまで公式BOATCASTから取得。保存名：<span class="script-name">boatrace_tenji_boatcast.user.js</span>
     </div>
     <button class="copy-btn" onclick="copyScript('boatcast')">📋 スクリプトをコピー（BOATCAST版）</button>
   </div>
@@ -111,7 +132,7 @@
   <div class="step">
     <div class="step-title"><span class="step-num">B</span>kyoteibiyori版（予備）</div>
     <div class="step-desc">
-      BOATCASTが使えない時の代替。展示タイム・ST・体重等のみ（風情報なし）。保存名：<span class="script-name">boatrace_tenji_chrome.user.js</span>
+      BOATCASTが使えない時の代替。展示タイム・ST・体重等のみ（風情報・オッズなし）。保存名：<span class="script-name">boatrace_tenji_chrome.user.js</span>
     </div>
     <button class="copy-btn secondary" onclick="copyScript('kyoteibiyori')">📋 スクリプトをコピー（kyoteibiyori版）</button>
   </div>
@@ -239,6 +260,35 @@ const SCRIPT_BOATCAST = `// ==UserScript==
   }
 
   // 「スタート展示」タブ: 実際のSTタイミング（フライングは F.xx 表記→数値部分のみ使用）
+  function extractOdds3tan() {
+    var tables = document.querySelectorAll('table.par-table01.odds3Tan');
+    if (!tables || tables.length < 6) return null;
+    var result = {};
+    for (var t = 0; t < tables.length; t++) {
+      var rows = tables[t].querySelectorAll('tr');
+      var first = 0;
+      var curSecond = null;
+      for (var i = 0; i < rows.length; i++) {
+        var cells = rows[i].querySelectorAll('td');
+        if (cells.length === 2 && cells[0].className.indexOf('chaku_1') >= 0) {
+          first = parseInt(cells[0].textContent.trim(), 10);
+          continue;
+        }
+        if (cells.length === 3) {
+          curSecond = parseInt(cells[0].textContent.trim(), 10);
+          var third = parseInt(cells[1].textContent.trim(), 10);
+          var odds = parseFloat(cells[2].textContent.trim());
+          result[first + '-' + curSecond + '-' + third] = odds;
+        } else if (cells.length === 2 && curSecond !== null) {
+          var third2 = parseInt(cells[0].textContent.trim(), 10);
+          var odds2 = parseFloat(cells[1].textContent.trim());
+          result[first + '-' + curSecond + '-' + third2] = odds2;
+        }
+      }
+    }
+    return Object.keys(result).length === 120 ? result : null;
+  }
+
   function extractSt() {
     var table = document.querySelector('table.par-table01.normal.tbl_tenji');
     if (!table) return null;
@@ -328,8 +378,12 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     var weather = extractWeather();
     var windKey = weather ? computeWindKey(weather.windDir, weather.windSpeed) : null;
 
+    clickOuterTab('オッズ');
+    await wait(500);
+    var odds = extractOdds3tan();
+
+    if (origOuterLabel) { clickOuterTab(origOuterLabel); await wait(300); }
     if (origTabLabel) { clickTab(origTabLabel); }
-    if (origOuterLabel && origOuterLabel !== '直前情報') { await wait(200); clickOuterTab(origOuterLabel); }
 
     btn.textContent = origLabel;
 
@@ -353,12 +407,13 @@ const SCRIPT_BOATCAST = `// ==UserScript==
       lines.push('天候 ' + weather.weather);
       lines.push('波高 ' + weather.wave);
     }
+    if (odds) lines.push('オッズ ' + JSON.stringify(odds));
 
     var text = lines.join('\\n');
-    showCopyOverlay(text, sts, windKey, weather);
+    showCopyOverlay(text, sts, windKey, weather, odds);
   }
 
-  function showCopyOverlay(text, hasSt, windKey, weather) {
+  function showCopyOverlay(text, hasSt, windKey, weather, odds) {
     var overlay = document.getElementById('tenji-copy-overlay');
     if (overlay) overlay.remove();
 
@@ -380,7 +435,7 @@ const SCRIPT_BOATCAST = `// ==UserScript==
       var windBox = document.createElement('div');
       windBox.style.cssText = 'background:#0e1b2c;border:1px solid #f9c513;border-radius:8px;padding:8px 10px;margin-bottom:10px;';
       var windLine1 = document.createElement('div');
-      windLine1.textContent = '🌬 風・天候・波高も下のテキストに含まれています（自動反映）: ' + windKey;
+      windLine1.textContent = '🌬 風・天候・波高も下のテキストに含まれています（自動反映）: ' + windKey + (odds ? '　💰オッズも含む' : '');
       windLine1.style.cssText = 'color:#f9c513;font-size:13px;font-weight:800;';
       windBox.appendChild(windLine1);
       if (weather) {
@@ -560,7 +615,6 @@ const SCRIPT_KYOTEIBIYORI = `// ==UserScript==
   observer.observe(document.body, { childList: true, subtree: true });
 })();
 `;
-
 </script>
 </body>
 </html>
