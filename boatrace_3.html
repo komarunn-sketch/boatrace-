@@ -980,7 +980,11 @@ function App() {
         // 天候・波高を貼り付けテキストから自動反映（final1のスコア計算にも反映される）
         var weatherLine=parseSingleLine(text,"天候");
         var waveLine=parseSingleLine(text,"波高");
-        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
+        // オッズ（Tampermonkey版から貼り付けた場合、JSON文字列として1行に含まれる）
+        var oddsLine=parseSingleLine(text,"オッズ");
+        var oddsParsed=null;
+        if(oddsLine){try{oddsParsed=JSON.parse(oddsLine);}catch(e){oddsParsed=null;}}
+        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.odds3tan=oddsParsed||prev.odds3tan;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
         return;
       }
       updateRd(function(prev){var n=Object.assign({},prev);n.tenjiMsg="タイムが見つかりません";return n;});
