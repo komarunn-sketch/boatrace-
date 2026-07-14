@@ -65,6 +65,8 @@ function waveBucket(raw){
   var cm=parseInt(m[1],10);
   return cm===0?"0cm":(cm<=2?"1-2cm":"3cm+");
 }
+// 買い目候補(1〜6番目)の無条件的中確率(%)。本命信頼度帯別。6,283R実績より算出
+const COMBO_PROB_TABLE = {"不安定":{"honmei_rate":39.4,"rank_probs_pct":[7.19,3.74,2.72,3.26,3.86,2.17]},"中間":{"honmei_rate":58.4,"rank_probs_pct":[10.56,6.85,5.1,5.1,5.42,3.64]},"堅い":{"honmei_rate":75.7,"rank_probs_pct":[13.11,8.61,7.73,7.52,6.25,3.51]}};
 const VENUE_TENJI_IMPORTANCE = {"びわこ": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 21.2, "isshu": 28.9, "mawari": 40.4, "chokusen": -10.0}, "top": "mawari"}, "三国": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 15.3, "isshu": 31.3, "mawari": 27.3, "chokusen": 15.4}, "top": "isshu"}, "下関": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 20.4, "isshu": 39.5, "mawari": 28.7, "chokusen": 18.9}, "top": "isshu"}, "丸亀": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 29.1, "isshu": 35.5, "mawari": 16.7, "chokusen": 22.3}, "top": "isshu"}, "児島": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 21.3, "isshu": 30.4, "mawari": 7.5, "chokusen": 35.5}, "top": "chokusen"}, "唐津": {"ranking": ["mawari", "tenji", "isshu", "chokusen"], "gaps": {"tenji": 23.7, "isshu": 23.2, "mawari": 40.2, "chokusen": -1.3}, "top": "mawari"}, "常滑": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.1, "isshu": 42.8, "mawari": 15.9, "chokusen": 23.8}, "top": "isshu"}, "平和島": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 14.0, "isshu": 29.1, "mawari": 19.7, "chokusen": 12.4}, "top": "isshu"}, "戸田": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.8, "isshu": 36.8, "mawari": 15.6, "chokusen": 23.0}, "top": "isshu"}, "江戸川": {"ranking": ["tenji"], "gaps": {"tenji": 9.9}, "top": "tenji"}, "津": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 20.2, "isshu": 40.1, "mawari": 40.2, "chokusen": -4.0}, "top": "mawari"}, "浜名湖": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 25.7, "isshu": 40.4, "mawari": 30.4, "chokusen": 0.4}, "top": "isshu"}, "福岡": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 24.4, "isshu": 40.7, "mawari": 27.6, "chokusen": 12.4}, "top": "isshu"}, "若松": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 16.9, "isshu": 36.7, "mawari": 29.3, "chokusen": 20.4}, "top": "isshu"}, "鳴門": {"ranking": ["chokusen", "tenji", "isshu", "mawari"], "gaps": {"tenji": 21.0, "isshu": 20.6, "mawari": 10.8, "chokusen": 26.8}, "top": "chokusen"}, "多摩川": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 23.9, "isshu": 29.7, "mawari": -0.4, "chokusen": 39.2}, "top": "chokusen"}, "大村": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 22.7, "isshu": 33.8, "mawari": 12.5, "chokusen": 21.9}, "top": "isshu"}, "徳山": {"ranking": ["tenji"], "gaps": {"tenji": 23.6}, "top": "tenji"}, "桐生": {"ranking": ["isshu", "chokusen", "mawari", "tenji"], "gaps": {"tenji": 7.1, "isshu": 34.1, "mawari": 19.9, "chokusen": 20.1}, "top": "isshu"}, "住之江": {"ranking": ["tenji"], "gaps": {"tenji": 22.7}, "top": "tenji"}, "尼崎": {"ranking": ["tenji"], "gaps": {"tenji": 27.0}, "top": "tenji"}, "芦屋": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 23.8, "isshu": 43.1, "mawari": 38.6, "chokusen": 18.9}, "top": "isshu"}, "蒲郡": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 27.8, "isshu": 28.2, "mawari": 32.2, "chokusen": 0.9}, "top": "mawari"}, "宮島": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 23.5, "isshu": 35.9, "mawari": 3.4, "chokusen": 28.3}, "top": "isshu"}};
 
 function weatherBucket(raw){
@@ -356,7 +358,7 @@ function emptyRace() {
     weights:{1:"",2:"",3:"",4:"",5:"",6:""},
     courses:{1:1,2:2,3:3,4:4,5:5,6:6},
     wind:"無風",
-    weather:"",waveHeight:"",
+    weather:"",waveHeight:"",odds3tan:null,
     tokuten:null,
   };
 }
@@ -1618,6 +1620,19 @@ function App() {
       var s3=Object.keys(used3).sort().join("");
       return{text:axis+"-"+s2+"-"+s3,count:count};
     }
+    // 個別の(2着,3着)ペアリストを順位付きで返す（オッズ期待値計算用）
+    function makeBetPairs(axis,maxN){
+      if(!axis)return[];
+      var p2c=[].concat(p2top,p2mid,p2rest).filter(function(b){return b!==axis;});
+      var p3c=[].concat(p3top,p3mid,p3rest).filter(function(b){return b!==axis;});
+      var pairs=[];
+      for(var i=0;i<p2c.length&&pairs.length<maxN;i++){
+        for(var j=0;j<p3c.length&&pairs.length<maxN;j++){
+          if(p2c[i]!==p3c[j])pairs.push([p2c[i],p3c[j]]);
+        }
+      }
+      return pairs;
+    }
     // 対抗（複数1着対応）
     function makeTaikoBet(t1,t2,maxN){
       if(!t1)return{text:"",count:0};
@@ -1652,6 +1667,24 @@ function App() {
     // 中間ゾーン(40-70%)は資金配分シミュレーションで判明した「見送り推奨」帯
     // 6,283R検証：中間ゾーンを除外すると回収率116.0%→126.5%、最大ドローダウンはほぼ変わらず
     var idealBetSkipRecommended=(honmeiR1v>=40&&honmeiR1v<70);
+
+    // オッズ「うま味」計算：買い目候補ごとに確率×オッズで期待値を算出
+    var idealBetPairs=makeBetPairs(honmei,idealN);
+    var confTier=honmeiR1v<40?"不安定":(honmeiR1v<70?"中間":"堅い");
+    var probTable=COMBO_PROB_TABLE[confTier];
+    var valueBets=[];
+    if(rd.odds3tan&&probTable){
+      for(var vbi=0;vbi<idealBetPairs.length;vbi++){
+        var pair=idealBetPairs[vbi];
+        var comboKey=honmei+"-"+pair[0]+"-"+pair[1];
+        var odds=rd.odds3tan[comboKey];
+        if(odds==null)continue;
+        var prob=probTable.rank_probs_pct[vbi]!=null?probTable.rank_probs_pct[vbi]:0;
+        var ev=(prob/100)*(odds*100); // 100円あたりの期待払い戻し
+        valueBets.push({pair:pair,odds:odds,prob:prob,ev:ev,isValue:ev>=100});
+      }
+    }
+    var hasValueBet=valueBets.some(function(v){return v.isValue;});
 
     // 対抗1・2をまとめた買目（1着欄に両方）
     // 僅差の場合は対抗1・2を別々に、それ以外はまとめる
@@ -1823,6 +1856,7 @@ function App() {
       idealBet:idealBet,idealN:idealN,idealBetReason:idealBetReason,
       idealBetHonmeiConf:idealBetHonmeiConf,idealBetTotalConf:idealBetTotalConf,
       idealBetReturnRate:idealBetReturnRate,idealBetSkipRecommended:idealBetSkipRecommended,
+      valueBets:valueBets,hasValueBet:hasValueBet,
       taiko4:taiko4,taiko10:taiko10,taiko24:taiko24,taiko210:taiko210,taiko6:taiko6,taiko2:taiko2,
       ana4:ana4,ana10:ana10,ana6:ana6,
       suichi:suichi,anaBeat:anaBeat,nukemeA:nukemeA,nukemeB:nukemeB,motorB1Boats:motorB1Boats,motorB1Bets:motorB1Bets,
@@ -2142,11 +2176,18 @@ function App() {
               </div>;
             })()}
             <textarea value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" rows={5} style={{width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:8,padding:10,fontSize:13,resize:"vertical"}}/>
+            <input type="text" id="odds-data-input" value="" readOnly onChange={function(e){
+              try{
+                var parsed=JSON.parse(e.target.value);
+                updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;return n;});
+              }catch(err){}
+            }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
               <button onClick={parseTenji} style={btnS("#3d7ab8","#fff")}>解析して入力</button>
               <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText="";n.tenjiMsg="";return n;});}} style={btnS("#0e1b2c","#9db5cc",{border:"1px solid #2c4762"})}>クリア</button>
               {rd.tenjiMsg&&<span style={{fontSize:12,color:rd.tenjiMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80"}}>{rd.tenjiMsg}</span>}
               {(rd.weather||rd.waveHeight)&&<div style={{fontSize:11,color:"#9db5cc",marginTop:4}}>{rd.weather&&("天候:"+rd.weather)}{rd.weather&&rd.waveHeight&&"　"}{rd.waveHeight&&("波高:"+rd.waveHeight)}</div>}
+              {rd.odds3tan&&<div style={{fontSize:11,color:"#5dd39e",marginTop:4}}>✓ オッズ120通り取得済み</div>}
             </div>
           </div>
         )}
@@ -2666,6 +2707,22 @@ function App() {
                         </div>
                       </div>
                       <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度・回収率は過去6,283R実績（本命の信頼度帯ごとの集計）に基づく参考値。個別レースの確約ではありません。中間ゾーン(40〜70%)は資金配分シミュレーションで最もドローダウンリスクが高いと判明したため見送りを推奨しています</div>
+                      {yoso.valueBets&&yoso.valueBets.length>0&&(
+                        <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #2c4762"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:yoso.hasValueBet?"#5dd39e":"#9db5cc",marginBottom:4}}>
+                            {yoso.hasValueBet?"💰 オッズの「うま味」あり":"オッズ期待値チェック"}
+                          </div>
+                          {yoso.valueBets.map(function(v,vi){
+                            return (
+                              <div key={vi} style={{display:"flex",justifyContent:"space-between",fontSize:10,color:v.isValue?"#5dd39e":"#7da3c8",padding:"2px 0"}}>
+                                <span>{honmei}-{v.pair[0]}-{v.pair[1]}</span>
+                                <span>オッズ{v.odds}倍 ／ 期待値{v.ev.toFixed(0)}円{v.isValue&&" ★"}</span>
+                              </div>
+                            );
+                          })}
+                          <div style={{fontSize:9,color:"#5a6b7d",marginTop:4}}>※期待値100円以上＝理論上プラス（確率推定・オッズとも参考値）</div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {yoso.taiko4&&yoso.taiko4.count>0&&(
