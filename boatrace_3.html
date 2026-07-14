@@ -358,7 +358,7 @@ function emptyRace() {
     weights:{1:"",2:"",3:"",4:"",5:"",6:""},
     courses:{1:1,2:2,3:3,4:4,5:5,6:6},
     wind:"無風",
-    weather:"",waveHeight:"",odds3tan:null,
+    weather:"",waveHeight:"",odds3tan:null,oddsTime:null,
     tokuten:null,
   };
 }
@@ -1015,7 +1015,7 @@ function App() {
             if(op&&typeof op==="object"&&Object.keys(op).length===120)oddsParsed=op;
           }catch(e){oddsParsed=null;}
         }
-        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.odds3tan=oddsParsed||prev.odds3tan;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
+        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.odds3tan=oddsParsed||prev.odds3tan;n.oddsTime=oddsParsed?Date.now():prev.oddsTime;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
         return;
       }
       updateRd(function(prev){var n=Object.assign({},prev);n.tenjiMsg="タイムが見つかりません";return n;});
@@ -2217,7 +2217,7 @@ function App() {
             <input type="text" id="odds-data-input" value="" readOnly onChange={function(e){
               try{
                 var parsed=JSON.parse(e.target.value);
-                updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;return n;});
+                updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;n.oddsTime=Date.now();return n;});
               }catch(err){}
             }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
@@ -2747,8 +2747,17 @@ function App() {
                       <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度・回収率は過去6,283R実績（本命の信頼度帯ごとの集計）に基づく参考値。個別レースの確約ではありません。中間ゾーン(40〜70%)は資金配分シミュレーションで最もドローダウンリスクが高いと判明したため見送りを推奨しています</div>
                       {yoso.valueBets&&yoso.valueBets.length>0&&(
                         <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #2c4762"}}>
-                          <div style={{fontSize:11,fontWeight:800,color:yoso.hasValueBet?"#5dd39e":"#9db5cc",marginBottom:4}}>
-                            {yoso.hasValueBet?"💰 オッズの「うま味」あり":"オッズ期待値チェック"}
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                            <div style={{fontSize:11,fontWeight:800,color:yoso.hasValueBet?"#5dd39e":"#9db5cc"}}>
+                              {yoso.hasValueBet?"💰 オッズの「うま味」あり":"オッズ期待値チェック"}
+                            </div>
+                            {rd.oddsTime&&(function(){
+                              var mins=Math.floor((Date.now()-rd.oddsTime)/60000);
+                              var stale=mins>=5;
+                              return <span style={{fontSize:9,color:stale?"#ff8a80":"#7da3c8",fontWeight:stale?800:400}}>
+                                {stale?"⚠️ ":""}取得から{mins<1?"1分未満":mins+"分"}経過
+                              </span>;
+                            })()}
                           </div>
                           {yoso.valueBets.map(function(v,vi){
                             return (
@@ -2758,7 +2767,7 @@ function App() {
                               </div>
                             );
                           })}
-                          <div style={{fontSize:9,color:"#5a6b7d",marginTop:4}}>※期待値100円以上＝理論上プラス（確率推定・オッズとも参考値）</div>
+                          <div style={{fontSize:9,color:"#5a6b7d",marginTop:4}}>※期待値100円以上＝理論上プラス（確率推定・オッズとも参考値）。<b>オッズは締切間際に大きく変動します。締切直前にもう一度取得し直すと精度が上がります</b></div>
                         </div>
                       )}
                     </div>
