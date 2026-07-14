@@ -751,6 +751,32 @@ function QuickNav(){
   );
 }
 
+class ErrorBoundary extends React.Component{
+  constructor(props){
+    super(props);
+    this.state={hasError:false,errorMsg:"",errorStack:""};
+  }
+  static getDerivedStateFromError(error){
+    return{hasError:true,errorMsg:String(error&&error.message||error)};
+  }
+  componentDidCatch(error,info){
+    this.setState({errorStack:(info&&info.componentStack)||""});
+  }
+  render(){
+    if(this.state.hasError){
+      return(
+        <div style={{minHeight:"100vh",background:"#0e1b2c",color:"#fff",padding:20,fontFamily:"sans-serif"}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#ff8a80",marginBottom:12}}>⚠️ エラーが発生しました</div>
+          <div style={{fontSize:13,color:"#e6edf3",marginBottom:12,wordBreak:"break-all"}}>{this.state.errorMsg}</div>
+          <div style={{fontSize:11,color:"#9db5cc",marginBottom:16,whiteSpace:"pre-wrap",wordBreak:"break-all"}}>{this.state.errorStack}</div>
+          <button onClick={function(){window.location.reload();}} style={{padding:"10px 16px",borderRadius:8,background:"#3d7ab8",color:"#fff",border:"none",fontSize:14,fontWeight:700}}>再読み込み</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [venue,setVenue]=useState("");
   const [racerCat,setRacerCat]=useState("直近1年");
@@ -2840,7 +2866,7 @@ function App() {
 
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
 </script>
 </body>
