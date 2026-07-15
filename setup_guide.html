@@ -234,6 +234,8 @@ const SCRIPT_BOATCAST = `// ==UserScript==
   }
 
   // 「オリジナル展示データ」タブ: 展示/一周/まわり足/直線/体重/調整重量/チルト
+  // 戻り値: 正常に全艇分埋まっていればオブジェクト、テーブル未描画/データ未着（空欄）ならnull
+  //         （nullを返すことでwaitForOriten側がリトライする）
   function extractOriten() {
     var table = document.querySelector('table.par-table01.oriten');
     if (!table) return null;
@@ -242,21 +244,42 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     var res = { tenji: [], isshu: [], mawari: [], chokusen: [], weight: [], chosei: [], tilt: [] };
     for (var i = 0; i < rows.length; i++) {
       var tds = rows[i].querySelectorAll('td');
-      if (tds.length < 8) continue;
+      if (tds.length < 8) return null; // 行の描画がまだ整っていない→リトライ対象
       var leaf = tds[2].querySelectorAll('span');
       var wc = [];
       for (var k = 0; k < leaf.length; k++) {
         if (leaf[k].children.length === 0) wc.push(leaf[k].textContent.trim());
       }
-      res.weight.push(wc[0] || '-');
-      res.chosei.push(wc[1] || '-');
-      res.tilt.push(tds[3].textContent.trim() || '-');
-      res.tenji.push(tds[4].textContent.trim() || '-');
-      res.isshu.push(tds[5].textContent.trim() || '-');
-      res.mawari.push(tds[6].textContent.trim() || '-');
-      res.chokusen.push(tds[7].textContent.trim() || '-');
+      var w = wc[0] || '';
+      var c = wc[1] || '';
+      var tl = tds[3].textContent.trim();
+      var tj = tds[4].textContent.trim();
+      var is = tds[5].textContent.trim();
+      var mw = tds[6].textContent.trim();
+      var ch = tds[7].textContent.trim();
+      // 全項目が空欄の行＝データ未着のプレースホルダー状態とみなしリトライ対象にする
+      if (!w && !c && !tl && !tj && !is && !mw && !ch) return null;
+      res.weight.push(w || '-');
+      res.chosei.push(c || '-');
+      res.tilt.push(tl || '-');
+      res.tenji.push(tj || '-');
+      res.isshu.push(is || '-');
+      res.mawari.push(mw || '-');
+      res.chokusen.push(ch || '-');
     }
     return res;
+  }
+
+  // extractOritenが安定して値を返すまでポーリングする（固定wait依存の脱却）
+  async function waitForOriten(maxMs) {
+    var start = Date.now();
+    var result = null;
+    while (Date.now() - start < maxMs) {
+      result = extractOriten();
+      if (result) return result;
+      await wait(200);
+    }
+    return null;
   }
 
   // 「スタート展示」タブ: 実際のSTタイミング（フライングは F.xx 表記→数値部分のみ使用）
@@ -300,9 +323,9 @@ const SCRIPT_BOATCAST = `// ==UserScript==
       var raw = '-';
       for (var j = tds.length - 1; j >= 0; j--) {
         var t = tds[j].textContent.trim();
-        if (/^F?\\.\\d+$/.test(t) || /^F?\\d+\\.\\d+$/.test(t)) { raw = t; break; }
+        if (/^F?\.\d+$/.test(t) || /^F?\d+\.\d+$/.test(t)) { raw = t; break; }
       }
-      var m = raw.match(/(\\d*\\.\\d+)/);
+      var m = raw.match(/(\d*\.\d+)/);
       sts.push(m ? m[1] : '-');
     }
     return sts;
@@ -340,12 +363,12 @@ const SCRIPT_BOATCAST = `// ==UserScript==
 
   function computeWindKey(dirText, speedText) {
     if (!dirText || !speedText) return null;
-    var m = dirText.match(/\\((.+?)\\)/);
+    var m = dirText.match(/\((.+?)\)/);
     var cat = m ? m[1] : dirText;
     var catMap = { '向い風': '向かい風', '向かい風': '向かい風', '追い風': '追い風', '左横風': '左横風', '右横風': '右横風', '無風': '無風', '無 風': '無風' };
     cat = catMap[cat] || cat;
     if (cat === '無風') return '無風';
-    var sm = speedText.match(/(\\d+)/);
+    var sm = speedText.match(/(\d+)/);
     var speed = sm ? parseInt(sm[1], 10) : 0;
     if (speed === 0) return '無風';
     if (cat === '向かい風' || cat === '追い風') {
@@ -369,8 +392,8 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     await wait(400);
 
     clickTab('オリジナル展示データ');
-    await wait(500);
-    var oriten = extractOriten();
+    await wait(300);
+    var oriten = await waitForOriten(4000);
 
     clickTab('スタート展示');
     await wait(500);
@@ -388,7 +411,7 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     btn.textContent = origLabel;
 
     if (!oriten) {
-      showToast('展示データがまだ発表されていません', false);
+      showToast('展示データを取得できませんでした（未発表、または読込が遅い可能性）', false);
       return;
     }
 
@@ -409,7 +432,7 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     }
     if (odds) lines.push('オッズ ' + JSON.stringify(odds));
 
-    var text = lines.join('\\n');
+    var text = lines.join('\n');
     showCopyOverlay(text, sts, windKey, weather, odds);
   }
 
@@ -440,7 +463,7 @@ const SCRIPT_BOATCAST = `// ==UserScript==
       windBox.appendChild(windLine1);
       if (weather) {
         var windLine2 = document.createElement('div');
-        windLine2.textContent = '(元データ: ' + weather.weather + ' / ' + weather.windDir.replace(/\\s+/g, '') + ' / ' + weather.windSpeed + ' / 波高' + weather.wave + ')';
+        windLine2.textContent = '(元データ: ' + weather.weather + ' / ' + weather.windDir.replace(/\s+/g, '') + ' / ' + weather.windSpeed + ' / 波高' + weather.wave + ')';
         windLine2.style.cssText = 'color:#8a94a6;font-size:10px;margin-top:2px;';
         windBox.appendChild(windLine2);
       }
