@@ -233,53 +233,104 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     return false;
   }
 
+  // ヘッダー行のテキストから各項目の列インデックスを動的に判定する。
+  // 会場によって「直線」列が存在しない等の差異があるため、固定インデックスは使わない。
+  function getOritenColMap(table) {
+    var thead = table.querySelector('thead');
+    if (!thead) return null;
+    var ths = thead.querySelectorAll('th');
+    if (ths.length < 5) return null;
+    var col = { weightChosei: -1, tilt: -1, tenji: -1, isshu: -1, mawari: -1, chokusen: -1 };
+    for (var i = 0; i < ths.length; i++) {
+      var txt = ths[i].textContent.replace(/\s+/g, '');
+      if (txt.indexOf('体重') >= 0) col.weightChosei = i;
+      else if (txt.indexOf('チルト') >= 0) col.tilt = i;
+      else if (txt.indexOf('展示') >= 0) col.tenji = i;
+      else if (txt.indexOf('一周') >= 0) col.isshu = i;
+      else if (txt.indexOf('まわり足') >= 0 || txt.indexOf('回り足') >= 0) col.mawari = i;
+      else if (txt.indexOf('直線') >= 0) col.chokusen = i;
+    }
+    return col;
+  }
+
   // 「オリジナル展示データ」タブ: 展示/一周/まわり足/直線/体重/調整重量/チルト
-  // 戻り値: 正常に全艇分埋まっていればオブジェクト、テーブル未描画/データ未着（空欄）ならnull
-  //         （nullを返すことでwaitForOriten側がリトライする）
+  // ヘッダーから動的に列位置を判定して読む。会場によって存在しない列（例:徳山は「直線」列が無い）は
+  // 構造的な欠如として最初から'-'扱いにし、読込中の空欄（null）とは区別してリトライ判定に使う。
   function extractOriten() {
     var table = document.querySelector('table.par-table01.oriten');
     if (!table) return null;
+    var col = getOritenColMap(table);
+    if (!col) return null;
     var rows = table.querySelectorAll('tbody > tr');
     if (rows.length < 6) return null;
     var res = { tenji: [], isshu: [], mawari: [], chokusen: [], weight: [], chosei: [], tilt: [] };
     for (var i = 0; i < rows.length; i++) {
       var tds = rows[i].querySelectorAll('td');
-      if (tds.length < 8) return null; // 行の描画がまだ整っていない→リトライ対象
-      var leaf = tds[2].querySelectorAll('span');
-      var wc = [];
-      for (var k = 0; k < leaf.length; k++) {
-        if (leaf[k].children.length === 0) wc.push(leaf[k].textContent.trim());
+      var cellText = function (idx) {
+        if (idx < 0) return '-';          // この会場には元々この項目の列がない（構造的欠如）
+        if (idx >= tds.length) return null; // 読込中でまだ該当セルが無い（リトライ対象）
+        var t = tds[idx].textContent.trim();
+        return t || null;                  // 空欄＝読込中とみなしリトライ対象にする
+      };
+      var w, c;
+      if (col.weightChosei < 0) {
+        w = '-'; c = '-';
+      } else if (col.weightChosei >= tds.length) {
+        w = null; c = null;
+      } else {
+        var leaf = tds[col.weightChosei].querySelectorAll('span');
+        var wc = [];
+        for (var k = 0; k < leaf.length; k++) {
+          if (leaf[k].children.length === 0) wc.push(leaf[k].textContent.trim());
+        }
+        w = wc[0] || null;
+        c = wc[1] || null;
       }
-      var w = wc[0] || '';
-      var c = wc[1] || '';
-      var tl = tds[3].textContent.trim();
-      var tj = tds[4].textContent.trim();
-      var is = tds[5].textContent.trim();
-      var mw = tds[6].textContent.trim();
-      var ch = tds[7].textContent.trim();
-      // 全項目が空欄の行＝データ未着のプレースホルダー状態とみなしリトライ対象にする
-      if (!w && !c && !tl && !tj && !is && !mw && !ch) return null;
-      res.weight.push(w || '-');
-      res.chosei.push(c || '-');
-      res.tilt.push(tl || '-');
-      res.tenji.push(tj || '-');
-      res.isshu.push(is || '-');
-      res.mawari.push(mw || '-');
-      res.chokusen.push(ch || '-');
+      res.weight.push(w);
+      res.chosei.push(c);
+      res.tilt.push(cellText(col.tilt));
+      res.tenji.push(cellText(col.tenji));
+      res.isshu.push(cellText(col.isshu));
+      res.mawari.push(cellText(col.mawari));
+      res.chokusen.push(cellText(col.chokusen)); // 徳山等では列自体が無いため常に'-'（リトライ対象にならない）
     }
     return res;
   }
 
-  // extractOritenが安定して値を返すまでポーリングする（固定wait依存の脱却）
+  // resの全項目が読込完了しているか判定。構造的に存在しない列('-')は完了扱い、
+  // 読込中の空欄（null）が1つでも残っていれば未完了としてリトライさせる。
+  function isOritenComplete(res) {
+    if (!res) return false;
+    var arrs = [res.tenji, res.isshu, res.mawari, res.chokusen, res.weight, res.chosei, res.tilt];
+    for (var a = 0; a < arrs.length; a++) {
+      for (var b = 0; b < arrs[a].length; b++) {
+        if (arrs[a][b] === null) return false;
+      }
+    }
+    return true;
+  }
+
+  // 出力直前にnull（タイムアウトしても読めなかった項目）を'-'に変換する
+  function finalizeOriten(res) {
+    var out = {};
+    ['tenji', 'isshu', 'mawari', 'chokusen', 'weight', 'chosei', 'tilt'].forEach(function (key) {
+      out[key] = res[key].map(function (v) { return v == null ? '-' : v; });
+    });
+    return out;
+  }
+
+  // 完全なデータが取れるまでポーリングし、タイムアウトしても最後に読み取れた
+  // ベストエフォートの結果（null混じりでも）を返す（諦めてnullを返さない）。
+  // 戻り値: { data: 表示用に確定した値（nullは'-'に変換済み）, complete: 全項目読み切れたか }
   async function waitForOriten(maxMs) {
     var start = Date.now();
-    var result = null;
+    var last = null;
     while (Date.now() - start < maxMs) {
-      result = extractOriten();
-      if (result) return result;
+      last = extractOriten();
+      if (isOritenComplete(last)) return { data: finalizeOriten(last), complete: true };
       await wait(200);
     }
-    return null;
+    return last ? { data: finalizeOriten(last), complete: false } : { data: null, complete: false };
   }
 
   // 「スタート展示」タブ: 実際のSTタイミング（フライングは F.xx 表記→数値部分のみ使用）
@@ -393,7 +444,8 @@ const SCRIPT_BOATCAST = `// ==UserScript==
 
     clickTab('オリジナル展示データ');
     await wait(300);
-    var oriten = await waitForOriten(4000);
+    var oritenResult = await waitForOriten(4000);
+    var oriten = oritenResult.data;
 
     clickTab('スタート展示');
     await wait(500);
@@ -411,8 +463,11 @@ const SCRIPT_BOATCAST = `// ==UserScript==
     btn.textContent = origLabel;
 
     if (!oriten) {
-      showToast('展示データを取得できませんでした（未発表、または読込が遅い可能性）', false);
+      showToast('展示データを取得できませんでした（未発表の可能性）', false);
       return;
+    }
+    if (!oritenResult.complete) {
+      showToast('一部の展示データが取得できず「-」で埋めています（再取得推奨）', false);
     }
 
     var lines = [];
