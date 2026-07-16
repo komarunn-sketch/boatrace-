@@ -246,7 +246,7 @@ const SCRIPT_BOATCAST = `// ==UserScript==
       if (txt.indexOf('体重') >= 0) col.weightChosei = i;
       else if (txt.indexOf('チルト') >= 0) col.tilt = i;
       else if (txt.indexOf('展示') >= 0) col.tenji = i;
-      else if (txt.indexOf('一周') >= 0) col.isshu = i;
+      else if (txt.indexOf('一周') >= 0 || txt.indexOf('半周') >= 0) col.isshu = i; // 桐生のみ「半周ラップ」表記（他会場と測定区間が異なるが、値はそのまま格納）
       else if (txt.indexOf('まわり足') >= 0 || txt.indexOf('回り足') >= 0) col.mawari = i;
       else if (txt.indexOf('直線') >= 0) col.chokusen = i;
     }
