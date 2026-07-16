@@ -698,7 +698,10 @@ const AI1CHAKU_THRESH={2:20,3:20,4:20,5:15,6:10};
 const AI1CHAKU_TOTAL_POINTS=6;
 // 日付ベース2分割交差検証(奇数日/偶数日)で、両方とも回収率100%を割った会場。
 // 桐生・蒲郡・江戸川等は分割すると大きくブレて再現しなかったため対象外（精度分析ログ追記47〜48参照）。
-const AI1CHAKU_WEAK_VENUES=["徳山","丸亀","下関"];
+const AI1CHAKU_WEAK_VENUES=["丸亀","下関"];
+// 徳山は以前含まれていたが、当時展示データ(一周・まわり足)がbuild_race_sheet.pyの
+// バグで欠損していたことが原因と判明。正しいデータで再計算したところ回収率が
+// 74.94%→114.89%に改善したため除外した（精度分析ログ追記50参照）。
 function ai1chakuAllocatePoints(cands,rowsByBoat,total){
   if(cands.length===1){var only={};only[cands[0]]=total;return only;}
   var weights={};cands.forEach(function(b){weights[b]=rowsByBoat[b].aiP1||0;});
