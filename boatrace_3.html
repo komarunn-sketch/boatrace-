@@ -725,6 +725,19 @@ function ai1chakuAllocatePoints(cands,rowsByBoat,total){
 function ai1chakuR1(r){return r.racerR1final!=null?r.racerR1final:r.final1;}
 function ai1chakuR2(r){return r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;}
 function ai1chakuR3(r){return r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;}
+// predict.py の kimari_score(b) を忠実に移植。決まり手実績(6ヶ月・コース別)を0〜10のスコアに変換する。
+// 原典と同様、コース番号を艇番として決まり手データを引く仕様をそのまま踏襲している。
+function ai1chakuKimariScore(rd,rowsByBoat,b){
+  var course=rowsByBoat[b]?rowsByBoat[b].course:b;
+  var rc=rd.racerRaceCount?rd.racerRaceCount[b-1]:null;
+  if(!rc)return 5;
+  var kc=rd.kimariCount;
+  if(!kc)return 5;
+  var ci=course-1;
+  function gv(arr){return arr&&arr[ci]!=null?arr[ci]:0;}
+  var tot=gv(kc.nige)+gv(kc.sashi)+gv(kc.makuri)+gv(kc.makurizashi)+gv(kc.nuki);
+  return Math.min(10,tot/rc*10);
+}
 function getAi1chakuCandidates(rowsByBoat){
   var aiP1={};for(var b=1;b<=6;b++)aiP1[b]=rowsByBoat[b].aiP1||0;
   if(aiP1[1]>45)return [1];
@@ -733,9 +746,9 @@ function getAi1chakuCandidates(rowsByBoat){
   if(cands.length===0)cands=[1];
   return cands;
 }
-function makeAi1chakuBetForAxis(rowsByBoat,axis,maxN){
-  function aiScore2(b){var rr=rowsByBoat[b];return ai1chakuR2(rr)*0.3+(rr.aiP2||0)*0.3+(rr.ren3total||0)*0.2;}
-  function aiScore3(b){var rr=rowsByBoat[b];return ai1chakuR3(rr)*0.3+(rr.aiP3||0)*0.3+(rr.ren3total||0)*0.2;}
+function makeAi1chakuBetForAxis(rd,rowsByBoat,axis,maxN){
+  function aiScore2(b){var rr=rowsByBoat[b];return ai1chakuR2(rr)*0.3+(rr.aiP2||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
+  function aiScore3(b){var rr=rowsByBoat[b];return ai1chakuR3(rr)*0.3+(rr.aiP3||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
   var allBoats=[1,2,3,4,5,6];
   var aiPlace2=allBoats.filter(function(b){return b!==axis&&ai1chakuR2(rowsByBoat[b])>=10;}).sort(function(a,b){return aiScore2(b)-aiScore2(a);});
   var aiPlace3=allBoats.filter(function(b){return b!==axis&&ai1chakuR3(rowsByBoat[b])>=5;}).sort(function(a,b){return aiScore3(b)-aiScore3(a);});
@@ -749,7 +762,7 @@ function makeAi1chakuBetForAxis(rowsByBoat,axis,maxN){
   }
   return combos;
 }
-function computeAi1chakuFormation(result){
+function computeAi1chakuFormation(result,rd){
   if(!result||!result.rows||result.rows.length<6)return null;
   var rowsByBoat={};
   for(var b=1;b<=6;b++){
@@ -762,7 +775,7 @@ function computeAi1chakuFormation(result){
   var alloc=ai1chakuAllocatePoints(cands,rowsByBoat,AI1CHAKU_TOTAL_POINTS);
   var bet=[];
   cands.forEach(function(axis){
-    bet=bet.concat(makeAi1chakuBetForAxis(rowsByBoat,axis,alloc[axis]));
+    bet=bet.concat(makeAi1chakuBetForAxis(rd,rowsByBoat,axis,alloc[axis]));
   });
   var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1||0)<=45);
   return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc};
@@ -2447,10 +2460,10 @@ function App() {
     return computeV2FromRd(rd,venue);
   },[rd,venue]);
 
-  // AI1着%基準フォーメーション（v2のP1を利用した別ルール）
+  // AI1着%基準フォーメーション（既存のtotalScore系aiP1を利用した別ルール。v2とは無関係）
   const ai1chaku=useMemo(function(){
-    return computeAi1chakuFormation(result);
-  },[result]);
+    return computeAi1chakuFormation(result,rd);
+  },[result,rd]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
