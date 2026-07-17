@@ -71,9 +71,6 @@ function waveBucket(raw){
 // 市場確率を考慮していないため、高オッズなほど期待値を過大評価する構造的な偏りがあった。
 // データが十分溜まるまで、または確率モデルを作り直すまで非表示とする。
 const SHOW_VALUE_BETS = false;
-// 結果CSV・直前情報CSVの一括取込ブロック（分析用・開発用機能）の表示切替。
-// tsx単体で使う時はtrueのまま、HTMLビルド時にビルドスクリプトがfalseへ書き換える。
-const SHOW_BULK_CSV_IMPORT = false; // HTMLビルド時に自動でfalseへ書き換え（tsx側はtrueのまま）
 const COMBO_PROB_TABLE = {"不安定":{"honmei_rate":39.4,"rank_probs_pct":[7.19,3.74,2.72,3.26,3.86,2.17]},"中間":{"honmei_rate":58.4,"rank_probs_pct":[10.56,6.85,5.1,5.1,5.42,3.64]},"堅い":{"honmei_rate":75.7,"rank_probs_pct":[13.11,8.61,7.73,7.52,6.25,3.51]}};
 const VENUE_TENJI_IMPORTANCE = {"びわこ": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 21.2, "isshu": 28.9, "mawari": 40.4, "chokusen": -10.0}, "top": "mawari"}, "三国": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 15.3, "isshu": 31.3, "mawari": 27.3, "chokusen": 15.4}, "top": "isshu"}, "下関": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 20.4, "isshu": 39.5, "mawari": 28.7, "chokusen": 18.9}, "top": "isshu"}, "丸亀": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 29.1, "isshu": 35.5, "mawari": 16.7, "chokusen": 22.3}, "top": "isshu"}, "児島": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 21.3, "isshu": 30.4, "mawari": 7.5, "chokusen": 35.5}, "top": "chokusen"}, "唐津": {"ranking": ["mawari", "tenji", "isshu", "chokusen"], "gaps": {"tenji": 23.7, "isshu": 23.2, "mawari": 40.2, "chokusen": -1.3}, "top": "mawari"}, "常滑": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.1, "isshu": 42.8, "mawari": 15.9, "chokusen": 23.8}, "top": "isshu"}, "平和島": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 14.0, "isshu": 29.1, "mawari": 19.7, "chokusen": 12.4}, "top": "isshu"}, "戸田": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.8, "isshu": 36.8, "mawari": 15.6, "chokusen": 23.0}, "top": "isshu"}, "江戸川": {"ranking": ["tenji"], "gaps": {"tenji": 9.9}, "top": "tenji"}, "津": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 20.2, "isshu": 40.1, "mawari": 40.2, "chokusen": -4.0}, "top": "mawari"}, "浜名湖": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 25.7, "isshu": 40.4, "mawari": 30.4, "chokusen": 0.4}, "top": "isshu"}, "福岡": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 24.4, "isshu": 40.7, "mawari": 27.6, "chokusen": 12.4}, "top": "isshu"}, "若松": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 16.9, "isshu": 36.7, "mawari": 29.3, "chokusen": 20.4}, "top": "isshu"}, "鳴門": {"ranking": ["chokusen", "tenji", "isshu", "mawari"], "gaps": {"tenji": 21.0, "isshu": 20.6, "mawari": 10.8, "chokusen": 26.8}, "top": "chokusen"}, "多摩川": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 23.9, "isshu": 29.7, "mawari": -0.4, "chokusen": 39.2}, "top": "chokusen"}, "大村": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 22.7, "isshu": 33.8, "mawari": 12.5, "chokusen": 21.9}, "top": "isshu"}, "徳山": {"ranking": ["tenji"], "gaps": {"tenji": 23.6}, "top": "tenji"}, "桐生": {"ranking": ["isshu", "chokusen", "mawari", "tenji"], "gaps": {"tenji": 7.1, "isshu": 34.1, "mawari": 19.9, "chokusen": 20.1}, "top": "isshu"}, "住之江": {"ranking": ["tenji"], "gaps": {"tenji": 22.7}, "top": "tenji"}, "尼崎": {"ranking": ["tenji"], "gaps": {"tenji": 27.0}, "top": "tenji"}, "芦屋": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 23.8, "isshu": 43.1, "mawari": 38.6, "chokusen": 18.9}, "top": "isshu"}, "蒲郡": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 27.8, "isshu": 28.2, "mawari": 32.2, "chokusen": 0.9}, "top": "mawari"}, "宮島": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 23.5, "isshu": 35.9, "mawari": 3.4, "chokusen": 28.3}, "top": "isshu"}};
 
@@ -1659,6 +1656,21 @@ function App() {
       function rScore(b){var rank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[b-1]:null;return rank!=null?Math.max(0,7-rank):0;}
       function mScore(b){var m=rd.motors[b];if(!m||m.ren2==null||mAvg2==null)return 0;return Math.min(5,Math.max(0,(m.ren2-mAvg2)/10));}
       function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var ci=r.course-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi,rd.kimariCount.nuki];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
+      // 節間得点率による補正（精度分析ログ追記53：45日6,926Rバックテストでw=0.3が最良かつ
+      // 日付ベース2分割交差検証でも安定して回収率改善を確認済み。フィールド平均との相対差を
+      // ±4にクリップして加点/減点。節出走回数(nodes)が0（節初日で未計算）の艇は対象外＝補正0）。
+      var tokutenRates=[];
+      for(var tb=1;tb<=6;tb++){
+        var tk0=rd.tokuten&&rd.tokuten[tb];
+        if(tk0&&tk0.rate!=null&&(tk0.nodes||0)>=1)tokutenRates.push(tk0.rate);
+      }
+      var tokutenFieldAvg=tokutenRates.length?tokutenRates.reduce(function(a,c){return a+c;},0)/tokutenRates.length:null;
+      function tokutenBonus(b){
+        var tk=rd.tokuten&&rd.tokuten[b];
+        if(!tk||tk.rate==null||(tk.nodes||0)<1||tokutenFieldAvg==null)return 0;
+        var diff=Math.max(-4,Math.min(4,tk.rate-tokutenFieldAvg));
+        return diff*0.3;
+      }
       var b1r=rows.filter(function(r){return r.boat===1;})[0];
       var b1diff=b1r&&b1r.diff!=null&&b1r.diff<=0;
       var s1=[],s2=[],s3=[];
@@ -1667,7 +1679,7 @@ function App() {
         var r1v=r.racerR1final!=null?r.racerR1final:r.final1;
         var r2v=r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;
         var r3v=r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;
-        var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3;
+        var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3+tokutenBonus(r.boat);
         if(r.boat===1&&b1diff)ts1-=10;
         var ts2=r2v*0.5+cScore(r.boat)*1.5+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.5;
         var ts3=r3v*0.7+cScore(r.boat)*1+kScore(r)*0.2+mScore(r.boat)*0.3;
@@ -2508,7 +2520,6 @@ function App() {
           </div>
         </div>
 
-        {SHOW_BULK_CSV_IMPORT&&(
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 結果CSVから展示情報を一括取り込み</div>
           <div style={{fontSize:10,color:"#7da3c8",marginBottom:8}}>進入コース・展示タイム・風向・天候・波高を取り込みます（1行=1艇の結果CSV形式）</div>
@@ -2520,9 +2531,7 @@ function App() {
             {resultsCsvMsg&&<span style={{fontSize:12,color:resultsCsvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{resultsCsvMsg}</span>}
           </div>
         </div>
-        )}
 
-        {SHOW_BULK_CSV_IMPORT&&(
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 直前情報CSVから展示データを一括取り込み</div>
           <div style={{fontSize:10,color:"#7da3c8",marginBottom:8}}>展示タイム・体重・調整重量・チルト・一周・まわり足・直線・締切時間を取り込みます（1行=1艇、全場・全レース分まとめてOK）</div>
@@ -2534,7 +2543,6 @@ function App() {
             {tenjiCsvMsg&&<span style={{fontSize:12,color:tenjiCsvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{tenjiCsvMsg}</span>}
           </div>
         </div>
-        )}
 
         {(function(){
           var now=nowTime;
