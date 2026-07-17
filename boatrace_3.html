@@ -1301,6 +1301,7 @@ function App() {
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
   const [tenjiCsvMsg,setTenjiCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
+  const [axisPickBoat,setAxisPickBoat]=useState(null);
 
   const rd=races[rk(venue,curRace)]||emptyRace();
   const updateRd=useCallback(function(fn){
@@ -2487,6 +2488,23 @@ function App() {
     return computeAi1chakuFormation(result,rd);
   },[result,rd]);
 
+  // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
+  // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
+  const axisPickRowsByBoat=useMemo(function(){
+    if(!result||!result.rows||result.rows.length<6)return null;
+    var rowsByBoat={};
+    for(var b=1;b<=6;b++){
+      var found=result.rows.filter(function(r){return r.boat===b;})[0];
+      if(!found)return null;
+      rowsByBoat[b]=found;
+    }
+    return rowsByBoat;
+  },[result]);
+  const axisPickCombos=useMemo(function(){
+    if(!axisPickRowsByBoat||!axisPickBoat)return null;
+    return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,10);
+  },[axisPickRowsByBoat,rd,axisPickBoat]);
+
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
   function col(n){return n>0?"#5dd39e":n<0?"#ff8a80":"#9db5cc";}
@@ -3412,6 +3430,48 @@ function App() {
                           );
                         })}
                       </div>
+                    </div>
+                  )}
+                  {axisPickRowsByBoat&&(
+                    <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
+                      <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4}}>６択チャレンジ！てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
+                      <div style={{fontSize:9,color:"#8a94a6",marginBottom:8,lineHeight:1.5}}>
+                        任意の艇を1着と仮定した場合の2着・3着候補をAI1着%基準フォーメーションと同じロジックで算出します。
+                      </div>
+                      <div style={{display:"flex",gap:6,marginBottom:10}}>
+                        {[1,2,3,4,5,6].map(function(b){
+                          var isSel=axisPickBoat===b;
+                          var aiP1v=axisPickRowsByBoat[b]&&axisPickRowsByBoat[b].aiP1;
+                          return (
+                            <div key={b} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                              <button onClick={function(){setAxisPickBoat(isSel?null:b);}}
+                                style={{width:36,height:36,borderRadius:8,border:isSel?"2px solid #fff":"1px solid #2c4762",background:isSel?LANE[b].bg:"#0e1b2c",color:isSel?LANE[b].fg:"#9db5cc",fontWeight:800,fontSize:15,cursor:"pointer"}}>
+                                {b}
+                              </button>
+                              <span style={{fontSize:9,fontWeight:700,color:aiP1v!=null?(aiP1v>=45?"#f9c513":"#7db4e8"):"#5a6b7d"}}>
+                                {aiP1v!=null?aiP1v+"%":"―"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
+                        <div>
+                          <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の出目候補（上位{axisPickCombos.length}点、スコア順）</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {axisPickCombos.map(function(t,ti){
+                              return (
+                                <span key={ti} style={{background:"#0e1b2c",borderRadius:6,padding:"5px 10px",fontSize:13,fontWeight:700,color:ti===0?"#f9c513":"#7db4e8",letterSpacing:"0.03em"}}>
+                                  {t[0]}-{t[1]}-{t[2]}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {axisPickBoat&&(!axisPickCombos||axisPickCombos.length===0)&&(
+                        <div style={{fontSize:10,color:"#5a6b7d"}}>この艇の2着・3着候補データが不足しているため出目を算出できません</div>
+                      )}
                     </div>
                   )}
                   {yoso.taiko4&&yoso.taiko4.count>0&&(
