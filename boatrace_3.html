@@ -1309,6 +1309,7 @@ function App() {
   const [tenjiCsvMsg,setTenjiCsvMsg]=useState("");
   const [csvDebug,setCsvDebug]=useState(null);
   const [axisPickBoat,setAxisPickBoat]=useState(null);
+  const [axisPickMode,setAxisPickMode]=useState("2tan");
 
   const rd=races[rk(venue,curRace)]||emptyRace();
   const updateRd=useCallback(function(fn){
@@ -2509,8 +2510,9 @@ function App() {
   },[result]);
   const axisPickCombos=useMemo(function(){
     if(!axisPickRowsByBoat||!axisPickBoat)return null;
+    if(axisPickMode==="3tan")return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,10);
     return makeAi1chakuBet2ForAxis(rd,axisPickRowsByBoat,axisPickBoat,5);
-  },[axisPickRowsByBoat,rd,axisPickBoat]);
+  },[axisPickRowsByBoat,rd,axisPickBoat,axisPickMode]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
@@ -3443,7 +3445,17 @@ function App() {
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
                       <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.4}}>６x６択チャレンジ！<br/>てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
                       <div style={{fontSize:9,color:"#8a94a6",marginBottom:8,lineHeight:1.5}}>
-                        任意の艇を1着と仮定した場合の2着候補（2連単）をAI2着率順に表示します。
+                        任意の艇を1着と仮定した場合の出目候補をAI着率順に表示します。
+                      </div>
+                      <div style={{display:"flex",gap:6,marginBottom:10}}>
+                        <button onClick={function(){setAxisPickMode("2tan");}}
+                          style={{padding:"5px 12px",borderRadius:6,border:axisPickMode==="2tan"?"2px solid #5dd39e":"1px solid #2c4762",background:axisPickMode==="2tan"?"#1a3b2e":"#0e1b2c",color:axisPickMode==="2tan"?"#5dd39e":"#9db5cc",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                          2連単
+                        </button>
+                        <button onClick={function(){setAxisPickMode("3tan");}}
+                          style={{padding:"5px 12px",borderRadius:6,border:axisPickMode==="3tan"?"2px solid #c9a8ff":"1px solid #2c4762",background:axisPickMode==="3tan"?"#2a1f45":"#0e1b2c",color:axisPickMode==="3tan"?"#c9a8ff":"#9db5cc",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                          3連単
+                        </button>
                       </div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         {[1,2,3,4,5,6].map(function(b){
@@ -3462,7 +3474,7 @@ function App() {
                           );
                         })}
                       </div>
-                      {axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
+                      {axisPickMode==="2tan"&&axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
                         <div>
                           <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の2連単・全{axisPickCombos.length}通り（AI2着率順）</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -3477,8 +3489,22 @@ function App() {
                           </div>
                         </div>
                       )}
+                      {axisPickMode==="3tan"&&axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
+                        <div>
+                          <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の出目候補（上位{axisPickCombos.length}点、スコア順）</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {axisPickCombos.map(function(t,ti){
+                              return (
+                                <span key={ti} style={{background:"#0e1b2c",borderRadius:6,padding:"5px 10px",fontSize:13,fontWeight:700,color:ti===0?"#f9c513":"#c9a8ff",letterSpacing:"0.03em"}}>
+                                  {t[0]}-{t[1]}-{t[2]}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                       {axisPickBoat&&(!axisPickCombos||axisPickCombos.length===0)&&(
-                        <div style={{fontSize:10,color:"#5a6b7d"}}>この艇の2着候補データが不足しているため出目を算出できません</div>
+                        <div style={{fontSize:10,color:"#5a6b7d"}}>この艇の候補データが不足しているため出目を算出できません</div>
                       )}
                     </div>
                   )}
