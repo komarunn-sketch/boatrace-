@@ -1484,6 +1484,7 @@ function App() {
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
   const [openMotorB1,setOpenMotorB1]=useState(false);
+  const [openSenbatsu,setOpenSenbatsu]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
@@ -2537,24 +2538,31 @@ function App() {
     if(!ai1chaku)return null;
     return synthesizeOdds(ai1chaku.bet,rd.odds3tan);
   },[ai1chaku,rd.odds3tan]);
-  // 前予想：展示タイム入力前でも、全レースCSVで読み込み済みの基本データ（枠別成績・級別・モーター・節間得点率等）だけで
-  // 厳選条件を先読みするリスト。当該venueの1〜12Rを全部計算し、該当したレース番号を返す（レース選択テーブルの下に表示）。
-  const preRaceSelectedList=useMemo(function(){
-    if(!venue)return [];
+  // 厳選レース一覧（B1軸レースと同じ方式：全venue横断、締切時間順、開閉タブ）。
+  // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
+  const senbatsuList=useMemo(function(){
     var out=[];
-    for(var ni=0;ni<RNUMS.length;ni++){
-      var n=RNUMS[ni];
-      var raceEntry=races[rk(venue,n)];
-      if(!raceEntry)continue;
-      var r=computeResultForRd(venue,raceEntry,racerCat);
-      if(!r)continue;
-      var formation=computeAi1chakuFormation(r,raceEntry,venue);
-      if(formation&&isRaceSelected(venue,formation)){
-        out.push({race:n,candidates:formation.candidates});
+    Object.keys(races).forEach(function(key){
+      var raceEntry=races[key];
+      if(!raceEntry||!raceEntry.racerStats)return;
+      var sp=key.split("_");
+      var vname=sp.slice(0,-1).join("_");
+      var rnum=parseInt(sp[sp.length-1]);
+      if(RACE_SELECT_GOOD_VENUES.indexOf(vname)<0)return;
+      var r=computeResultForRd(vname,raceEntry,racerCat);
+      if(!r)return;
+      var formation=computeAi1chakuFormation(r,raceEntry,vname);
+      if(formation&&isRaceSelected(vname,formation)){
+        out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,candidates:formation.candidates});
       }
-    }
+    });
+    out.sort(function(a,b){
+      var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
+      var tb=b.shimekiri?parseInt(b.shimekiri.split(":")[0])*60+parseInt(b.shimekiri.split(":")[1]):9999;
+      return ta-tb||(a.rnum-b.rnum);
+    });
     return out;
-  },[venue,races,racerCat]);
+  },[races,racerCat]);
 
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
@@ -2702,6 +2710,31 @@ function App() {
           );
         })()}
 
+        {senbatsuList.length>0&&(
+          <div style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openSenbatsu?5:0}}>
+              <div style={{fontSize:10,color:"#5dd39e",fontWeight:700}}>🎯 厳選レースあり</div>
+              <button onClick={function(){setOpenSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#5dd39e",border:"1px solid #2e6b52",fontWeight:700}}>{openSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
+            </div>
+            {openSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+              {senbatsuList.map(function(item){
+                var isActive=venue===item.vname&&curRace===item.rnum;
+                return (
+                  <button key={item.vname+"_"+item.rnum}
+                    onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                    style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                      background:isActive?"#2c4762":"#0e1b2c",
+                      color:"#5dd39e",
+                      border:isActive?"2px solid #5dd39e":"1px solid #2e6b52",textAlign:"left"}}>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　候補{item.candidates.length}艇</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                  </button>
+                );
+              })}
+            </div>}
+          </div>
+        )}
+
         {(function(){
           var items=[];
           Object.keys(races).forEach(function(key){
@@ -2827,22 +2860,6 @@ function App() {
             })}
           </div>
           <div style={{fontSize:10,color:"#7da3c8",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（75%以上） ● 紫字＝波乱注意（45%以下）</div>
-          {preRaceSelectedList.length>0&&(
-            <div style={{marginTop:8,background:"#132b20",border:"1px solid #2e6b52",borderRadius:8,padding:"8px 10px"}}>
-              <div style={{color:"#5dd39e",fontWeight:700,fontSize:11,marginBottom:4}}>🎯 厳選候補（前予想・展示入力前の全レースCSVベース）</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {preRaceSelectedList.map(function(item){
-                  return (
-                    <button key={item.race} onClick={function(){setCurRace(item.race);}}
-                      style={{padding:"4px 10px",borderRadius:6,border:"1px solid #2e6b52",background:"#0e1b2c",color:"#5dd39e",fontWeight:700,fontSize:12,cursor:"pointer"}}>
-                      {item.race}R（{item.candidates.length}候補）
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{fontSize:9,color:"#5a6b7d",marginTop:4}}>※展示タイム未反映の仮判定です。展示入力後に確定判定（見出し横バッジ）で再確認してください。</div>
-            </div>
-          )}
         </div>
 
         <div style={{marginBottom:16}}>
@@ -3101,7 +3118,6 @@ function App() {
           <div>
             <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",marginBottom:10}}>
               <span style={{fontSize:19,fontWeight:800,color:"#fff"}}>{curRace}R {venue}{result.avg!=null?"（平均: "+fmt(result.avg)+"）":""}</span>
-              {isSelectedRace&&<span style={{fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:999,background:"#1a3b2e",color:"#5dd39e",border:"1px solid #2e6b52"}}>🎯 厳選</span>}
               {rd.shimekiri&&<span style={{fontSize:13,color:"#f9c513",fontWeight:700,marginLeft:6}}>締切 {rd.shimekiri}</span>}
               <span style={{fontSize:12,color:"#9db5cc"}}>{rd.wind}</span>
               {aiEval&&<span style={{fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>}
