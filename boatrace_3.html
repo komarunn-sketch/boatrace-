@@ -24,6 +24,7 @@
     ::-webkit-scrollbar-thumb:hover { background: #3d5f82; background-clip: padding-box; }
   }
   #root { min-height: 100vh; overflow-x: hidden; }
+  [id^="section-"] { scroll-margin-top: 84px; }
 </style>
 </head>
 <body>
@@ -1417,30 +1418,48 @@ function parseRowByIndex(d){
 }
 
 const NAV_ITEMS=[
-  {id:"section-shimekiri",label:"締切直前",icon:"⏰"},
-  {id:"section-tenji",label:"展示",icon:"📋"},
-  {id:"section-yosochakuritsu",label:"予想着率",icon:"📊"},
-  {id:"section-yoso",label:"着順予想",icon:"🎯"},
+  {id:"section-shimekiri",label:"締切直前",icon:"⏰",tab:"setup"},
+  {id:"section-tenji",label:"展示",icon:"📋",tab:"setup"},
+  {id:"section-yosochakuritsu",label:"予想着率",icon:"📊",tab:"data"},
+  {id:"section-yoso",label:"着順予想",icon:"🎯",tab:"yoso"},
 ];
-function QuickNav(){
+const TABS=[
+  {id:"setup",label:"①セットアップ"},
+  {id:"data",label:"②データ確認"},
+  {id:"yoso",label:"③予想・買い目"},
+];
+function QuickNav(props){
   const [msg,setMsg]=useState("");
-  function jump(id,label){
-    var el=document.getElementById(id);
-    if(el){
-      el.scrollIntoView({behavior:"smooth",block:"start"});
-    }else{
-      setMsg(label+"はまだ表示できません（場・レースを選択してください）");
-      setTimeout(function(){setMsg("");},2200);
-    }
+  function jump(item){
+    props.setActiveTab(item.tab);
+    setTimeout(function(){
+      var el=document.getElementById(item.id);
+      if(el){
+        el.scrollIntoView({behavior:"smooth",block:"start"});
+      }else{
+        setMsg(item.label+"はまだ表示できません（場・レースを選択してください）");
+        setTimeout(function(){setMsg("");},2200);
+      }
+    },60);
   }
   return (
     <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999}}>
       <div style={{background:"#0e1b2c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
         {NAV_ITEMS.map(function(item){
           return (
-            <button key={item.id} onClick={function(){jump(item.id,item.label);}} style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:"5px 2px",borderRadius:7,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:9,fontWeight:700,cursor:"pointer",overflow:"hidden"}}>
+            <button key={item.id} onClick={function(){jump(item);}} style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:"5px 2px",borderRadius:7,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:9,fontWeight:700,cursor:"pointer",overflow:"hidden"}}>
               <span style={{fontSize:14,lineHeight:1}}>{item.icon}</span>
               <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{background:"#16273c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
+        {TABS.map(function(t){
+          var isActive=props.activeTab===t.id;
+          return (
+            <button key={t.id} onClick={function(){props.setActiveTab(t.id);}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:isActive?"1px solid #5a87b8":"1px solid #2c4762",background:isActive?"#2c4762":"#0e1b2c",color:isActive?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+              {t.label}
             </button>
           );
         })}
@@ -1478,6 +1497,7 @@ class ErrorBoundary extends React.Component{
 
 function App() {
   const [venue,setVenue]=useState("");
+  const [activeTab,setActiveTab]=useState("setup");
   const [racerCat,setRacerCat]=useState("直近1年");
   const [stPeriod,setStPeriod]=useState("今期");
   const [kimariPeriod,setKimariPeriod]=useState("直近6ヶ月");
@@ -2603,7 +2623,7 @@ function App() {
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
   var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px",overflowX:"hidden",maxWidth:"100vw"};
-  var innerS={maxWidth:760,margin:"0 auto",paddingTop:44};
+  var innerS={maxWidth:760,margin:"0 auto",paddingTop:84};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
   var inpS={width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 8px",fontSize:15};
@@ -2611,10 +2631,11 @@ function App() {
 
   return (
     <div style={wrapS}>
-      <QuickNav/>
+      <QuickNav activeTab={activeTab} setActiveTab={setActiveTab}/>
       <div style={innerS}>
         
 
+        {activeTab==="setup"&&(<>
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 CSVから全レース一括取り込み</div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
@@ -2629,7 +2650,7 @@ function App() {
         {SHOW_BULK_CSV_IMPORT&&(<>
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 結果CSVから展示情報を一括取り込み</div>
-          <div style={{fontSize:10,color:"#7da3c8",marginBottom:8}}>進入コース・展示タイム・風向・天候・波高を取り込みます（1行=1艇の結果CSV形式）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginBottom:8}}>進入コース・展示タイム・風向・天候・波高を取り込みます（1行=1艇の結果CSV形式）</div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <label style={{padding:"9px 18px",borderRadius:8,cursor:"pointer",background:"#3d7ab8",color:"#fff",fontSize:13,fontWeight:700}}>
               結果CSVを選択して取り込む
@@ -2641,7 +2662,7 @@ function App() {
 
         <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
           <div style={{fontSize:12,fontWeight:700,color:"#7db4e8",marginBottom:6}}>📂 直前情報CSVから展示データを一括取り込み</div>
-          <div style={{fontSize:10,color:"#7da3c8",marginBottom:8}}>展示タイム・体重・調整重量・チルト・一周・まわり足・直線・締切時間を取り込みます（1行=1艇、全場・全レース分まとめてOK）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginBottom:8}}>展示タイム・体重・調整重量・チルト・一周・まわり足・直線・締切時間を取り込みます（1行=1艇、全場・全レース分まとめてOK）</div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <label style={{padding:"9px 18px",borderRadius:8,cursor:"pointer",background:"#c77d3d",color:"#fff",fontSize:13,fontWeight:700}}>
               直前情報CSVを選択して取り込む
@@ -2690,7 +2711,7 @@ function App() {
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                 <div style={{fontSize:10,color:"#f9c513",fontWeight:700}}>⏰ 締切直前</div>
                 <button onClick={function(){setNowTime(new Date());}} style={{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1d3149",color:"#7db4e8",border:"1px solid #2c4762",fontWeight:700}}>🔄 更新</button>
-                <span style={{fontSize:9,color:"#7da3c8"}}>{nowTime.getHours()}:{String(nowTime.getMinutes()).padStart(2,"0")}</span>
+                <span style={{fontSize:9,color:"#a9cbea"}}>{nowTime.getHours()}:{String(nowTime.getMinutes()).padStart(2,"0")}</span>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
                 {top4.map(function(item){
@@ -2804,7 +2825,7 @@ function App() {
         })()}
 
         <div style={{marginBottom:16}}>
-          <div id="section-venue" style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>開催場を選択</div>
+          <div id="section-venue" style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>開催場を選択</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {Object.keys(VENUES).map(function(v){
               var hasBas=RNUMS.some(function(n){var r=races[rk(v,n)];return r&&(r.racerStats!=null||r.stTable!=null||r.motors[1]!=null);});
@@ -2826,7 +2847,7 @@ function App() {
         </div>
 
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>レース選択</div>
+          <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>レース選択</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             {RNUMS.map(function(n){
               var r=races[rk(venue,n)]||emptyRace();
@@ -2862,14 +2883,13 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#7da3c8",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（75%以上） ● 紫字＝波乱注意（45%以下）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（75%以上） ● 紫字＝波乱注意（45%以下）</div>
         </div>
 
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:"#7da3c8",marginBottom:6}}>{curRace}R の風</div>
-          <select value={rd.wind} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.wind=e.target.value;return n;});}} style={{width:"100%",padding:"11px 12px",fontSize:16,background:"#16273c",color:"#fff",border:"1px solid #2c4762",borderRadius:10}}>
-            {Object.keys(WIND).map(function(w){return <option key={w} value={w}>{w}</option>;})}
-          </select>
+        <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+          <div style={{padding:"8px 4px",borderRadius:8,fontSize:13,fontWeight:700,border:"1px solid #2c4762",background:"#16273c",color:"#9db5cc",textAlign:"center"}}>風　{rd.wind}</div>
+          <div style={{padding:"8px 4px",borderRadius:8,fontSize:13,fontWeight:700,border:"1px solid #2c4762",background:"#16273c",color:"#9db5cc",textAlign:"center"}}>天候　{rd.weather||"―"}</div>
+          <div style={{padding:"8px 4px",borderRadius:8,fontSize:13,fontWeight:700,border:"1px solid #2c4762",background:"#16273c",color:"#9db5cc",textAlign:"center"}}>波高　{rd.waveHeight||"―"}</div>
         </div>
 
         <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
@@ -2877,7 +2897,6 @@ function App() {
           <button onClick={function(){setOpenPanel(function(v){return v==="tenji"?null:"tenji";});}} style={btnS(openPanel==="tenji"?"#2c4762":"#3d7ab8","#fff",{border:openPanel==="tenji"?"1px solid #5a87b8":"none"})}>📋 展示タイム</button>
           <button onClick={function(){updateRd(function(){return emptyRace();});}} style={btnS("#3b1a1a","#ff8a80",{border:"1px solid #6b2e2e"})}>🗑 {curRace}R消去</button>
           <button onClick={function(){setRaces(initRaces());}} style={btnS("#2a1a1a","#ff6060",{fontSize:11,border:"1px solid #4b2020"})}>🗑 全消去</button>
-          <button onClick={function(){var el=document.getElementById("section-tenji");if(el)el.scrollIntoView({behavior:"smooth"});}} style={btnS("#1d3149","#fff",{fontSize:18,fontWeight:800,border:"1px solid #2c4762",marginLeft:"auto"})}>展示↓</button>
         </div>
 
         {openPanel==="basic"&&(
@@ -2934,50 +2953,6 @@ function App() {
           </div>
         )}
 
-        {(function(){
-          // データがある期間だけ選択肢に表示
-          var stOpts=rd.stTable?STPS.filter(function(o){return rd.stTable[o]!=null;}):rd.stScore&&rd.stScore.byPeriod?Object.keys(rd.stScore.byPeriod).filter(function(o){return rd.stScore.byPeriod[o].some(function(v){return v!=null;});}):[];
-          var rcOpts=rd.racerStats&&rd.racerStats.win1?RCATS.filter(function(o){return rd.racerStats.win1[o]&&rd.racerStats.win1[o].some(function(v){return v!=null;});}):[];
-          var kmOpts=rd.kimari?KPERIODS.filter(function(o){return rd.kimari[o]!=null;}):[];
-          var items=[
-            {label:"平均STの期間",value:stPeriod,opts:stOpts,loaded:stOpts.length>0,onChange:function(v){
-              setStPeriod(v);
-              if(rd.stTable){
-                var ap=applyStTbl(rd.stTable,v,rd);
-                updateRd(function(prev){return Object.assign({},prev,ap);});
-              } else if(rd.stScore&&rd.stScore.byPeriod&&rd.stScore.byPeriod[v]){
-                var newArr=rd.stScore.byPeriod[v];
-                var ents=[];
-                for(var bi=0;bi<6;bi++){if(newArr[bi]!=null)ents.push({idx:bi,v:newArr[bi]});}
-                ents.sort(function(a,b){return a.v-b.v;});
-                var newRank=[null,null,null,null,null,null];
-                for(var si=0;si<ents.length;si++){newRank[ents[si].idx]=si+1;}
-                updateRd(function(prev){var n=Object.assign({},prev);n.stScore=Object.assign({},prev.stScore,{rate:newArr,rank:newRank,st1y:newArr});return n;});
-              }
-            }},
-            {label:"選手成績の区分",value:racerCat,opts:rcOpts,loaded:rcOpts.length>0,onChange:function(v){setRacerCat(v);}},
-            {label:"決まり手の期間",value:kimariPeriod,opts:kmOpts,loaded:kmOpts.length>0,onChange:function(v){setKimariPeriod(v);}},
-          ];
-          return items.map(function(item){
-            return (
-              <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:11,color:"#7da3c8"}}>{item.label}</span>
-                {item.opts.length>0?(
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    {item.opts.map(function(o){
-                      var active=item.value===o;
-                      return <button key={o} onClick={function(){item.onChange(o);}} style={{padding:"4px 10px",fontSize:11,fontWeight:active?800:500,borderRadius:6,cursor:"pointer",background:active?"#3d7ab8":"#0e1b2c",color:active?"#fff":"#9db5cc",border:active?"1px solid #5a87b8":"1px solid #2c4762"}}>{o}</button>;
-                    })}
-                    <span style={{fontSize:11,color:"#5dd39e"}}>✓ 読込済</span>
-                  </div>
-                ):(
-                  <span style={{fontSize:11,color:"#7da3c8"}}>※CSVまたは貼り付けで有効</span>
-                )}
-              </div>
-            );
-          });
-        })()}
-
         <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
@@ -3004,10 +2979,13 @@ function App() {
             </div>
           </div>
 
+        </>)}
+
+        {activeTab==="data"&&(<>
         <div id="section-slit" style={{marginBottom:24}}>
-          <div style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>スリット予測</div>
+          <div style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>スリット予測</div>
           {!slit?(
-            <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#7da3c8",fontSize:12}}>6艇すべての平均STを選択するとスリット隊形を表示します</div>
+            <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべての平均STを選択するとスリット隊形を表示します</div>
           ):(
             <React.Fragment>
             <div style={{background:"#16273c",borderRadius:10,padding:"14px 12px",position:"relative"}}>
@@ -3029,7 +3007,7 @@ function App() {
                   var tenjDiff=(!isNaN(myTenji)&&!isNaN(inTenji))?(inTenji-myTenji):null;
                   return (
                     <div key={r.boat} style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{width:22,fontSize:10,color:"#7da3c8",flexShrink:0}}>{r.course}C</span>
+                      <span style={{width:22,fontSize:10,color:"#a9cbea",flexShrink:0}}>{r.course}C</span>
                       <div style={{flex:1,position:"relative",height:26}}>
                         <div style={{position:"absolute",left:0,top:"50%",width:(p*100)+"%",height:3,transform:"translateY(-50%)",background:"#2c4762",borderRadius:2}}/>
                         {/* スタートライン */}
@@ -3061,24 +3039,24 @@ function App() {
         </div>
 
         <div style={{marginBottom:24}}>
-          <div id="section-tenji" style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8",marginBottom:8}}>展示タイム一覧</div>
+          <div id="section-tenji" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>展示タイム一覧</div>
           {venue&&VENUE_TENJI_IMPORTANCE[venue]&&(function(){
             var info=VENUE_TENJI_IMPORTANCE[venue];
             var nameMap={isshu:"周回",mawari:"周り足",chokusen:"直線",tenji:"展示"};
             return <div style={{fontSize:11,color:"#9db5cc",marginBottom:8,background:"#16273c",borderRadius:6,padding:"6px 10px"}}>
               💡 {venue}で重要度が高い指標：<span style={{color:"#f9c513",fontWeight:800}}>{nameMap[info.ranking[0]]}</span>
-              {info.ranking.length>1&&<span style={{color:"#7da3c8"}}> ＞ {info.ranking.slice(1).map(function(m){return nameMap[m];}).join(" ＞ ")}</span>}
-              <span style={{color:"#5a6b7d",marginLeft:6}}>（過去実績より）</span>
+              {info.ranking.length>1&&<span style={{color:"#a9cbea"}}> ＞ {info.ranking.slice(1).map(function(m){return nameMap[m];}).join(" ＞ ")}</span>}
+              <span style={{color:"#8b9bae",marginLeft:6}}>（過去実績より）</span>
             </div>;
           })()}
           <div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
-                <tr style={{color:"#7da3c8",fontSize:11}}>
+                <tr style={{color:"#a9cbea",fontSize:11}}>
                   {["艇","周回","周り足","直線","展示"].map(function(h,hi){
                     var keyMap={"周回":"isshu","周り足":"mawari","直線":"chokusen","展示":"tenji"};
                     var isTop=venue&&VENUE_TENJI_IMPORTANCE[venue]&&VENUE_TENJI_IMPORTANCE[venue].top===keyMap[h];
-                    return <th key={h} style={{padding:"6px 10px",textAlign:"center",borderBottom:isTop?"2px solid #f9c513":"1px solid #2c4762",color:isTop?"#f9c513":"#7da3c8"}}>{h}{isTop&&" ★"}</th>;
+                    return <th key={h} style={{padding:"6px 10px",textAlign:"center",borderBottom:isTop?"2px solid #f9c513":"1px solid #2c4762",color:isTop?"#f9c513":"#a9cbea"}}>{h}{isTop&&" ★"}</th>;
                   })}
                 </tr>
               </thead>
@@ -3110,11 +3088,11 @@ function App() {
         </div>
 
         {!venue?(
-          <div style={{textAlign:"center",padding:"28px 16px",borderRadius:10,border:"1px dashed #2c4762",color:"#7da3c8",fontSize:13}}>
+          <div style={{textAlign:"center",padding:"28px 16px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:13}}>
             まず開催場を選択してください
           </div>
         ):!result?(
-          <div style={{textAlign:"center",padding:"28px 16px",borderRadius:10,border:"1px dashed #2c4762",color:"#7da3c8",fontSize:13}}>
+          <div style={{textAlign:"center",padding:"28px 16px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:13}}>
             データを読み込んでください
           </div>
         ):(
@@ -3122,7 +3100,7 @@ function App() {
             <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",marginBottom:10}}>
               <span style={{fontSize:19,fontWeight:800,color:"#fff"}}>{curRace}R {venue}{result.avg!=null?"（平均: "+fmt(result.avg)+"）":""}</span>
               {rd.shimekiri&&<span style={{fontSize:13,color:"#f9c513",fontWeight:700,marginLeft:6}}>締切 {rd.shimekiri}</span>}
-              <span style={{fontSize:12,color:"#9db5cc"}}>{rd.wind}</span>
+              <span style={{fontSize:10,color:"#9db5cc"}}>風　{rd.wind}{rd.weather&&"　　天候　"+rd.weather}{rd.waveHeight&&"　　波高　"+rd.waveHeight}</span>
               {aiEval&&<span style={{fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>}
             </div>
             {result.dup&&<div style={{fontSize:12,color:"#f9c513",background:"#2e2710",border:"1px solid #6b5a1d",borderRadius:8,padding:"8px 10px",marginBottom:12}}>⚠ 同じコースに複数の艇が入っています。</div>}
@@ -3131,7 +3109,6 @@ function App() {
               <div id="section-yosochakuritsu" style={{marginBottom:24}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <span>予想着率（枠別成績＋補正）{kimariByBoat&&<span style={{fontSize:11,color:"#5dd39e",fontWeight:400,marginLeft:6}}>＋ 決まり手数</span>}</span>
-                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
                 </div>
                 {rd.racerStats!=null&&(
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
@@ -3148,7 +3125,7 @@ function App() {
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <thead>
-                      <tr style={{color:"#7da3c8",fontSize:11}}>
+                      <tr style={{color:"#a9cbea",fontSize:11}}>
                         <th style={{padding:"6px 8px",textAlign:"left",borderBottom:"1px solid #2c4762"}}>艇</th>
                         <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>SSA</th>
                         {kimariByBoat&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>合計／出走数</th>}
@@ -3207,7 +3184,7 @@ function App() {
                               </div>
                             </td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontSize:16}}>{showThunder?"⚡":""}</td>
-                            {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff"}}>{nc!=null?nc:"―"}<span style={{color:"#7da3c8",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
+                            {kimariByBoat&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#fff"}}>{nc!=null?nc:"―"}<span style={{color:"#a9cbea",fontWeight:400}}>/{rc!=null?rc:"-"}</span></td>}
                             {rd.tokuten&&(function(){
                               var tk=rd.tokuten[r.boat];
                               var rate=tk&&tk.rate!=null?tk.rate:null;
@@ -3244,7 +3221,7 @@ function App() {
             <div style={{marginBottom:26}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
-                  <tr style={{color:"#7da3c8",fontSize:11}}>
+                  <tr style={{color:"#a9cbea",fontSize:11}}>
                     {["艇","1着補正","2着補正","3着補正","3連補正","合計","差"].map(function(h,i){return <th key={h} style={{padding:"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
                   </tr>
                 </thead>
@@ -3267,8 +3244,8 @@ function App() {
             </div>
 
             <div id="section-baserate" onClick={function(){setOpenBaseRate(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openBaseRate?8:16,cursor:"pointer",userSelect:"none"}}>
-              <span style={{fontSize:11,letterSpacing:"0.2em",color:"#7da3c8"}}>場平均で見る1着率</span>
-              <span style={{fontSize:11,color:"#7da3c8",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
+              <span style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea"}}>場平均で見る1着率</span>
+              <span style={{fontSize:11,color:"#a9cbea",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
             </div>
             {openBaseRate&&<div style={{display:"grid",gap:6,marginBottom:28}}>
               {result.rows.slice().sort(function(a,b){return(b.baseRate+b.windAdj+b.waveAdj+b.weatherAdj)-(a.baseRate+a.windAdj+a.waveAdj+a.weatherAdj);}).map(function(r,i){
@@ -3276,13 +3253,13 @@ function App() {
                 var maxV=Math.max.apply(null,result.rows.map(function(x){return x.baseRate+x.windAdj+x.waveAdj+x.weatherAdj;}));
                 return (
                   <div key={r.boat} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{width:18,fontSize:12,color:"#7da3c8"}}>{i+1}.</span>
+                    <span style={{width:18,fontSize:12,color:"#a9cbea"}}>{i+1}.</span>
                     <LB b={r.boat}/>
                     <div style={{flex:1}}>
                       <div style={{height:18,background:"#16273c",borderRadius:4,overflow:"hidden"}}>
                         <div style={{width:Math.max((v/maxV)*100,0)+"%",height:"100%",background:"#3d7ab8"}}/>
                       </div>
-                      <div style={{fontSize:10,color:"#7da3c8",marginTop:2}}>
+                      <div style={{fontSize:10,color:"#a9cbea",marginTop:2}}>
                         {r.course}C ／ {r.baseRate}%{r.windAdj!==0&&<span> 風<span style={{color:col(r.windAdj)}}>{sign(r.windAdj)}%</span></span>}{r.waveAdj!==0&&<span> 波<span style={{color:col(r.waveAdj)}}>{sign(r.waveAdj)}%</span></span>}{r.weatherAdj!==0&&<span> 天<span style={{color:col(r.weatherAdj)}}>{sign(r.weatherAdj)}%</span></span>}
                       </div>
                     </div>
@@ -3295,7 +3272,7 @@ function App() {
             {aiEval&&(
               <div style={{marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <span style={{fontSize:12,letterSpacing:"0.2em",color:"#7da3c8"}}>総合AI評価</span>
+                  <span style={{fontSize:12,letterSpacing:"0.2em",color:"#a9cbea"}}>総合AI評価</span>
                   <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
                 </div>
                 <div style={{display:"grid",gap:8}}>
@@ -3321,11 +3298,12 @@ function App() {
           </div>
         )}
 
-            {yoso&&(
+        </>)}
+
+            {activeTab==="yoso"&&yoso&&(
               <div id="section-yoso" style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                   <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🎯 着順予想</div>
-                  <button onClick={function(){var el=document.getElementById("section-venue");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{padding:"4px 10px",fontSize:18,fontWeight:800,borderRadius:6,cursor:"pointer",background:"#1d3149",color:"#fff",border:"1px solid #2c4762"}}>場選択↑</button>
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
                   {RCATS.filter(function(cat){return rd.racerStats&&rd.racerStats.win1&&rd.racerStats.win1[cat]&&rd.racerStats.win1[cat].some(function(v){return v!=null;});}).map(function(cat){
@@ -3339,7 +3317,7 @@ function App() {
                 </div>
                 <div style={{display:"grid",gap:10}}>
                   <div>
-                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>
+                    <div style={{fontSize:11,color:"#a9cbea",marginBottom:4}}>
                       1着予想
                       {yoso.b1r1>=70&&<span style={{marginLeft:6,fontSize:10,color:"#f9c513"}}>（1号艇逃げ本命）</span>}
                       {yoso.b1r1<=40&&<span style={{marginLeft:6,fontSize:10,color:"#ff8a80"}}>（1号艇飛び注意）</span>}
@@ -3358,7 +3336,7 @@ function App() {
                     )}
                     {yoso.courseKimari&&Object.keys(yoso.courseKimari).length>0&&(
                       <div style={{marginTop:8,background:"#0e1b2c",borderRadius:8,padding:"8px 10px"}}>
-                        <div style={{fontSize:10,color:"#7da3c8",marginBottom:5,fontWeight:700}}>予想決まり手（個人成績）</div>
+                        <div style={{fontSize:10,color:"#a9cbea",marginBottom:5,fontWeight:700}}>予想決まり手（個人成績）</div>
                         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4}}>
                           {Object.keys(yoso.courseKimari).map(function(boat){
                             var ck=yoso.courseKimari[boat];
@@ -3370,7 +3348,7 @@ function App() {
                                 <LB b={parseInt(boat)}/>
                                 <div>
                                   <div style={{fontSize:11,fontWeight:700,color:best==="sashi"?"#5dd39e":best==="makuri"?"#f9c513":"#c084fc"}}>{label}</div>
-                                  {bestV>0&&<div style={{fontSize:9,color:"#7da3c8"}}>{bestV.toFixed(1)}%</div>}
+                                  {bestV>0&&<div style={{fontSize:9,color:"#a9cbea"}}>{bestV.toFixed(1)}%</div>}
                                 </div>
                               </div>
                             );
@@ -3380,7 +3358,7 @@ function App() {
                     )}
                   </div>
                   <div>
-                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>2着予想</div>
+                    <div style={{fontSize:11,color:"#a9cbea",marginBottom:4}}>2着予想</div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                       {yoso.p2top.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#f9c513",fontWeight:700}}>最優先</span><LB b={b}/></span>;})}
                       {yoso.p2mid.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#5dd39e",fontWeight:700}}>優先</span><LB b={b}/></span>;})}
@@ -3389,7 +3367,7 @@ function App() {
                     </div>
                   </div>
                   <div>
-                    <div style={{fontSize:11,color:"#7da3c8",marginBottom:4}}>3着予想</div>
+                    <div style={{fontSize:11,color:"#a9cbea",marginBottom:4}}>3着予想</div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                       {yoso.p3top.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#f9c513",fontWeight:700}}>最優先</span><LB b={b}/></span>;})}
                       {yoso.p3mid.map(function(b){return <span key={b} style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#5dd39e",fontWeight:700}}>優先</span><LB b={b}/></span>;})}
@@ -3449,7 +3427,7 @@ function App() {
                           </div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginTop:6}}>※信頼度・回収率は過去6,283R実績（本命の信頼度帯ごとの集計）に基づく参考値。個別レースの確約ではありません。中間ゾーン(40〜70%)は資金配分シミュレーションで最もドローダウンリスクが高いと判明したため見送りを推奨しています</div>
+                      <div style={{fontSize:11,color:"#b3bdcc",marginTop:6,lineHeight:1.5}}>※過去6,283R実績に基づく参考値です。中間ゾーン(40〜70%)はドローダウンリスクが高いため見送りを推奨します</div>
                       {SHOW_VALUE_BETS&&yoso.valueBets&&yoso.valueBets.length>0&&(
                         <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #2c4762"}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -3459,20 +3437,20 @@ function App() {
                             {rd.oddsTime&&(function(){
                               var mins=Math.floor((Date.now()-rd.oddsTime)/60000);
                               var stale=mins>=5;
-                              return <span style={{fontSize:9,color:stale?"#ff8a80":"#7da3c8",fontWeight:stale?800:400}}>
+                              return <span style={{fontSize:9,color:stale?"#ff8a80":"#a9cbea",fontWeight:stale?800:400}}>
                                 {stale?"⚠️ ":""}取得から{mins<1?"1分未満":mins+"分"}経過
                               </span>;
                             })()}
                           </div>
                           {yoso.valueBets.map(function(v,vi){
                             return (
-                              <div key={vi} style={{display:"flex",justifyContent:"space-between",fontSize:10,color:v.isValue?"#5dd39e":"#7da3c8",padding:"2px 0"}}>
+                              <div key={vi} style={{display:"flex",justifyContent:"space-between",fontSize:10,color:v.isValue?"#5dd39e":"#a9cbea",padding:"2px 0"}}>
                                 <span>{yoso.honmei}-{v.pair[0]}-{v.pair[1]}</span>
                                 <span>オッズ{v.odds}倍 ／ 期待値{v.ev.toFixed(0)}円{v.isValue&&" ★"}</span>
                               </div>
                             );
                           })}
-                          <div style={{fontSize:9,color:"#5a6b7d",marginTop:4}}>※期待値100円以上＝理論上プラス（確率推定・オッズとも参考値）。<b>オッズは締切間際に大きく変動します。締切直前にもう一度取得し直すと精度が上がります</b></div>
+                          <div style={{fontSize:11,color:"#8b9bae",marginTop:4,lineHeight:1.5}}>※期待値100円以上＝理論上プラス（参考値）。<b>締切直前にオッズを取得し直すと精度が上がります</b></div>
                         </div>
                       )}
                     </div>
@@ -3480,8 +3458,8 @@ function App() {
                   {v2bet&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #8e5ce0"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🧪 v2買い目（本線4点＋対抗2点・実験的機能）</div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginBottom:8,lineHeight:1.5}}>
-                        既存の予想（totalScore系）とは別の確率モデル（オッズ比合成＋カバレッジ方式）による買い目です。45日6,770R＋未使用の1日(7/2・156R)での検証で、既存の固定6点（回収率109.4%）を上回る結果（回収率120.9%〜128.1%）が出ています。既存ロジックを置き換えるものではなく並行して参考にする位置づけです。
+                      <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
+                        別の確率モデルによる買い目。45日検証で回収率120〜128%と、既存の固定6点（109%）を上回っています。参考として並行利用してください。
                       </div>
                       <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap"}}>
                         <div style={{background:"#1a2f4d",borderRadius:6,padding:"6px 12px",textAlign:"center"}}>
@@ -3505,17 +3483,17 @@ function App() {
                           );
                         })}
                       </div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginTop:8}}>白＝本命軸4点、黄＝対抗軸2点。本命軸のみのカバレッジ方式買い目（目標カバー率55%・{v2bet.bet_n}点）は{v2bet.bet.map(function(bb){return v2bet.honmei+"-"+bb[0]+"-"+bb[1];}).join("　")}</div>
+                      <div style={{fontSize:11,color:"#b3bdcc",marginTop:8,lineHeight:1.5}}>白＝本命軸4点、黄＝対抗軸2点</div>
                     </div>
                   )}
                   {!v2bet&&(
-                    <div style={{marginTop:10,fontSize:10,color:"#5a6b7d"}}>🧪 v2買い目：選手データ（CSV取込等）が揃うと表示されます</div>
+                    <div style={{marginTop:10,fontSize:10,color:"#8b9bae"}}>🧪 v2買い目：選手データ（CSV取込等）が揃うと表示されます</div>
                   )}
                   {ai1chaku&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:4}}>🎯 AI1着%基準フォーメーション（実験的）</div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginBottom:6,lineHeight:1.5}}>
-                        予想着率テーブルのAI1着%（既存スコアを正規化したもの。v2買い目とは別指標）を使い、1号艇のAI1着%が45%以下の時、2〜6号艇のAI1着%が閾値（②③④20%・⑤15%・⑥10%）を超えた艇に1着候補を切り替える方式。総点数6点を候補艇のAI1着%比率で配分。45日6,926Rの検証で、常に単一候補にするより回収率が高いことを確認済み。
+                      <div style={{fontSize:11,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
+                        1号艇のAI1着%が45%以下の時、有力な他艇に1着候補を切り替える方式。45日検証で、単一候補固定より回収率が高いことを確認済みです。
                       </div>
                       {AI1CHAKU_WEAK_VENUES.indexOf(venue)>=0&&(
                         <div style={{background:"#3a1f1f",border:"1px solid #7a3a3a",borderRadius:6,padding:"6px 10px",marginBottom:6,fontSize:10,color:"#ff9b9b"}}>
@@ -3533,7 +3511,7 @@ function App() {
                       )}
                       <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
                         1着候補：{ai1chaku.candidates.map(function(b){return b+"号艇";}).join("・")}
-                        {ai1chaku.isFallback&&<span style={{color:"#5a6b7d"}}>（他艇が閾値未満のため1号艇のみ）</span>}
+                        {ai1chaku.isFallback&&<span style={{color:"#8b9bae"}}>（他艇が閾値未満のため1号艇のみ）</span>}
                       </div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                         {ai1chaku.bet.map(function(t,ti){
@@ -3551,21 +3529,21 @@ function App() {
                         ai1chakuSynthOdds!=null?(
                           <div style={{marginTop:8,fontSize:11,color:"#9db5cc"}}>
                             合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{ai1chakuSynthOdds.toFixed(1)}倍</span>
-                            <span style={{color:"#5a6b7d",fontSize:9,marginLeft:6}}>（{ai1chaku.bet.length}点均等買いの想定払戻倍率）</span>
+                            <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{ai1chaku.bet.length}点均等買いの想定払戻倍率）</span>
                           </div>
                         ):(
-                          <div style={{marginTop:8,fontSize:10,color:"#5a6b7d"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>
+                          <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>
                         )
                       ):(
-                        <div style={{marginTop:8,fontSize:10,color:"#5a6b7d"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
+                        <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
                       )}
                     </div>
                   )}
                   {axisPickRowsByBoat&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
                       <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.4}}>６x６択チャレンジ！<br/>てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
-                      <div style={{fontSize:9,color:"#8a94a6",marginBottom:8,lineHeight:1.5}}>
-                        任意の艇を1着と仮定した場合の出目候補をAI着率順に表示します。
+                      <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
+                        任意の艇を1着と仮定した出目候補をAI着率順に表示します。
                       </div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         <button onClick={function(){setAxisPickMode("2tan");}}
@@ -3587,7 +3565,7 @@ function App() {
                                 style={{width:36,height:36,borderRadius:8,border:isSel?"2px solid #fff":"1px solid #2c4762",background:isSel?LANE[b].bg:"#0e1b2c",color:isSel?LANE[b].fg:"#9db5cc",fontWeight:800,fontSize:15,cursor:"pointer"}}>
                                 {b}
                               </button>
-                              <span style={{fontSize:9,fontWeight:700,color:aiP1v!=null?(aiP1v>=45?"#f9c513":"#7db4e8"):"#5a6b7d"}}>
+                              <span style={{fontSize:9,fontWeight:700,color:aiP1v!=null?(aiP1v>=45?"#f9c513":"#7db4e8"):"#8b9bae"}}>
                                 {aiP1v!=null?aiP1v+"%":"―"}
                               </span>
                             </div>
@@ -3626,19 +3604,19 @@ function App() {
                           </div>
                           {(function(){
                             var synth=rd.odds3tan?synthesizeOdds(axisPickCombos,rd.odds3tan):null;
-                            if(!rd.odds3tan)return <div style={{marginTop:8,fontSize:10,color:"#5a6b7d"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>;
-                            if(synth==null)return <div style={{marginTop:8,fontSize:10,color:"#5a6b7d"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>;
+                            if(!rd.odds3tan)return <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>;
+                            if(synth==null)return <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>;
                             return (
                               <div style={{marginTop:8,fontSize:11,color:"#9db5cc"}}>
                                 合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{synth.toFixed(1)}倍</span>
-                                <span style={{color:"#5a6b7d",fontSize:9,marginLeft:6}}>（{axisPickCombos.length}点均等買いの想定払戻倍率）</span>
+                                <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{axisPickCombos.length}点均等買いの想定払戻倍率）</span>
                               </div>
                             );
                           })()}
                         </div>
                       )}
                       {axisPickBoat&&(!axisPickCombos||axisPickCombos.length===0)&&(
-                        <div style={{fontSize:10,color:"#5a6b7d"}}>この艇の候補データが不足しているため出目を算出できません</div>
+                        <div style={{fontSize:10,color:"#8b9bae"}}>この艇の候補データが不足しているため出目を算出できません</div>
                       )}
                     </div>
                   )}
