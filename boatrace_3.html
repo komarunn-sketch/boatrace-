@@ -1515,6 +1515,7 @@ function App() {
   const [csvDebug,setCsvDebug]=useState(null);
   const [axisPickBoat,setAxisPickBoat]=useState(null);
   const [axisPickMode,setAxisPickMode]=useState("2tan");
+  const [axisPickN,setAxisPickN]=useState(10);
 
   const rd=races[rk(venue,curRace)]||emptyRace();
   const updateRd=useCallback(function(fn){
@@ -2601,9 +2602,9 @@ function App() {
   },[result]);
   const axisPickCombos=useMemo(function(){
     if(!axisPickRowsByBoat||!axisPickBoat)return null;
-    if(axisPickMode==="3tan")return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,10);
+    if(axisPickMode==="3tan")return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,axisPickN);
     return makeAi1chakuBet2ForAxis(rd,axisPickRowsByBoat,axisPickBoat,5);
-  },[axisPickRowsByBoat,rd,axisPickBoat,axisPickMode]);
+  },[axisPickRowsByBoat,rd,axisPickBoat,axisPickMode,axisPickN]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
@@ -3554,6 +3555,13 @@ function App() {
                           style={{padding:"5px 12px",borderRadius:6,border:axisPickMode==="3tan"?"2px solid #c9a8ff":"1px solid #2c4762",background:axisPickMode==="3tan"?"#2a1f45":"#0e1b2c",color:axisPickMode==="3tan"?"#c9a8ff":"#9db5cc",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                           3連単
                         </button>
+                        {axisPickMode==="3tan"&&(
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:6}}>
+                            <button onClick={function(){setAxisPickN(function(v){return Math.max(1,v-1);});}} style={{width:26,height:26,borderRadius:6,border:"1px solid #2c4762",background:"#0e1b2c",color:"#c9a8ff",fontWeight:800,cursor:"pointer"}}>－</button>
+                            <span style={{fontSize:12,color:"#c9a8ff",fontWeight:700,minWidth:36,textAlign:"center"}}>{axisPickN}点</span>
+                            <button onClick={function(){setAxisPickN(function(v){return Math.min(20,v+1);});}} style={{width:26,height:26,borderRadius:6,border:"1px solid #2c4762",background:"#0e1b2c",color:"#c9a8ff",fontWeight:800,cursor:"pointer"}}>＋</button>
+                          </div>
+                        )}
                       </div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         {[1,2,3,4,5,6].map(function(b){
