@@ -24,7 +24,7 @@
     ::-webkit-scrollbar-thumb:hover { background: #3d5f82; background-clip: padding-box; }
   }
   #root { min-height: 100vh; overflow-x: hidden; }
-  [id^="section-"] { scroll-margin-top: 84px; }
+  [id^="section-"] { scroll-margin-top: 48px; }
 </style>
 </head>
 <body>
@@ -34,7 +34,6 @@
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
 const { useState, useMemo, useCallback } = React;
-
 
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
@@ -81,8 +80,11 @@ function waveBucket(raw){
 // データが十分溜まるまで、または確率モデルを作り直すまで非表示とする。
 const SHOW_VALUE_BETS = false;
 // 結果CSV・直前情報CSVの一括取込ブロック（分析用・開発用機能）の表示切替。
-// HTML版では非表示にする。
-const SHOW_BULK_CSV_IMPORT = false;
+// tsx単体で使う時はtrueのまま、HTMLビルド時にfalseへ書き換える。
+const SHOW_BULK_CSV_IMPORT = true;
+// スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
+// 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
+const SHOW_HONMEI_TAIKO_ANA = false;
 const COMBO_PROB_TABLE = {"不安定":{"honmei_rate":39.4,"rank_probs_pct":[7.19,3.74,2.72,3.26,3.86,2.17]},"中間":{"honmei_rate":58.4,"rank_probs_pct":[10.56,6.85,5.1,5.1,5.42,3.64]},"堅い":{"honmei_rate":75.7,"rank_probs_pct":[13.11,8.61,7.73,7.52,6.25,3.51]}};
 const VENUE_TENJI_IMPORTANCE = {"びわこ": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 21.2, "isshu": 28.9, "mawari": 40.4, "chokusen": -10.0}, "top": "mawari"}, "三国": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 15.3, "isshu": 31.3, "mawari": 27.3, "chokusen": 15.4}, "top": "isshu"}, "下関": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 20.4, "isshu": 39.5, "mawari": 28.7, "chokusen": 18.9}, "top": "isshu"}, "丸亀": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 29.1, "isshu": 35.5, "mawari": 16.7, "chokusen": 22.3}, "top": "isshu"}, "児島": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 21.3, "isshu": 30.4, "mawari": 7.5, "chokusen": 35.5}, "top": "chokusen"}, "唐津": {"ranking": ["mawari", "tenji", "isshu", "chokusen"], "gaps": {"tenji": 23.7, "isshu": 23.2, "mawari": 40.2, "chokusen": -1.3}, "top": "mawari"}, "常滑": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.1, "isshu": 42.8, "mawari": 15.9, "chokusen": 23.8}, "top": "isshu"}, "平和島": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 14.0, "isshu": 29.1, "mawari": 19.7, "chokusen": 12.4}, "top": "isshu"}, "戸田": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.8, "isshu": 36.8, "mawari": 15.6, "chokusen": 23.0}, "top": "isshu"}, "江戸川": {"ranking": ["tenji"], "gaps": {"tenji": 9.9}, "top": "tenji"}, "津": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 20.2, "isshu": 40.1, "mawari": 40.2, "chokusen": -4.0}, "top": "mawari"}, "浜名湖": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 25.7, "isshu": 40.4, "mawari": 30.4, "chokusen": 0.4}, "top": "isshu"}, "福岡": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 24.4, "isshu": 40.7, "mawari": 27.6, "chokusen": 12.4}, "top": "isshu"}, "若松": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 16.9, "isshu": 36.7, "mawari": 29.3, "chokusen": 20.4}, "top": "isshu"}, "鳴門": {"ranking": ["chokusen", "tenji", "isshu", "mawari"], "gaps": {"tenji": 21.0, "isshu": 20.6, "mawari": 10.8, "chokusen": 26.8}, "top": "chokusen"}, "多摩川": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 23.9, "isshu": 29.7, "mawari": -0.4, "chokusen": 39.2}, "top": "chokusen"}, "大村": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 22.7, "isshu": 33.8, "mawari": 12.5, "chokusen": 21.9}, "top": "isshu"}, "徳山": {"ranking": ["tenji"], "gaps": {"tenji": 23.6}, "top": "tenji"}, "桐生": {"ranking": ["isshu", "chokusen", "mawari", "tenji"], "gaps": {"tenji": 7.1, "isshu": 34.1, "mawari": 19.9, "chokusen": 20.1}, "top": "isshu"}, "住之江": {"ranking": ["tenji"], "gaps": {"tenji": 22.7}, "top": "tenji"}, "尼崎": {"ranking": ["tenji"], "gaps": {"tenji": 27.0}, "top": "tenji"}, "芦屋": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 23.8, "isshu": 43.1, "mawari": 38.6, "chokusen": 18.9}, "top": "isshu"}, "蒲郡": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 27.8, "isshu": 28.2, "mawari": 32.2, "chokusen": 0.9}, "top": "mawari"}, "宮島": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 23.5, "isshu": 35.9, "mawari": 3.4, "chokusen": 28.3}, "top": "isshu"}};
 
@@ -1417,43 +1419,14 @@ function parseRowByIndex(d){
   return base;
 }
 
-const NAV_ITEMS=[
-  {id:"section-shimekiri",label:"締切直前",icon:"⏰",tab:"setup"},
-  {id:"section-tenji",label:"展示",icon:"📋",tab:"setup"},
-  {id:"section-yosochakuritsu",label:"予想着率",icon:"📊",tab:"data"},
-  {id:"section-yoso",label:"着順予想",icon:"🎯",tab:"yoso"},
-];
 const TABS=[
   {id:"setup",label:"①セットアップ"},
   {id:"data",label:"②データ確認"},
   {id:"yoso",label:"③予想・買い目"},
 ];
 function QuickNav(props){
-  const [msg,setMsg]=useState("");
-  function jump(item){
-    props.setActiveTab(item.tab);
-    setTimeout(function(){
-      var el=document.getElementById(item.id);
-      if(el){
-        el.scrollIntoView({behavior:"smooth",block:"start"});
-      }else{
-        setMsg(item.label+"はまだ表示できません（場・レースを選択してください）");
-        setTimeout(function(){setMsg("");},2200);
-      }
-    },60);
-  }
   return (
     <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999}}>
-      <div style={{background:"#0e1b2c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
-        {NAV_ITEMS.map(function(item){
-          return (
-            <button key={item.id} onClick={function(){jump(item);}} style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:"5px 2px",borderRadius:7,border:"1px solid #2c4762",background:"#1d3149",color:"#7db4e8",fontSize:9,fontWeight:700,cursor:"pointer",overflow:"hidden"}}>
-              <span style={{fontSize:14,lineHeight:1}}>{item.icon}</span>
-              <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
       <div style={{background:"#16273c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
         {TABS.map(function(t){
           var isActive=props.activeTab===t.id;
@@ -1464,7 +1437,6 @@ function QuickNav(props){
           );
         })}
       </div>
-      {msg&&<div style={{background:"#e05252",color:"#fff",fontSize:11,fontWeight:700,textAlign:"center",padding:"6px 8px"}}>{msg}</div>}
     </div>
   );
 }
@@ -1515,6 +1487,12 @@ function App() {
   const [csvDebug,setCsvDebug]=useState(null);
   const [axisPickBoat,setAxisPickBoat]=useState(null);
   const [axisPickMode,setAxisPickMode]=useState("2tan");
+  // finalize_bet.py用コマンド生成に使う設定（セッション中のみ保持、ブラウザを閉じるとリセットされます）
+  const [fbRaceDate,setFbRaceDate]=useState("");
+  const [fbRaceCsvPath,setFbRaceCsvPath]=useState("sheets\\{DATE}_全場_全レース.csv");
+  const [fbBufferSec,setFbBufferSec]=useState(70);
+  const [fbCopyMsg,setFbCopyMsg]=useState("");
+  const [axisPickN,setAxisPickN]=useState(10);
 
   const rd=races[rk(venue,curRace)]||emptyRace();
   const updateRd=useCallback(function(fn){
@@ -1527,40 +1505,10 @@ function App() {
     });
   },[venue,curRace]);
 
-  // オッズ履歴収集（精度分析ログ追記63）：races内に蓄積されたodds3tan（取得済みのレースのみ）を
-  // venue・race・取得時刻付きのJSONとしてまとめてダウンロードする。将来のバックテスト用に日々保存し、
-  // まとまった時点でチャットにアップロードしてdata_all/odds/等へ統合する運用を想定。
-  function downloadOddsLog(){
-    var keys=Object.keys(races);
-    var out=[];
-    for(var i=0;i<keys.length;i++){
-      var k=keys[i];
-      var r=races[k];
-      if(!r||!r.odds3tan)continue;
-      var sp=k.split("_");
-      var rnum=sp[sp.length-1];
-      var vname=sp.slice(0,-1).join("_");
-      out.push({venue:vname,race:parseInt(rnum),oddsTime:r.oddsTime||null,odds3tan:r.odds3tan});
-    }
-    if(out.length===0){
-      alert("オッズが取得済みのレースがありません");
-      return;
-    }
-    var today=new Date();
-    var ymd=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
-    var blob=new Blob([JSON.stringify({date:ymd,races:out},null,2)],{type:"application/json"});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement("a");
-    a.href=url;
-    a.download="odds_log_"+ymd+".json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
   function handleCSV(e){
     var file=e.target.files[0];if(!file)return;
+    var dateMatch=(file.name||"").match(/(\d{4}-\d{2}-\d{2})/);
+    if(dateMatch)setFbRaceDate(dateMatch[1]);
     var reader=new FileReader();
     reader.onload=function(ev){
       try{
@@ -2593,6 +2541,50 @@ function App() {
     if(!ai1chaku)return null;
     return synthesizeOdds(ai1chaku.bet,rd.odds3tan);
   },[ai1chaku,rd.odds3tan]);
+  // finalize_bet.py にそのまま貼り付けて実行できるコマンド文字列を組み立てる。
+  // 日付・CSVパス・待機秒数はユーザーが入力欄で設定した値を使う（買い目・場・レース番号は自動）。
+  const fbCommand=useMemo(function(){
+    if(!ai1chaku||!ai1chaku.bet||ai1chaku.bet.length===0)return null;
+    if(!venue||!curRace)return null;
+    var dateStr=(fbRaceDate||"").trim();
+    if(!dateStr)return null;
+    var csvPath=(fbRaceCsvPath||"").replace(/\{DATE\}/g,dateStr);
+    var betsStr=ai1chaku.bet.map(function(t){return t[0]+"-"+t[1]+"-"+t[2];}).join(",");
+    var bufSec=parseInt(fbBufferSec,10);
+    if(isNaN(bufSec)||bufSec<0)bufSec=70;
+    return "python finalize_bet.py --date "+dateStr+" --venue "+venue+" --race "+curRace+
+      " --race-csv "+csvPath+" --bets "+betsStr+" --buffer-sec "+bufSec;
+  },[ai1chaku,venue,curRace,fbRaceDate,fbRaceCsvPath,fbBufferSec]);
+  const copyFbCommand=useCallback(function(){
+    if(!fbCommand)return;
+    function fallbackCopy(){
+      try{
+        var ta=document.createElement("textarea");
+        ta.value=fbCommand;
+        ta.style.position="fixed";ta.style.top="-1000px";ta.style.left="-1000px";
+        document.body.appendChild(ta);
+        ta.focus();ta.select();
+        var ok=document.execCommand("copy");
+        document.body.removeChild(ta);
+        if(ok){
+          setFbCopyMsg("✓ コピーしました");
+          setTimeout(function(){setFbCopyMsg("");},2000);
+        }else{
+          setFbCopyMsg("自動コピーできませんでした。下のコマンド欄をクリックして全選択→Ctrl+Cでコピーしてください");
+        }
+      }catch(err){
+        setFbCopyMsg("自動コピーできませんでした。下のコマンド欄をクリックして全選択→Ctrl+Cでコピーしてください");
+      }
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(fbCommand).then(function(){
+        setFbCopyMsg("✓ コピーしました");
+        setTimeout(function(){setFbCopyMsg("");},2000);
+      }).catch(fallbackCopy);
+    }else{
+      fallbackCopy();
+    }
+  },[fbCommand]);
   // 厳選レース一覧（B1軸レースと同じ方式：全venue横断、締切時間順、開閉タブ）。
   // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
   const senbatsuList=useMemo(function(){
@@ -2633,9 +2625,9 @@ function App() {
   },[result]);
   const axisPickCombos=useMemo(function(){
     if(!axisPickRowsByBoat||!axisPickBoat)return null;
-    if(axisPickMode==="3tan")return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,10);
+    if(axisPickMode==="3tan")return makeAi1chakuBetForAxis(rd,axisPickRowsByBoat,axisPickBoat,axisPickN);
     return makeAi1chakuBet2ForAxis(rd,axisPickRowsByBoat,axisPickBoat,5);
-  },[axisPickRowsByBoat,rd,axisPickBoat,axisPickMode]);
+  },[axisPickRowsByBoat,rd,axisPickBoat,axisPickMode,axisPickN]);
 
   function fmt(n,d){return n.toFixed(d!=null?d:2);}
   function sign(n){return n>0?"+"+n:""+n;}
@@ -2655,7 +2647,7 @@ function App() {
   }
   var hasBasic=rd.racerStats!=null||rd.stTable!=null||rd.motors[1]!=null;
   var wrapS={minHeight:"100vh",background:"#0e1b2c",color:"#e8eef5",fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",padding:"16px 12px 48px",overflowX:"hidden",maxWidth:"100vw"};
-  var innerS={maxWidth:760,margin:"0 auto",paddingTop:84};
+  var innerS={maxWidth:760,margin:"0 auto",paddingTop:48};
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
   var inpS={width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 8px",fontSize:15};
@@ -2677,14 +2669,6 @@ function App() {
             </label>
             {csvMsg&&<span style={{fontSize:12,color:csvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{csvMsg}</span>}
           </div>
-        </div>
-
-        <div style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:12}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#a9cbea",marginBottom:6}}>💾 オッズ履歴を保存（今後のバックテスト用）</div>
-          <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
-            展示情報の貼り付けと一緒にオッズを取得したレースは、このセッション中{Object.values(races).filter(function(r){return r&&r.odds3tan;}).length}件分たまっています。1日の終わりにダウンロードして保存しておくと、次回チャットにアップロードしてオッズを使った検証に使えます。
-          </div>
-          <button onClick={downloadOddsLog} style={btnS("#3d7ab8","#fff")}>📥 本日のオッズ履歴をダウンロード</button>
         </div>
 
         {SHOW_BULK_CSV_IMPORT&&(<>
@@ -2992,6 +2976,7 @@ function App() {
             </div>
           </div>
         )}
+
 
         <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
@@ -3415,6 +3400,7 @@ function App() {
                       {yoso.p3top.length===0&&yoso.p3mid.length===0&&yoso.p3rest.length===0&&<span style={{fontSize:11,color:"#4a5d70"}}>―</span>}
                     </div>
                   </div>
+                  {SHOW_HONMEI_TAIKO_ANA&&(<>
                   {yoso.suichi&&(
                     <div style={{background:"#0e1b2c",borderRadius:8,padding:"10px 12px",border:"1px solid #f9c513"}}>
                       <div style={{fontSize:11,color:"#f9c513",marginBottom:6,fontWeight:700}}>⭐ スイチ（最確1点）</div>
@@ -3495,6 +3481,7 @@ function App() {
                       )}
                     </div>
                   )}
+                  </>)}
                   {v2bet&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #8e5ce0"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🧪 v2買い目（本線4点＋対抗2点・実験的機能）</div>
@@ -3577,6 +3564,34 @@ function App() {
                       ):(
                         <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
                       )}
+                      <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2a2140"}}>
+                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🖥️ finalize_bet.py 実行コマンドをコピー</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                          <input type="text" placeholder="日付 YYYY-MM-DD" value={fbRaceDate}
+                            onChange={function(e){setFbRaceDate(e.target.value);}}
+                            style={{width:130,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
+                          <input type="text" placeholder="CSVパス（{DATE}が日付に置換されます）" value={fbRaceCsvPath}
+                            onChange={function(e){setFbRaceCsvPath(e.target.value);}}
+                            style={{flex:1,minWidth:220,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
+                          <input type="number" placeholder="秒" value={fbBufferSec}
+                            onChange={function(e){setFbBufferSec(e.target.value);}}
+                            style={{width:60,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
+                        </div>
+                        {fbCommand?(
+                          <div>
+                            <textarea readOnly value={fbCommand} onClick={function(e){e.target.select();}}
+                              rows={3}
+                              style={{width:"100%",boxSizing:"border-box",fontSize:10,color:"#8b9bae",background:"#0e1b2c",borderRadius:6,padding:"6px 8px",fontFamily:"monospace",border:"1px solid #3a3060",resize:"vertical"}}/>
+                            <div style={{fontSize:9,color:"#8b9bae",marginTop:2}}>↑クリックで全選択されます（Ctrl+Cで手動コピー可）</div>
+                            <button onClick={copyFbCommand} style={{marginTop:6,fontSize:11,fontWeight:700,color:"#0e1b2c",background:"#c9a8ff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer"}}>
+                              コマンドをコピー
+                            </button>
+                            {fbCopyMsg&&<span style={{marginLeft:8,fontSize:10,color:fbCopyMsg.indexOf("✓")===0?"#5dd39e":"#ff9b9b"}}>{fbCopyMsg}</span>}
+                          </div>
+                        ):(
+                          <div style={{fontSize:10,color:"#8b9bae"}}>日付を入力するとコマンドが生成されます</div>
+                        )}
+                      </div>
                     </div>
                   )}
                   {axisPickRowsByBoat&&(
@@ -3594,6 +3609,13 @@ function App() {
                           style={{padding:"5px 12px",borderRadius:6,border:axisPickMode==="3tan"?"2px solid #c9a8ff":"1px solid #2c4762",background:axisPickMode==="3tan"?"#2a1f45":"#0e1b2c",color:axisPickMode==="3tan"?"#c9a8ff":"#9db5cc",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                           3連単
                         </button>
+                        {axisPickMode==="3tan"&&(
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:6}}>
+                            <button onClick={function(){setAxisPickN(function(v){return Math.max(1,v-1);});}} style={{width:26,height:26,borderRadius:6,border:"1px solid #2c4762",background:"#0e1b2c",color:"#c9a8ff",fontWeight:800,cursor:"pointer"}}>－</button>
+                            <span style={{fontSize:12,color:"#c9a8ff",fontWeight:700,minWidth:36,textAlign:"center"}}>{axisPickN}点</span>
+                            <button onClick={function(){setAxisPickN(function(v){return Math.min(20,v+1);});}} style={{width:26,height:26,borderRadius:6,border:"1px solid #2c4762",background:"#0e1b2c",color:"#c9a8ff",fontWeight:800,cursor:"pointer"}}>＋</button>
+                          </div>
+                        )}
                       </div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         {[1,2,3,4,5,6].map(function(b){
@@ -3660,6 +3682,7 @@ function App() {
                       )}
                     </div>
                   )}
+                  {SHOW_HONMEI_TAIKO_ANA&&(<>
                   {yoso.taiko4&&yoso.taiko4.count>0&&(
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,color:"#5dd39e",marginBottom:6,fontWeight:700}}>○ 対抗</div>
@@ -3721,6 +3744,7 @@ function App() {
                       )}
                     </div>
                   )}
+                  </>)}
                 </div>
               </div>
             )}
