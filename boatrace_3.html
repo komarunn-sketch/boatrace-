@@ -1228,8 +1228,21 @@ function parseNewCSV(allRows){
       }
       stByPeriod[spk]=stArr;
     }
-    // デフォルトは直近1年
-    var stDefault=stByPeriod["直近1年"]||st_1y;
+    // 当地版の平均ST（3ヶ月=col52, 1年=col100）を取得し、フォールバックチェーン
+    // 「当地3ヶ月→当地1年→全国1年」でデフォルト値を組み立てる（精度分析ログ追記81・82で検証・採用）。
+    var stLocal3m=[null,null,null,null,null,null];
+    var stLocal1y=[null,null,null,null,null,null];
+    for(var bi3b=0;bi3b<boats.length;bi3b++){
+      var browL=boats[bi3b];
+      var bbL=pi(browL[0]);
+      if(!bbL||bbL<1||bbL>6)continue;
+      stLocal3m[bbL-1]=pf(browL[52]);
+      stLocal1y[bbL-1]=pf(browL[100]);
+    }
+    var stDefault=[null,null,null,null,null,null];
+    for(var sdi=0;sdi<6;sdi++){
+      stDefault[sdi]=stLocal3m[sdi]!=null?stLocal3m[sdi]:(stLocal1y[sdi]!=null?stLocal1y[sdi]:(stByPeriod["直近1年"]?stByPeriod["直近1年"][sdi]:(st_1y?st_1y[sdi]:null)));
+    }
     function calcStRank(arr){
       var rank=[null,null,null,null,null,null];
       var ents=[];
