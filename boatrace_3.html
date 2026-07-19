@@ -832,7 +832,15 @@ const RACE_SELECT_GOOD_COMBOS_V2={
   "若松|2":1,"若松|1":1,"浜名湖|2":1,"三国|2":1,"蒲郡|1":1,"江戸川|1":1,"戸田|1":1,
   "住之江|2":1,"びわこ|2":1,"津|1":1,
 };
+// 【マスタースイッチ】厳選レース機能そのものを使うかどうか（精度分析ログ参照）。
+// 月次で検証した結果、venue×候補数ベースの厳選ルールは月をまたぐと安定しない
+// （最も粘り強い組み合わせでも7ヶ月中4ヶ月分しか通用しない）ことが判明したため、
+// 信頼できる基準が確立するまで機能ごとオフにする。false時はisRaceSelectedが常にfalseを返し、
+// 厳選レースのバッジ・一覧パネルは表示されなくなる（全レースが平等に扱われる）。
+// 再度有効化したくなったらtrueに戻すだけでよい（RACE_SELECT_GOOD_VENUES/COMBOS_V2の中身は保持済み）。
+const RACE_SELECT_ENABLED=false;
 function isRaceSelected(venue,ai1chaku){
+  if(!RACE_SELECT_ENABLED)return false;
   if(!ai1chaku||!venue)return false;
   var n=ai1chaku.candidates.length;
   if(RACE_SELECT_USE_V2){
@@ -2715,6 +2723,7 @@ function App() {
   // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
   const senbatsuList=useMemo(function(){
     var out=[];
+    if(!RACE_SELECT_ENABLED)return out;
     Object.keys(races).forEach(function(key){
       var raceEntry=races[key];
       if(!raceEntry||!raceEntry.racerStats)return;
