@@ -369,6 +369,14 @@ const VW={
 // 階級による基礎力量倍率：グリッドサーチの結果、階級差を撤廃（全て1.0）した方が
 // 回収率が高いと判明したため撤廃（精度分析ログ追記44、45日6,926R・日付ベース2分割交差検証で確認）
 const CLASS_MULT_V2={"A1":1.0,"A2":1.0,"B1":1.0,"B2":1.0};
+// モーター補正・気象補正の効き具合を調整するダイヤル（精度分析ログ追記78で確定）。
+// 1.0=clip範囲そのまま、0.0=補正無効化、2.5/1.5=グリッドサーチで最良と判明した設定。
+const MOTOR_SPREAD_V2=2.5;
+const WEATHER_SPREAD_V2=1.5;
+function spreadClipV2(rawMult,spread,lo,hi){
+  var scaled=1.0+(rawMult-1.0)*spread;
+  return clipV2(scaled,lo,hi);
+}
 const COURSE1_2ND_PRIOR_V2={2:31,3:29,4:18,5:12,6:9};
 const SUJI_V2={
   1:{zenntai:{p2:[2,3,4,5,6],p3:[]},nige2:{p2:[3,4,5,6],p3:[]},nige3:{p2:[2,4,5,6],p3:[]},nige23:{p2:[4,5,6],p3:[]}},
@@ -388,10 +396,14 @@ function normOddsToProbV2(oddsObj){
   Object.keys(oddsObj).forEach(function(k){out[k]=oddsObj[k]/total;});
   return out;
 }
-function getSujiV2(honmeiCourse,boatsV2){
+function getSujiV2(honmeiCourse,boatsV2,boatAtCourseMap){
   if(honmeiCourse===1)return SUJI_V2[1].zenntai;
   if(SUJI_V2[honmeiCourse]){
-    var bd=boatsV2[honmeiCourse]; // 原典同様、コース番号を艇番として引く
+    // バグ修正（精度分析ログ追記76）：honmeiCourseは進入コース番号であり艇番ではない。
+    // 進入変更があると艇番とコース番号がズレるため、boatAtCourseMapで実際にそのコースを
+    // 走っている艇番に変換してからboatsV2を引く。マップが無い場合のみ旧来の前提にフォールバック。
+    var bnum=boatAtCourseMap&&boatAtCourseMap[honmeiCourse]!=null?boatAtCourseMap[honmeiCourse]:honmeiCourse;
+    var bd=boatsV2[bnum];
     var km=null,bestV=0;
     if(bd){
       var vals={sashi:bd.kc_sashi||0,makuri:bd.kc_makuri||0,makurizashi:bd.kc_makurizashi||0};
@@ -540,7 +552,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
     }
     o*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
     if(bd.motor_ren2!==null&&bd.motor_ren2!==undefined&&motorAvg!==null){
-      o*=clipV2(1+(bd.motor_ren2-motorAvg)/100,0.6,1.5);
+      o*=spreadClipV2(1+(bd.motor_ren2-motorAvg)/100,MOTOR_SPREAD_V2,0.6,1.5);
     }
     var kr=kimariRateV2(bb);
     if(kr!==null)o*=(0.7+kr*0.6);
@@ -550,7 +562,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
     else if(sr!==undefined&&sr<=2&&tr===1)o*=1.2;
     else if(tr===1||sr===1)o*=1.1;
     if(r.base_rate>0){
-      o*=clipV2((r.base_rate+r.wind_adj+r.wave_adj+r.weather_adj)/r.base_rate,0.7,1.3);
+      o*=spreadClipV2((r.base_rate+r.wind_adj+r.wave_adj+r.weather_adj)/r.base_rate,WEATHER_SPREAD_V2,0.7,1.3);
     }
     odds1[bb]=o;
   });
@@ -560,9 +572,9 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
 
   function combosForAxisV2(axis){
     var axisCourse=rowsV2[axis].course;
-    var sujiAx=getSujiV2(axisCourse,boats);
     var courseToBoat={};
     allBoats.forEach(function(bk){courseToBoat[(courses&&courses[bk]!=null)?courses[bk]:bk]=bk;});
+    var sujiAx=getSujiV2(axisCourse,boats,courseToBoat);
 
     var sujiP2={};
     if(sujiAx&&sujiAx.p2&&sujiAx.p2.length){
@@ -592,7 +604,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
       }
       val*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
       if(bd.motor_ren2!==null&&bd.motor_ren2!==undefined&&motorAvg!==null){
-        val*=clipV2(1+(bd.motor_ren2-motorAvg)/100,0.6,1.5);
+        val*=spreadClipV2(1+(bd.motor_ren2-motorAvg)/100,MOTOR_SPREAD_V2,0.6,1.5);
       }
       var kr=kimariRateV2(bb);
       if(kr!==null)val*=(0.8+kr*0.4);
@@ -623,7 +635,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
       }
       val*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
       if(bd.motor_ren3!==null&&bd.motor_ren3!==undefined&&motor3Avg!==null){
-        val*=clipV2(1+(bd.motor_ren3-motor3Avg)/100,0.6,1.5);
+        val*=spreadClipV2(1+(bd.motor_ren3-motor3Avg)/100,MOTOR_SPREAD_V2,0.6,1.5);
       }
       var kr=kimariRateV2(bb);
       if(kr!==null)val*=(0.85+kr*0.3);
