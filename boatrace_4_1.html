@@ -1,39 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>ボートレース予想ツール</title>
-<style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: #0e1b2c; overflow-x: hidden; width: 100%; overflow-y: auto; }
-  @media (pointer: coarse) {
-    html, body { overscroll-behavior-y: none; }
-  }
-  body { -webkit-font-smoothing: antialiased; }
-  input, select, button, textarea { font-family: inherit; }
-  input[type=number] { -moz-appearance: textfield; }
-  input[type=number]::-webkit-outer-spin-button,
-  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  ::-webkit-scrollbar { height: 6px; width: 6px; }
-  ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 3px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  @media (pointer: fine) {
-    ::-webkit-scrollbar { height: 14px; width: 14px; }
-    ::-webkit-scrollbar-thumb { background: #2c4762; border-radius: 7px; border: 3px solid #0e1b2c; background-clip: padding-box; }
-    ::-webkit-scrollbar-thumb:hover { background: #3d5f82; background-clip: padding-box; }
-  }
-  #root { min-height: 100vh; overflow-x: hidden; }
-  [id^="section-"] { scroll-margin-top: 48px; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-<script type="text/babel" data-presets="react">
-const { useState, useMemo, useCallback } = React;
+import { useState, useMemo, useCallback } from "react";
 
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
@@ -841,6 +806,64 @@ function synthesizeOdds(combos,oddsObj){
   if(sumInv<=0)return null;
   return 1/sumInv;
 }
+// 買い目リストをフォーメーション表記（例：1-23-2345）に圧縮する。
+// 軸（1着）ごとにグループ化し、その軸の(2着,3着)組の中から「2着候補×3着候補（2着≠3着）」の
+// 矩形になっている部分を貪欲に探して圧縮表記にする。矩形に入らない点は単独の組番として残す。
+function allNonEmptySubsets(arr){
+  var subsets=[];
+  var n=arr.length;
+  for(var mask=1;mask<(1<<n);mask++){
+    var subset=[];
+    for(var i=0;i<n;i++){
+      if(mask&(1<<i))subset.push(arr[i]);
+    }
+    subsets.push(subset);
+  }
+  return subsets;
+}
+function compressFormation(combos){
+  if(!combos||combos.length===0)return [];
+  var byAxis={};
+  combos.forEach(function(t){
+    var ax=t[0];
+    if(!byAxis[ax])byAxis[ax]=[];
+    byAxis[ax].push([t[1],t[2]]);
+  });
+  var out=[];
+  Object.keys(byAxis).sort(function(a,b){return a-b;}).forEach(function(axStr){
+    var ax=parseInt(axStr,10);
+    var remainingSet=new Set(byAxis[axStr].map(function(p){return p[0]+"-"+p[1];}));
+    var groups=[];
+    while(remainingSet.size>0){
+      var pairsArr=Array.from(remainingSet).map(function(k){var parts=k.split("-");return [parseInt(parts[0],10),parseInt(parts[1],10)];});
+      var seconds=Array.from(new Set(pairsArr.map(function(p){return p[0];})));
+      var thirds=Array.from(new Set(pairsArr.map(function(p){return p[1];})));
+      var bestRect=null;
+      allNonEmptySubsets(seconds).forEach(function(ss){
+        allNonEmptySubsets(thirds).forEach(function(ts){
+          var expected=[];
+          ss.forEach(function(s){ ts.forEach(function(t){ if(s!==t)expected.push(s+"-"+t); }); });
+          if(expected.length<2)return; // 1点だけなら圧縮の意味が無い
+          var allPresent=expected.every(function(k){return remainingSet.has(k);});
+          if(allPresent&&(!bestRect||expected.length>bestRect.expected.length)){
+            bestRect={ss:ss.slice().sort(function(a,b){return a-b;}),ts:ts.slice().sort(function(a,b){return a-b;}),expected:expected};
+          }
+        });
+      });
+      if(bestRect){
+        groups.push({type:"formation",text:ax+"-"+bestRect.ss.join("")+"-"+bestRect.ts.join(""),n:bestRect.expected.length});
+        bestRect.expected.forEach(function(k){remainingSet.delete(k);});
+      }else{
+        var firstKey=remainingSet.values().next().value;
+        var parts=firstKey.split("-");
+        groups.push({type:"single",text:ax+"-"+parts[0]+"-"+parts[1],n:1});
+        remainingSet.delete(firstKey);
+      }
+    }
+    groups.forEach(function(g){out.push(g);});
+  });
+  return out;
+}
 
 function computeResultForRd(venue,rd,racerCat){
     if(!venue)return null;
@@ -1479,7 +1502,7 @@ class ErrorBoundary extends React.Component{
   }
 }
 
-function App() {
+export default function App() {
   const [venue,setVenue]=useState("");
   const [activeTab,setActiveTab]=useState("setup");
   const [racerCat,setRacerCat]=useState("直近1年");
@@ -2553,6 +2576,35 @@ function App() {
     if(!ai1chaku)return null;
     return synthesizeOdds(ai1chaku.bet,rd.odds3tan);
   },[ai1chaku,rd.odds3tan]);
+  // V2＋AI1着%基準フォーメーションの合成買い目（重複する組番は1点にまとめる）。
+  // 精度分析ログ追記79：47日実績で重複部分の回収率が最も高く（137.5%）、
+  // 単体よりわずかに回収率は下がるが的中率が大きく向上する（30-37%→48.8%）ことを確認済み。
+  const combinedBet=useMemo(function(){
+    var v2List=(v2bet&&v2bet.bet_honmei4_taiko2)?v2bet.bet_honmei4_taiko2:[];
+    var ai1List=(ai1chaku&&ai1chaku.bet)?ai1chaku.bet:[];
+    if(v2List.length===0&&ai1List.length===0)return null;
+    var seen={};
+    var merged=[];
+    var overlapCount=0;
+    function addAll(list,fromV2,fromAi1){
+      list.forEach(function(t){
+        var key=t[0]+"-"+t[1]+"-"+t[2];
+        if(seen[key]){
+          if(!seen[key].dup){seen[key].dup=true;overlapCount++;}
+          return;
+        }
+        seen[key]={dup:false};
+        merged.push(t);
+      });
+    }
+    addAll(v2List);
+    addAll(ai1List);
+    return {bet:merged,overlapCount:overlapCount,v2Count:v2List.length,ai1Count:ai1List.length};
+  },[v2bet,ai1chaku]);
+  const combinedSynthOdds=useMemo(function(){
+    if(!combinedBet)return null;
+    return synthesizeOdds(combinedBet.bet,rd.odds3tan);
+  },[combinedBet,rd.odds3tan]);
   // finalize_bet.py にそのまま貼り付けて実行できるコマンド文字列を組み立てる。
   // 日付・CSVパス・待機秒数はユーザーが入力欄で設定した値を使う（買い目・場・レース番号は自動）。
   const fbCommand=useMemo(function(){
@@ -3606,6 +3658,40 @@ function App() {
                       </div>
                     </div>
                   )}
+                  {combinedBet&&(
+                    <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #3d7a5a"}}>
+                      <div style={{fontSize:11,fontWeight:800,color:"#5dd39e",marginBottom:4}}>🔗 V2＋AI1着%基準フォーメーション 合成買い目（重複除外）</div>
+                      <div style={{fontSize:11,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
+                        両方式が選んだ組番を1点にまとめて合算。47日実績（精度分析ログ追記79）では、単体（V2:37.2%/127.7%、AI1着%:30.5%/128.3%）に対し、
+                        合成で的中率48.8%・回収率126.1%（重複部分だけで見ると回収率137.5%と最も優秀）。的中率を優先したい場合向け。
+                      </div>
+                      <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                        V2 {combinedBet.v2Count}点 + AI1着% {combinedBet.ai1Count}点 − 重複{combinedBet.overlapCount}点 ＝ <span style={{color:"#5dd39e",fontWeight:700}}>{combinedBet.bet.length}点</span>
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {compressFormation(combinedBet.bet).map(function(g,gi){
+                          return (
+                            <span key={gi} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:"#5dd39e",letterSpacing:"0.03em"}}>{g.text}</span>
+                              {g.type==="formation"&&<span style={{fontSize:9,color:"#8b9bae"}}>（{g.n}点）</span>}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {rd.odds3tan?(
+                        combinedSynthOdds!=null?(
+                          <div style={{marginTop:8,fontSize:11,color:"#9db5cc"}}>
+                            合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{combinedSynthOdds.toFixed(1)}倍</span>
+                            <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{combinedBet.bet.length}点均等買いの想定払戻倍率）</span>
+                          </div>
+                        ):(
+                          <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>
+                        )
+                      ):(
+                        <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
+                      )}
+                    </div>
+                  )}
                   {axisPickRowsByBoat&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
                       <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.4}}>６x６択チャレンジ！<br/>てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
@@ -3796,11 +3882,3 @@ function App() {
     </div>
   );
 }
-
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<ErrorBoundary><App /></ErrorBoundary>);
-
-</script>
-</body>
-</html>
