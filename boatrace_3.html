@@ -821,10 +821,24 @@ function computeAi1chakuFormation(result,rd,venue){
 // レース厳選（追記：場別回収率×候補数の交差検証済みルール、精度分析ログ参照）
 // 46日プールで奇数日/偶数日それぞれ独立に「回収率の良い場」を選定し、両方に共通した11場。
 const RACE_SELECT_GOOD_VENUES=["びわこ","三国","住之江","唐津","宮島","江戸川","津","芦屋","若松","蒲郡","鳴門"];
+// 【切替可能】新基準を使うかどうか（精度分析ログ追記84・85）。true=新基準、false=旧基準（RACE_SELECT_GOOD_VENUES×候補2-3艇）。
+// 6月データと7月データで「良い場」が1つも重ならないことが判明（精度分析ログ追記85）したため、
+// 新基準の信頼性が確認できるまでfalse（旧基準）に戻す。RACE_SELECT_GOOD_COMBOS_V2の中身は
+// 将来の再検証用にそのまま残してある。
+const RACE_SELECT_USE_V2=false;
+// 場|候補数 のペアで管理。48日プール、n>=15かつ奇数日/偶数日ともn>=5・回収率100%超のみ採用（精度分析ログ追記84）。
+const RACE_SELECT_GOOD_COMBOS_V2={
+  "蒲郡|3":1,"鳴門|2":1,"びわこ|3":1,"大村|2":1,"唐津|2":1,"多摩川|2":1,"津|2":1,
+  "若松|2":1,"若松|1":1,"浜名湖|2":1,"三国|2":1,"蒲郡|1":1,"江戸川|1":1,"戸田|1":1,
+  "住之江|2":1,"びわこ|2":1,"津|1":1,
+};
 function isRaceSelected(venue,ai1chaku){
   if(!ai1chaku||!venue)return false;
-  if(RACE_SELECT_GOOD_VENUES.indexOf(venue)<0)return false;
   var n=ai1chaku.candidates.length;
+  if(RACE_SELECT_USE_V2){
+    return !!RACE_SELECT_GOOD_COMBOS_V2[venue+"|"+n];
+  }
+  if(RACE_SELECT_GOOD_VENUES.indexOf(venue)<0)return false;
   return n===2||n===3;
 }
 // 合成オッズ＝1/Σ(1/オッズ)。買い目全点のオッズが揃っている時のみ算出（1点でも未取得ならnull）。
@@ -2707,7 +2721,11 @@ function App() {
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      if(RACE_SELECT_GOOD_VENUES.indexOf(vname)<0)return;
+      // 新基準(V2)使用時は新基準の対象場、旧基準時は旧基準の対象場でのみ以降の計算を行う（早期リターンの高速化）。
+      var venueCandidatesForSelect=RACE_SELECT_USE_V2
+        ?Object.keys(RACE_SELECT_GOOD_COMBOS_V2).some(function(k){return k.split("|")[0]===vname;})
+        :RACE_SELECT_GOOD_VENUES.indexOf(vname)>=0;
+      if(!venueCandidatesForSelect)return;
       var r=computeResultForRd(vname,raceEntry,racerCat);
       if(!r)return;
       var formation=computeAi1chakuFormation(r,raceEntry,vname);
