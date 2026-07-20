@@ -82,7 +82,7 @@ function waveBucket(raw){
 const SHOW_VALUE_BETS = false;
 // 結果CSV・直前情報CSVの一括取込ブロック（分析用・開発用機能）の表示切替。
 // tsx単体で使う時はtrueのまま、HTMLビルド時にfalseへ書き換える。
-const SHOW_BULK_CSV_IMPORT = true;
+const SHOW_BULK_CSV_IMPORT = false;
 // スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
 // 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
 const SHOW_HONMEI_TAIKO_ANA = false;
@@ -3237,8 +3237,42 @@ function App() {
             }
             var sections=[["出足（0m地点）","deashi"],["中間速（150m地点）","chukan"],["伸び（300m地点）","nobi"]];
             var FLOOR=15;
+            function normScore(key){
+              var vals=boats.map(function(x){return x[key];});
+              var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+              var out={};
+              boats.forEach(function(x){out[x.b]=max===min?100:15+(x[key]-min)/(max-min)*85;});
+              return out;
+            }
+            var scoreDeashi=normScore("deashi"),scoreChukan=normScore("chukan"),scoreNobi=normScore("nobi");
+            var overall=boats.map(function(x){
+              return{b:x.b,score:Math.round((scoreDeashi[x.b]+scoreChukan[x.b]+scoreNobi[x.b])/3)};
+            }).sort(function(a,c){return c.score-a.score;});
+            function grade(s){
+              if(s>=85)return"S"; if(s>=70)return"A"; if(s>=55)return"B"; if(s>=40)return"C"; return"D";
+            }
+            var gradeColor={S:"#5dd39e",A:"#7db4e8",B:"#c084fc",C:"#9db5cc",D:"#e37a7a"};
             return (
               <div style={{display:"grid",gap:16}}>
+                <div>
+                  <div style={{fontSize:11,color:"#9db5cc",marginBottom:6}}>総合評価</div>
+                  <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",display:"grid",gap:6}}>
+                    {overall.map(function(o,i){
+                      var g=grade(o.score);
+                      return (
+                        <div key={o.b} style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{width:26,fontSize:11,color:"#9db5cc"}}>{i+1}位</span>
+                          <LB b={o.b}/>
+                          <div style={{flex:1,position:"relative",height:18,background:"#0e1b2c",borderRadius:5,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:o.score+"%",background:gradeColor[g],borderRadius:5}}/>
+                          </div>
+                          <span style={{width:40,fontSize:12,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{o.score}点</span>
+                          <span style={{width:18,fontSize:12,fontWeight:800,color:gradeColor[g],textAlign:"center",flexShrink:0}}>{g}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 {sections.map(function(sec){
                   var label=sec[0],key=sec[1];
                   var vals=boats.map(function(x){return x[key];});
