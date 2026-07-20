@@ -772,9 +772,13 @@ function ai1chakuKimariScore(rd,rowsByBoat,b){
   var tot=gv(kc.nige)+gv(kc.sashi)+gv(kc.makuri)+gv(kc.makurizashi)+gv(kc.nuki);
   return Math.min(10,tot/rc*10);
 }
+// 1号艇のAI1着%がこの値を超えたら単独候補とみなす閾値。
+// 精度分析ログ追記104で45→30に下げると、回収率・大穴依存の頑健性・最大連敗・
+// ドローダウン全てが改善することを確認（78日実測：回収率149.20%・最大連敗16・最大DD44,040円）。
+const AI1CHAKU_B1_CUT=30;
 function getAi1chakuCandidates(rowsByBoat){
   var aiP1={};for(var b=1;b<=6;b++)aiP1[b]=rowsByBoat[b].aiP1||0;
-  if(aiP1[1]>45)return [1];
+  if(aiP1[1]>AI1CHAKU_B1_CUT)return [1];
   var cands=[];
   for(var b=2;b<=6;b++){if(aiP1[b]>=AI1CHAKU_THRESH[b])cands.push(b);}
   if(cands.length===0)cands=[1];
@@ -813,12 +817,13 @@ function computeAi1chakuFormation(result,rd,venue){
   }
   if(rowsByBoat[1].aiP1==null)return null; // AI1着%が未計算(選手データ不足等)なら非表示
   var cands=getAi1chakuCandidates(rowsByBoat);
-  // 採用（精度分析ログ参照）：厳選場（RACE_SELECT_GOOD_VENUES）に限り、候補が3艇以上になった場合は
-  // aiP1上位2艇に絞り、1艇あたりの持ち点を厚くする。元々候補3艇だった188Rで交差検証済み（回収率+改善、両分割とも非悪化）。
-  // ただしサンプルがまだ小さいため継続検証中。
-  if(venue&&RACE_SELECT_GOOD_VENUES.indexOf(venue)>=0&&cands.length>2){
-    cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
-  }
+  // 【無効化済み】旧ロジック：厳選場（RACE_SELECT_GOOD_VENUES）に限り、候補が3艇以上になった場合に
+  // aiP1上位2艇へ絞る処理。188Rという小サンプルでの検証にとどまっていた上、精度分析ログ追記104の
+  // b1_cut=30ロジック（バックテストはこの絞り込み無しで実施）と整合しなくなるため無効化。
+  // 再度使いたくなった場合は下のif文のコメントを外すだけでよい。
+  // if(venue&&RACE_SELECT_GOOD_VENUES.indexOf(venue)>=0&&cands.length>2){
+  //   cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
+  // }
   var alloc=ai1chakuAllocatePoints(cands,rowsByBoat,cands.length>=2?AI1CHAKU_TOTAL_POINTS_2PLUS:AI1CHAKU_TOTAL_POINTS);
   var bet=[];
   cands.forEach(function(axis){
@@ -842,12 +847,12 @@ const RACE_SELECT_GOOD_COMBOS_V2={
   "住之江|2":1,"びわこ|2":1,"津|1":1,
 };
 // 【マスタースイッチ】厳選レース機能そのものを使うかどうか（精度分析ログ参照）。
-// 月次で検証した結果、venue×候補数ベースの厳選ルールは月をまたぐと安定しない
-// （最も粘り強い組み合わせでも7ヶ月中4ヶ月分しか通用しない）ことが判明したため、
-// 信頼できる基準が確立するまで機能ごとオフにする。false時はisRaceSelectedが常にfalseを返し、
-// 厳選レースのバッジ・一覧パネルは表示されなくなる（全レースが平等に扱われる）。
-// 再度有効化したくなったらtrueに戻すだけでよい（RACE_SELECT_GOOD_VENUES/COMBOS_V2の中身は保持済み）。
-const RACE_SELECT_ENABLED=false;
+// 旧基準（venue×候補数）は月をまたぐと安定しないことが判明し一旦オフにしていたが、
+// 精度分析ログ追記104で「候補2艇以上（b1_cut=30%）」という、場に依存しない
+// レース前の情報だけで判定できる新基準を発見・検証（78日実測で頑健性を確認）。
+// これに伴い機能を再度オンにする。なお持ち点も候補2艇以上の時は自動的に8点に増える
+// （AI1CHAKU_TOTAL_POINTS_2PLUS）。まだフォワードテスト継続検証中の基準。
+const RACE_SELECT_ENABLED=true;
 // 【新規】場ごとの構造的な弱さに関する注意バッジ用リスト（精度分析ログ追記102）。
 // 47日・7,259レースで、各場の払戻上位3件を除いてもROIが100%を割った5場。
 // 「このレースを買え」という推奨ではなく、「この場は過去データ上、回収率が低い」という
@@ -866,12 +871,10 @@ function isWeakVenue(venue){
 function isRaceSelected(venue,ai1chaku){
   if(!RACE_SELECT_ENABLED)return false;
   if(!ai1chaku||!venue)return false;
-  var n=ai1chaku.candidates.length;
-  if(RACE_SELECT_USE_V2){
-    return !!RACE_SELECT_GOOD_COMBOS_V2[venue+"|"+n];
-  }
-  if(RACE_SELECT_GOOD_VENUES.indexOf(venue)<0)return false;
-  return n===2||n===3;
+  // 新基準（精度分析ログ追記104）：場を問わず、候補2艇以上（b1_cut=30%）なら選定。
+  // 旧基準（RACE_SELECT_GOOD_VENUES×候補数、RACE_SELECT_GOOD_COMBOS_V2）は
+  // 月をまたぐ安定性が無かったため使用を停止（中身は将来の再検証用に保持）。
+  return ai1chaku.candidates.length>=2;
 }
 // 合成オッズ＝1/Σ(1/オッズ)。買い目全点のオッズが揃っている時のみ算出（1点でも未取得ならnull）。
 function synthesizeOdds(combos,oddsObj){
@@ -3856,7 +3859,7 @@ function App() {
                           <span style={{fontSize:11,color:ai1chaku.candidates.length>=2?"#5dd39e":"#e8b98a",fontWeight:700}}>{ai1chaku.candidates.length>=2?"参加検討":"見送り検討"}</span>
                         </div>
                         <div style={{fontSize:10,color:"#8fae9d",marginTop:4}}>
-                          78日実測：候補1艇のみは決着オッズが低くなりがち（20倍以上の割合50%）。候補2艇以上は69〜83%が20倍以上で決着。持ち点は候補2艇以上の時8点に増量済み（回収率141.41%・最大連敗24、6点のままなら回収率150.83%・最大連敗31）。精度分析ログ追記104参照。まだフォワードテスト検証中の基準です。
+                          78日実測（b1_cut=30%・8点）：回収率149.20%・上位10件除外後129.11%・最大連敗16・最大ドローダウン44,040円。1号艇のAI1着%が30%以下、または他艇が閾値超の時に「候補2艇以上」と判定。精度分析ログ追記104参照。まだフォワードテスト継続検証中の基準です。
                         </div>
                       </div>
                       <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
