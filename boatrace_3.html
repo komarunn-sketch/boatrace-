@@ -35,6 +35,7 @@
 <script type="text/babel" data-presets="react">
 const { useState, useMemo, useCallback } = React;
 
+
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
   "蒲郡":7,"常滑":8,"津":9,"三国":10,"びわこ":11,"住之江":12,
@@ -80,8 +81,8 @@ function waveBucket(raw){
 // データが十分溜まるまで、または確率モデルを作り直すまで非表示とする。
 const SHOW_VALUE_BETS = false;
 // 結果CSV・直前情報CSVの一括取込ブロック（分析用・開発用機能）の表示切替。
-// tsx単体で使う時はtrueのまま、HTMLビルド時にfalseへ書き換える。
-const SHOW_BULK_CSV_IMPORT = true;
+// HTML版では非表示にする。
+const SHOW_BULK_CSV_IMPORT = false;
 // スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
 // 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
 const SHOW_HONMEI_TAIKO_ANA = false;
@@ -369,14 +370,6 @@ const VW={
 // 階級による基礎力量倍率：グリッドサーチの結果、階級差を撤廃（全て1.0）した方が
 // 回収率が高いと判明したため撤廃（精度分析ログ追記44、45日6,926R・日付ベース2分割交差検証で確認）
 const CLASS_MULT_V2={"A1":1.0,"A2":1.0,"B1":1.0,"B2":1.0};
-// モーター補正・気象補正の効き具合を調整するダイヤル（精度分析ログ追記78で確定）。
-// 1.0=clip範囲そのまま、0.0=補正無効化、2.5/1.5=グリッドサーチで最良と判明した設定。
-const MOTOR_SPREAD_V2=2.5;
-const WEATHER_SPREAD_V2=1.5;
-function spreadClipV2(rawMult,spread,lo,hi){
-  var scaled=1.0+(rawMult-1.0)*spread;
-  return clipV2(scaled,lo,hi);
-}
 const COURSE1_2ND_PRIOR_V2={2:31,3:29,4:18,5:12,6:9};
 const SUJI_V2={
   1:{zenntai:{p2:[2,3,4,5,6],p3:[]},nige2:{p2:[3,4,5,6],p3:[]},nige3:{p2:[2,4,5,6],p3:[]},nige23:{p2:[4,5,6],p3:[]}},
@@ -396,14 +389,10 @@ function normOddsToProbV2(oddsObj){
   Object.keys(oddsObj).forEach(function(k){out[k]=oddsObj[k]/total;});
   return out;
 }
-function getSujiV2(honmeiCourse,boatsV2,boatAtCourseMap){
+function getSujiV2(honmeiCourse,boatsV2){
   if(honmeiCourse===1)return SUJI_V2[1].zenntai;
   if(SUJI_V2[honmeiCourse]){
-    // バグ修正（精度分析ログ追記76）：honmeiCourseは進入コース番号であり艇番ではない。
-    // 進入変更があると艇番とコース番号がズレるため、boatAtCourseMapで実際にそのコースを
-    // 走っている艇番に変換してからboatsV2を引く。マップが無い場合のみ旧来の前提にフォールバック。
-    var bnum=boatAtCourseMap&&boatAtCourseMap[honmeiCourse]!=null?boatAtCourseMap[honmeiCourse]:honmeiCourse;
-    var bd=boatsV2[bnum];
+    var bd=boatsV2[honmeiCourse]; // 原典同様、コース番号を艇番として引く
     var km=null,bestV=0;
     if(bd){
       var vals={sashi:bd.kc_sashi||0,makuri:bd.kc_makuri||0,makurizashi:bd.kc_makurizashi||0};
@@ -552,7 +541,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
     }
     o*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
     if(bd.motor_ren2!==null&&bd.motor_ren2!==undefined&&motorAvg!==null){
-      o*=spreadClipV2(1+(bd.motor_ren2-motorAvg)/100,MOTOR_SPREAD_V2,0.6,1.5);
+      o*=clipV2(1+(bd.motor_ren2-motorAvg)/100,0.6,1.5);
     }
     var kr=kimariRateV2(bb);
     if(kr!==null)o*=(0.7+kr*0.6);
@@ -562,7 +551,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
     else if(sr!==undefined&&sr<=2&&tr===1)o*=1.2;
     else if(tr===1||sr===1)o*=1.1;
     if(r.base_rate>0){
-      o*=spreadClipV2((r.base_rate+r.wind_adj+r.wave_adj+r.weather_adj)/r.base_rate,WEATHER_SPREAD_V2,0.7,1.3);
+      o*=clipV2((r.base_rate+r.wind_adj+r.wave_adj+r.weather_adj)/r.base_rate,0.7,1.3);
     }
     odds1[bb]=o;
   });
@@ -572,9 +561,9 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
 
   function combosForAxisV2(axis){
     var axisCourse=rowsV2[axis].course;
+    var sujiAx=getSujiV2(axisCourse,boats);
     var courseToBoat={};
     allBoats.forEach(function(bk){courseToBoat[(courses&&courses[bk]!=null)?courses[bk]:bk]=bk;});
-    var sujiAx=getSujiV2(axisCourse,boats,courseToBoat);
 
     var sujiP2={};
     if(sujiAx&&sujiAx.p2&&sujiAx.p2.length){
@@ -604,7 +593,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
       }
       val*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
       if(bd.motor_ren2!==null&&bd.motor_ren2!==undefined&&motorAvg!==null){
-        val*=spreadClipV2(1+(bd.motor_ren2-motorAvg)/100,MOTOR_SPREAD_V2,0.6,1.5);
+        val*=clipV2(1+(bd.motor_ren2-motorAvg)/100,0.6,1.5);
       }
       var kr=kimariRateV2(bb);
       if(kr!==null)val*=(0.8+kr*0.4);
@@ -635,7 +624,7 @@ function computeRaceV2(vname,boats,exh,windKey,courses,waveBucketKey,weatherBuck
       }
       val*=CLASS_MULT_V2[bd.racerClass]!==undefined?CLASS_MULT_V2[bd.racerClass]:1.0;
       if(bd.motor_ren3!==null&&bd.motor_ren3!==undefined&&motor3Avg!==null){
-        val*=spreadClipV2(1+(bd.motor_ren3-motor3Avg)/100,MOTOR_SPREAD_V2,0.6,1.5);
+        val*=clipV2(1+(bd.motor_ren3-motor3Avg)/100,0.6,1.5);
       }
       var kr=kimariRateV2(bb);
       if(kr!==null)val*=(0.85+kr*0.3);
@@ -821,32 +810,10 @@ function computeAi1chakuFormation(result,rd,venue){
 // レース厳選（追記：場別回収率×候補数の交差検証済みルール、精度分析ログ参照）
 // 46日プールで奇数日/偶数日それぞれ独立に「回収率の良い場」を選定し、両方に共通した11場。
 const RACE_SELECT_GOOD_VENUES=["びわこ","三国","住之江","唐津","宮島","江戸川","津","芦屋","若松","蒲郡","鳴門"];
-// 【切替可能】新基準を使うかどうか（精度分析ログ追記84・85）。true=新基準、false=旧基準（RACE_SELECT_GOOD_VENUES×候補2-3艇）。
-// 6月データと7月データで「良い場」が1つも重ならないことが判明（精度分析ログ追記85）したため、
-// 新基準の信頼性が確認できるまでfalse（旧基準）に戻す。RACE_SELECT_GOOD_COMBOS_V2の中身は
-// 将来の再検証用にそのまま残してある。
-const RACE_SELECT_USE_V2=false;
-// 場|候補数 のペアで管理。48日プール、n>=15かつ奇数日/偶数日ともn>=5・回収率100%超のみ採用（精度分析ログ追記84）。
-const RACE_SELECT_GOOD_COMBOS_V2={
-  "蒲郡|3":1,"鳴門|2":1,"びわこ|3":1,"大村|2":1,"唐津|2":1,"多摩川|2":1,"津|2":1,
-  "若松|2":1,"若松|1":1,"浜名湖|2":1,"三国|2":1,"蒲郡|1":1,"江戸川|1":1,"戸田|1":1,
-  "住之江|2":1,"びわこ|2":1,"津|1":1,
-};
-// 【マスタースイッチ】厳選レース機能そのものを使うかどうか（精度分析ログ参照）。
-// 月次で検証した結果、venue×候補数ベースの厳選ルールは月をまたぐと安定しない
-// （最も粘り強い組み合わせでも7ヶ月中4ヶ月分しか通用しない）ことが判明したため、
-// 信頼できる基準が確立するまで機能ごとオフにする。false時はisRaceSelectedが常にfalseを返し、
-// 厳選レースのバッジ・一覧パネルは表示されなくなる（全レースが平等に扱われる）。
-// 再度有効化したくなったらtrueに戻すだけでよい（RACE_SELECT_GOOD_VENUES/COMBOS_V2の中身は保持済み）。
-const RACE_SELECT_ENABLED=false;
 function isRaceSelected(venue,ai1chaku){
-  if(!RACE_SELECT_ENABLED)return false;
   if(!ai1chaku||!venue)return false;
-  var n=ai1chaku.candidates.length;
-  if(RACE_SELECT_USE_V2){
-    return !!RACE_SELECT_GOOD_COMBOS_V2[venue+"|"+n];
-  }
   if(RACE_SELECT_GOOD_VENUES.indexOf(venue)<0)return false;
+  var n=ai1chaku.candidates.length;
   return n===2||n===3;
 }
 // 合成オッズ＝1/Σ(1/オッズ)。買い目全点のオッズが揃っている時のみ算出（1点でも未取得ならnull）。
@@ -862,64 +829,6 @@ function synthesizeOdds(combos,oddsObj){
   }
   if(sumInv<=0)return null;
   return 1/sumInv;
-}
-// 買い目リストをフォーメーション表記（例：1-23-2345）に圧縮する。
-// 軸（1着）ごとにグループ化し、その軸の(2着,3着)組の中から「2着候補×3着候補（2着≠3着）」の
-// 矩形になっている部分を貪欲に探して圧縮表記にする。矩形に入らない点は単独の組番として残す。
-function allNonEmptySubsets(arr){
-  var subsets=[];
-  var n=arr.length;
-  for(var mask=1;mask<(1<<n);mask++){
-    var subset=[];
-    for(var i=0;i<n;i++){
-      if(mask&(1<<i))subset.push(arr[i]);
-    }
-    subsets.push(subset);
-  }
-  return subsets;
-}
-function compressFormation(combos){
-  if(!combos||combos.length===0)return [];
-  var byAxis={};
-  combos.forEach(function(t){
-    var ax=t[0];
-    if(!byAxis[ax])byAxis[ax]=[];
-    byAxis[ax].push([t[1],t[2]]);
-  });
-  var out=[];
-  Object.keys(byAxis).sort(function(a,b){return a-b;}).forEach(function(axStr){
-    var ax=parseInt(axStr,10);
-    var remainingSet=new Set(byAxis[axStr].map(function(p){return p[0]+"-"+p[1];}));
-    var groups=[];
-    while(remainingSet.size>0){
-      var pairsArr=Array.from(remainingSet).map(function(k){var parts=k.split("-");return [parseInt(parts[0],10),parseInt(parts[1],10)];});
-      var seconds=Array.from(new Set(pairsArr.map(function(p){return p[0];})));
-      var thirds=Array.from(new Set(pairsArr.map(function(p){return p[1];})));
-      var bestRect=null;
-      allNonEmptySubsets(seconds).forEach(function(ss){
-        allNonEmptySubsets(thirds).forEach(function(ts){
-          var expected=[];
-          ss.forEach(function(s){ ts.forEach(function(t){ if(s!==t)expected.push(s+"-"+t); }); });
-          if(expected.length<2)return; // 1点だけなら圧縮の意味が無い
-          var allPresent=expected.every(function(k){return remainingSet.has(k);});
-          if(allPresent&&(!bestRect||expected.length>bestRect.expected.length)){
-            bestRect={ss:ss.slice().sort(function(a,b){return a-b;}),ts:ts.slice().sort(function(a,b){return a-b;}),expected:expected};
-          }
-        });
-      });
-      if(bestRect){
-        groups.push({type:"formation",text:ax+"-"+bestRect.ss.join("")+"-"+bestRect.ts.join(""),n:bestRect.expected.length});
-        bestRect.expected.forEach(function(k){remainingSet.delete(k);});
-      }else{
-        var firstKey=remainingSet.values().next().value;
-        var parts=firstKey.split("-");
-        groups.push({type:"single",text:ax+"-"+parts[0]+"-"+parts[1],n:1});
-        remainingSet.delete(firstKey);
-      }
-    }
-    groups.forEach(function(g){out.push(g);});
-  });
-  return out;
 }
 
 function computeResultForRd(venue,rd,racerCat){
@@ -1019,7 +928,8 @@ function computeResultForRd(venue,rd,racerCat){
       function cScore(b){var cl=rd.racerClass?rd.racerClass[b-1]:null;return cl==="A1"?4:cl==="A2"?3:cl==="B1"?2:1;}
       function rScore(b){var rank=rd.stScore&&rd.stScore.rank?rd.stScore.rank[b-1]:null;return rank!=null?Math.max(0,7-rank):0;}
       function mScore(b){var m=rd.motors[b];if(!m||m.ren2==null||mAvg2==null)return 0;return Math.min(5,Math.max(0,(m.ren2-mAvg2)/10));}
-      function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var ci=r.course-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi,rd.kimariCount.nuki];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
+      var courseToBoat1={};for(var _ib1=0;_ib1<rows.length;_ib1++){courseToBoat1[rows[_ib1].course]=rows[_ib1].boat;}
+      function kScore(r){if(!rd.kimariCount||!rd.racerRaceCount)return 5;var rcVal=rd.racerRaceCount[r.boat-1];if(!rcVal)return 5;var actualBoat=courseToBoat1[r.course];if(actualBoat==null)return 5;var ci=actualBoat-1,tot=0;var arrs=[rd.kimariCount.nige,rd.kimariCount.sashi,rd.kimariCount.makuri,rd.kimariCount.makurizashi,rd.kimariCount.nuki];for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)tot+=arrs[ai][ci];}return Math.min(10,tot/rcVal*10);}
       // 節間得点率による補正（精度分析ログ追記53：45日6,926Rバックテストでw=0.3が最良かつ
       // 日付ベース2分割交差検証でも安定して回収率改善を確認済み。フィールド平均との相対差を
       // ±4にクリップして加点/減点。節出走回数(nodes)が0（節初日で未計算）の艇は対象外＝補正0）。
@@ -1250,21 +1160,8 @@ function parseNewCSV(allRows){
       }
       stByPeriod[spk]=stArr;
     }
-    // 当地版の平均ST（3ヶ月=col52, 1年=col100）を取得し、フォールバックチェーン
-    // 「当地3ヶ月→当地1年→全国1年」でデフォルト値を組み立てる（精度分析ログ追記81・82で検証・採用）。
-    var stLocal3m=[null,null,null,null,null,null];
-    var stLocal1y=[null,null,null,null,null,null];
-    for(var bi3b=0;bi3b<boats.length;bi3b++){
-      var browL=boats[bi3b];
-      var bbL=pi(browL[0]);
-      if(!bbL||bbL<1||bbL>6)continue;
-      stLocal3m[bbL-1]=pf(browL[52]);
-      stLocal1y[bbL-1]=pf(browL[100]);
-    }
-    var stDefault=[null,null,null,null,null,null];
-    for(var sdi=0;sdi<6;sdi++){
-      stDefault[sdi]=stLocal3m[sdi]!=null?stLocal3m[sdi]:(stLocal1y[sdi]!=null?stLocal1y[sdi]:(stByPeriod["直近1年"]?stByPeriod["直近1年"][sdi]:(st_1y?st_1y[sdi]:null)));
-    }
+    // デフォルトは直近1年
+    var stDefault=stByPeriod["直近1年"]||st_1y;
     function calcStRank(arr){
       var rank=[null,null,null,null,null,null];
       var ents=[];
@@ -1592,11 +1489,6 @@ function App() {
   const [csvDebug,setCsvDebug]=useState(null);
   const [axisPickBoat,setAxisPickBoat]=useState(null);
   const [axisPickMode,setAxisPickMode]=useState("2tan");
-  // finalize_bet.py用コマンド生成に使う設定（セッション中のみ保持、ブラウザを閉じるとリセットされます）
-  const [fbRaceDate,setFbRaceDate]=useState("");
-  const [fbRaceCsvPath,setFbRaceCsvPath]=useState("sheets\\{DATE}_全場_全レース.csv");
-  const [fbBufferSec,setFbBufferSec]=useState(70);
-  const [fbCopyMsg,setFbCopyMsg]=useState("");
   const [axisPickN,setAxisPickN]=useState(10);
 
   const rd=races[rk(venue,curRace)]||emptyRace();
@@ -1612,8 +1504,6 @@ function App() {
 
   function handleCSV(e){
     var file=e.target.files[0];if(!file)return;
-    var dateMatch=(file.name||"").match(/(\d{4}-\d{2}-\d{2})/);
-    if(dateMatch)setFbRaceDate(dateMatch[1]);
     var reader=new FileReader();
     reader.onload=function(ev){
       try{
@@ -2006,11 +1896,15 @@ function App() {
     var rows=result.rows;
     var kc=rd.kimariCount;
     var rc=rd.racerRaceCount;
+    // コース番号→実際にそのコースを走る艇番の逆引き（進入コース変更時のズレに対応、追記89）
+    var courseToBoat2={};for(var _ib2=0;_ib2<rows.length;_ib2++){courseToBoat2[rows[_ib2].course]=rows[_ib2].boat;}
 
     // 各艇の決まり手合計（コース別）
     function kimariTotal(r){
       if(!kc)return null;
-      var ci=r.course-1;
+      var actualBoat=courseToBoat2[r.course];
+      if(actualBoat==null)return null;
+      var ci=actualBoat-1;
       var total=0;
       var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
       var hasAny=false;
@@ -2037,7 +1931,9 @@ function App() {
       if(!kc||!rc)return 5;
       var rcVal=rc[r.boat-1];
       if(rcVal==null||rcVal===0)return 5;
-      var ci=r.course-1,total=0;
+      var actualBoat=courseToBoat2[r.course];
+      if(actualBoat==null)return 5;
+      var ci=actualBoat-1,total=0;
       var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
       for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][ci]!=null)total+=arrs[ai][ci];}
       return Math.min(10,total/rcVal*10);
@@ -2646,95 +2542,17 @@ function App() {
     if(!ai1chaku)return null;
     return synthesizeOdds(ai1chaku.bet,rd.odds3tan);
   },[ai1chaku,rd.odds3tan]);
-  // V2＋AI1着%基準フォーメーションの合成買い目（重複する組番は1点にまとめる）。
-  // 精度分析ログ追記79：47日実績で重複部分の回収率が最も高く（137.5%）、
-  // 単体よりわずかに回収率は下がるが的中率が大きく向上する（30-37%→48.8%）ことを確認済み。
-  const combinedBet=useMemo(function(){
-    var v2List=(v2bet&&v2bet.bet_honmei4_taiko2)?v2bet.bet_honmei4_taiko2:[];
-    var ai1List=(ai1chaku&&ai1chaku.bet)?ai1chaku.bet:[];
-    if(v2List.length===0&&ai1List.length===0)return null;
-    var seen={};
-    var merged=[];
-    var overlapCount=0;
-    function addAll(list,fromV2,fromAi1){
-      list.forEach(function(t){
-        var key=t[0]+"-"+t[1]+"-"+t[2];
-        if(seen[key]){
-          if(!seen[key].dup){seen[key].dup=true;overlapCount++;}
-          return;
-        }
-        seen[key]={dup:false};
-        merged.push(t);
-      });
-    }
-    addAll(v2List);
-    addAll(ai1List);
-    return {bet:merged,overlapCount:overlapCount,v2Count:v2List.length,ai1Count:ai1List.length};
-  },[v2bet,ai1chaku]);
-  const combinedSynthOdds=useMemo(function(){
-    if(!combinedBet)return null;
-    return synthesizeOdds(combinedBet.bet,rd.odds3tan);
-  },[combinedBet,rd.odds3tan]);
-  // finalize_bet.py にそのまま貼り付けて実行できるコマンド文字列を組み立てる。
-  // 日付・CSVパス・待機秒数はユーザーが入力欄で設定した値を使う（買い目・場・レース番号は自動）。
-  const fbCommand=useMemo(function(){
-    if(!ai1chaku||!ai1chaku.bet||ai1chaku.bet.length===0)return null;
-    if(!venue||!curRace)return null;
-    var dateStr=(fbRaceDate||"").trim();
-    if(!dateStr)return null;
-    var csvPath=(fbRaceCsvPath||"").replace(/\{DATE\}/g,dateStr);
-    var betsStr=ai1chaku.bet.map(function(t){return t[0]+"-"+t[1]+"-"+t[2];}).join(",");
-    var bufSec=parseInt(fbBufferSec,10);
-    if(isNaN(bufSec)||bufSec<0)bufSec=70;
-    return "python finalize_bet.py --date "+dateStr+" --venue "+venue+" --race "+curRace+
-      " --race-csv "+csvPath+" --bets "+betsStr+" --buffer-sec "+bufSec;
-  },[ai1chaku,venue,curRace,fbRaceDate,fbRaceCsvPath,fbBufferSec]);
-  const copyFbCommand=useCallback(function(){
-    if(!fbCommand)return;
-    function fallbackCopy(){
-      try{
-        var ta=document.createElement("textarea");
-        ta.value=fbCommand;
-        ta.style.position="fixed";ta.style.top="-1000px";ta.style.left="-1000px";
-        document.body.appendChild(ta);
-        ta.focus();ta.select();
-        var ok=document.execCommand("copy");
-        document.body.removeChild(ta);
-        if(ok){
-          setFbCopyMsg("✓ コピーしました");
-          setTimeout(function(){setFbCopyMsg("");},2000);
-        }else{
-          setFbCopyMsg("自動コピーできませんでした。下のコマンド欄をクリックして全選択→Ctrl+Cでコピーしてください");
-        }
-      }catch(err){
-        setFbCopyMsg("自動コピーできませんでした。下のコマンド欄をクリックして全選択→Ctrl+Cでコピーしてください");
-      }
-    }
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(fbCommand).then(function(){
-        setFbCopyMsg("✓ コピーしました");
-        setTimeout(function(){setFbCopyMsg("");},2000);
-      }).catch(fallbackCopy);
-    }else{
-      fallbackCopy();
-    }
-  },[fbCommand]);
   // 厳選レース一覧（B1軸レースと同じ方式：全venue横断、締切時間順、開閉タブ）。
   // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
   const senbatsuList=useMemo(function(){
     var out=[];
-    if(!RACE_SELECT_ENABLED)return out;
     Object.keys(races).forEach(function(key){
       var raceEntry=races[key];
       if(!raceEntry||!raceEntry.racerStats)return;
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      // 新基準(V2)使用時は新基準の対象場、旧基準時は旧基準の対象場でのみ以降の計算を行う（早期リターンの高速化）。
-      var venueCandidatesForSelect=RACE_SELECT_USE_V2
-        ?Object.keys(RACE_SELECT_GOOD_COMBOS_V2).some(function(k){return k.split("|")[0]===vname;})
-        :RACE_SELECT_GOOD_VENUES.indexOf(vname)>=0;
-      if(!venueCandidatesForSelect)return;
+      if(RACE_SELECT_GOOD_VENUES.indexOf(vname)<0)return;
       var r=computeResultForRd(vname,raceEntry,racerCat);
       if(!r)return;
       var formation=computeAi1chakuFormation(r,raceEntry,vname);
@@ -3115,7 +2933,6 @@ function App() {
             </div>
           </div>
         )}
-
 
         <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"#5dd39e",marginBottom:8}}>✓ CSVデータ読み込み済み</div>
@@ -3696,68 +3513,6 @@ function App() {
                           <div style={{marginTop:8,fontSize:11,color:"#9db5cc"}}>
                             合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{ai1chakuSynthOdds.toFixed(1)}倍</span>
                             <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{ai1chaku.bet.length}点均等買いの想定払戻倍率）</span>
-                          </div>
-                        ):(
-                          <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>
-                        )
-                      ):(
-                        <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
-                      )}
-                      <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2a2140"}}>
-                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🖥️ finalize_bet.py 実行コマンドをコピー</div>
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-                          <input type="text" placeholder="日付 YYYY-MM-DD" value={fbRaceDate}
-                            onChange={function(e){setFbRaceDate(e.target.value);}}
-                            style={{width:130,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
-                          <input type="text" placeholder="CSVパス（{DATE}が日付に置換されます）" value={fbRaceCsvPath}
-                            onChange={function(e){setFbRaceCsvPath(e.target.value);}}
-                            style={{flex:1,minWidth:220,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
-                          <input type="number" placeholder="秒" value={fbBufferSec}
-                            onChange={function(e){setFbBufferSec(e.target.value);}}
-                            style={{width:60,fontSize:11,padding:"4px 6px",borderRadius:4,border:"1px solid #3a3060",background:"#0e1b2c",color:"#e6ecf4"}}/>
-                        </div>
-                        {fbCommand?(
-                          <div>
-                            <textarea readOnly value={fbCommand} onClick={function(e){e.target.select();}}
-                              rows={3}
-                              style={{width:"100%",boxSizing:"border-box",fontSize:10,color:"#8b9bae",background:"#0e1b2c",borderRadius:6,padding:"6px 8px",fontFamily:"monospace",border:"1px solid #3a3060",resize:"vertical"}}/>
-                            <div style={{fontSize:9,color:"#8b9bae",marginTop:2}}>↑クリックで全選択されます（Ctrl+Cで手動コピー可）</div>
-                            <button onClick={copyFbCommand} style={{marginTop:6,fontSize:11,fontWeight:700,color:"#0e1b2c",background:"#c9a8ff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer"}}>
-                              コマンドをコピー
-                            </button>
-                            {fbCopyMsg&&<span style={{marginLeft:8,fontSize:10,color:fbCopyMsg.indexOf("✓")===0?"#5dd39e":"#ff9b9b"}}>{fbCopyMsg}</span>}
-                          </div>
-                        ):(
-                          <div style={{fontSize:10,color:"#8b9bae"}}>日付を入力するとコマンドが生成されます</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {combinedBet&&(
-                    <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #3d7a5a"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#5dd39e",marginBottom:4}}>🔗 V2＋AI1着%基準フォーメーション 合成買い目（重複除外）</div>
-                      <div style={{fontSize:11,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
-                        両方式が選んだ組番を1点にまとめて合算。47日実績（精度分析ログ追記79）では、単体（V2:37.2%/127.7%、AI1着%:30.5%/128.3%）に対し、
-                        合成で的中率48.8%・回収率126.1%（重複部分だけで見ると回収率137.5%と最も優秀）。的中率を優先したい場合向け。
-                      </div>
-                      <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
-                        V2 {combinedBet.v2Count}点 + AI1着% {combinedBet.ai1Count}点 − 重複{combinedBet.overlapCount}点 ＝ <span style={{color:"#5dd39e",fontWeight:700}}>{combinedBet.bet.length}点</span>
-                      </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                        {compressFormation(combinedBet.bet).map(function(g,gi){
-                          return (
-                            <span key={gi} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
-                              <span style={{fontSize:13,fontWeight:700,color:"#5dd39e",letterSpacing:"0.03em"}}>{g.text}</span>
-                              {g.type==="formation"&&<span style={{fontSize:9,color:"#8b9bae"}}>（{g.n}点）</span>}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {rd.odds3tan?(
-                        combinedSynthOdds!=null?(
-                          <div style={{marginTop:8,fontSize:11,color:"#9db5cc"}}>
-                            合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{combinedSynthOdds.toFixed(1)}倍</span>
-                            <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{combinedBet.bet.length}点均等買いの想定払戻倍率）</span>
                           </div>
                         ):(
                           <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>買い目の一部のオッズが未取得のため合成オッズを算出できません</div>
