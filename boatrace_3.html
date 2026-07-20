@@ -824,6 +824,13 @@ function computeAi1chakuFormation(result,rd,venue){
   // if(venue&&RACE_SELECT_GOOD_VENUES.indexOf(venue)>=0&&cands.length>2){
   //   cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
   // }
+  // 採用（精度分析ログ追記104・109日再検証）：候補3艇になった場合、aiP1が最も低い3番目を除外し、
+  // 残り2艇に持ち点8点を集中。109日実測で、3艇のまま8点均等より大穴依存を除いた頑健性が上回り
+  // （上位10件除外後135.23% vs 134.31%）、ドローダウン（29,310円 vs 44,040円）・最大連敗
+  // （23 vs 30、3艇均等は許容ライン29を超過）ともに改善したため。場を問わず適用する。
+  if(cands.length===3){
+    cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
+  }
   var alloc=ai1chakuAllocatePoints(cands,rowsByBoat,cands.length>=2?AI1CHAKU_TOTAL_POINTS_2PLUS:AI1CHAKU_TOTAL_POINTS);
   var bet=[];
   cands.forEach(function(axis){
@@ -3859,7 +3866,7 @@ function App() {
                           <span style={{fontSize:11,color:ai1chaku.candidates.length>=2?"#5dd39e":"#e8b98a",fontWeight:700}}>{ai1chaku.candidates.length>=2?"参加検討":"見送り検討"}</span>
                         </div>
                         <div style={{fontSize:10,color:"#8fae9d",marginTop:4}}>
-                          78日実測（b1_cut=30%・8点）：回収率149.20%・上位10件除外後129.11%・最大連敗16・最大ドローダウン44,040円。1号艇のAI1着%が30%以下、または他艇が閾値超の時に「候補2艇以上」と判定。精度分析ログ追記104参照。まだフォワードテスト継続検証中の基準です。
+                          109日実測（b1_cut=30%・候補3艇時は上位2艇に8点集中）：回収率151.40%・上位10件除外後135.23%・最大連敗23・最大ドローダウン29,310円。1号艇のAI1着%が30%以下、または他艇が閾値超の時に「候補2艇以上」と判定。精度分析ログ追記104参照。まだフォワードテスト継続検証中の基準です。
                         </div>
                       </div>
                       <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
