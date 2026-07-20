@@ -1532,17 +1532,28 @@ const TABS=[
   {id:"yoso",label:"③予想・買い目"},
 ];
 function QuickNav(props){
+  function jumpToAccel(){
+    props.setActiveTab("data");
+    setTimeout(function(){
+      var el=document.getElementById("section-accel");
+      if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+    },60);
+  }
   return (
     <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999}}>
       <div style={{background:"#16273c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
-        {TABS.map(function(t){
-          var isActive=props.activeTab===t.id;
-          return (
-            <button key={t.id} onClick={function(){props.setActiveTab(t.id);}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:isActive?"1px solid #5a87b8":"1px solid #2c4762",background:isActive?"#2c4762":"#0e1b2c",color:isActive?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-              {t.label}
-            </button>
-          );
-        })}
+        <button key="setup" onClick={function(){props.setActiveTab("setup");}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:props.activeTab==="setup"?"1px solid #5a87b8":"1px solid #2c4762",background:props.activeTab==="setup"?"#2c4762":"#0e1b2c",color:props.activeTab==="setup"?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          ①セットアップ
+        </button>
+        <button key="accel" onClick={jumpToAccel} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:"1px solid #6b5a9a",background:"#241d3d",color:"#c084fc",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          加速へ
+        </button>
+        <button key="data" onClick={function(){props.setActiveTab("data");}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:props.activeTab==="data"?"1px solid #5a87b8":"1px solid #2c4762",background:props.activeTab==="data"?"#2c4762":"#0e1b2c",color:props.activeTab==="data"?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          ②データ確認
+        </button>
+        <button key="yoso" onClick={function(){props.setActiveTab("yoso");}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:props.activeTab==="yoso"?"1px solid #5a87b8":"1px solid #2c4762",background:props.activeTab==="yoso"?"#2c4762":"#0e1b2c",color:props.activeTab==="yoso"?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          ③予想・買い目
+        </button>
       </div>
     </div>
   );
@@ -3208,6 +3219,53 @@ function App() {
             <div style={{fontSize:11,color:"#fff",marginTop:4,paddingLeft:4}}>スリットアラートとST順位差0.5早ければ⚡SSA発動</div>
             </React.Fragment>
           )}
+        </div>
+
+        <div style={{marginBottom:24}}>
+          <div id="section-accel" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>加速可視化（出足・中間速・伸び）</div>
+          {(function(){
+            var boats=[1,2,3,4,5,6].map(function(b){
+              var inp=rd.inputs[b];
+              var tenji=parseFloat(inp.tenji),choku=parseFloat(inp.chokusen);
+              if(isNaN(tenji)||isNaN(choku))return null;
+              var v1=150/choku, v2=150/tenji;
+              var a=2*(v2-v1)/(choku+tenji);
+              return{b:b,deashi:v1-a*choku/2,chukan:v1+a*choku/2,nobi:v2+a*tenji/2};
+            });
+            if(boats.some(function(x){return x===null;})){
+              return <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべての展示・直線を入力すると表示します</div>;
+            }
+            var sections=[["出足（0m地点）","deashi"],["中間速（150m地点）","chukan"],["伸び（300m地点）","nobi"]];
+            var FLOOR=15;
+            return (
+              <div style={{display:"grid",gap:16}}>
+                {sections.map(function(sec){
+                  var label=sec[0],key=sec[1];
+                  var vals=boats.map(function(x){return x[key];});
+                  var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+                  return (
+                    <div key={key}>
+                      <div style={{fontSize:11,color:"#9db5cc",marginBottom:6}}>{label}</div>
+                      <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",display:"grid",gap:6}}>
+                        {boats.map(function(x){
+                          var pct=max===min?100:FLOOR+(x[key]-min)/(max-min)*(100-FLOOR);
+                          return (
+                            <div key={x.b} style={{display:"flex",alignItems:"center",gap:8}}>
+                              <LB b={x.b}/>
+                              <div style={{flex:1,position:"relative",height:18,background:"#0e1b2c",borderRadius:5,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:pct+"%",background:"#7db4e8",borderRadius:5}}/>
+                              </div>
+                              <span style={{width:52,fontSize:11,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{x[key].toFixed(2)}m/s</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         <div style={{marginBottom:24}}>
