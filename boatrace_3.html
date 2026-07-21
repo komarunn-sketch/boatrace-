@@ -3808,9 +3808,16 @@ function App() {
                   </>)}
                   {v2bet&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #8e5ce0"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🧪 v2買い目（本線4点＋対抗2点・実験的機能）</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🧪 v2買い目（本線4点＋対抗2点・実験的機能）</div>
+                        {ai1chaku&&ai1chaku.candidates.length===1?(
+                          <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#3a2a5c",color:"#c9a8ff",border:"2px solid #7c5cff"}}>🎯 V2使用推奨レース</span>
+                        ):(
+                          <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#0e1b2c",color:"#8b9bae",border:"2px solid #3a4a5c"}}>参考（下のAI1着%が推奨）</span>
+                        )}
+                      </div>
                       <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
-                        別の確率モデルによる買い目。45日検証で回収率120〜128%と、既存の固定6点（109%）を上回っています。参考として並行利用してください。
+                        別の確率モデルによる買い目。展示あり70日の検証で、超鉄板（候補1艇）レースに限るとAI1着%(回収率95.71%・赤字)を上回る回収率121.76%を記録。逆に候補2艇以上のレースではAI1着%の方が明確に優位でした（精度分析ログ追記107参照）。
                       </div>
                       <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap"}}>
                         <div style={{background:"#1a2f4d",borderRadius:6,padding:"6px 12px",textAlign:"center"}}>
@@ -3842,9 +3849,16 @@ function App() {
                   )}
                   {ai1chaku&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:4}}>🎯 AI1着%基準フォーメーション（実験的）</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:4}}>
+                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🎯 AI1着%基準フォーメーション（実験的）</div>
+                        {ai1chaku.candidates.length>=2?(
+                          <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🅰️ AI1着%使用推奨レース</span>
+                        ):(
+                          <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#0e1b2c",color:"#8b9bae",border:"2px solid #3a4a5c"}}>参考（上のV2買い目が推奨）</span>
+                        )}
+                      </div>
                       <div style={{fontSize:11,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
-                        1号艇のAI1着%が45%以下の時、有力な他艇に1着候補を切り替える方式。45日検証で、単一候補固定より回収率が高いことを確認済みです。
+                        1号艇のAI1着%が45%以下の時、有力な他艇に1着候補を切り替える方式。展示あり70日の検証で、候補2艇以上のレースでは回収率151〜172%とV2（102〜107%）を上回る一方、超鉄板（候補1艇）レースでは回収率95.71%と赤字でした（精度分析ログ追記106・107参照。超鉄板レースは上の「v2買い目」欄の方を参考にしてください）。
                       </div>
                       {AI1CHAKU_WEAK_VENUES.indexOf(venue)>=0&&(
                         <div style={{background:"#3a1f1f",border:"1px solid #7a3a3a",borderRadius:6,padding:"6px 10px",marginBottom:6,fontSize:10,color:"#ff9b9b"}}>
