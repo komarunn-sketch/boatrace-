@@ -2811,11 +2811,9 @@ function App() {
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      // 新基準(V2)使用時は新基準の対象場、旧基準時は旧基準の対象場でのみ以降の計算を行う（早期リターンの高速化）。
-      var venueCandidatesForSelect=RACE_SELECT_USE_V2
-        ?Object.keys(RACE_SELECT_GOOD_COMBOS_V2).some(function(k){return k.split("|")[0]===vname;})
-        :RACE_SELECT_GOOD_VENUES.indexOf(vname)>=0;
-      if(!venueCandidatesForSelect)return;
+      // 【修正済み】以前はここで旧基準の場（RACE_SELECT_GOOD_VENUES）だけに絞る早期リターンが
+      // 残っており、isRaceSelected自体は場を問わない新基準（候補2艇以上）に直していたにも関わらず、
+      // この一覧だけ旧11場に限定されてしまっていたバグを修正（精度分析ログ追記111参照）。
       var r=computeResultForRd(vname,raceEntry,racerCat);
       if(!r)return;
       var formation=computeAi1chakuFormation(r,raceEntry,vname);
