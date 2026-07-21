@@ -1640,6 +1640,12 @@ function App() {
   const [axisPickMode,setAxisPickMode]=useState("2tan");
   // finalize_bet.py用コマンド生成に使う設定（セッション中のみ保持、ブラウザを閉じるとリセットされます）
   const [fbRaceDate,setFbRaceDate]=useState("");
+  // v2買い目の点数切り替え（精度分析ログ追記109参照）。超鉄板(候補1艇)70日実測：
+  // 1点(スイチ)=回収率132.47%/上位10除外後123.45%/最大連敗47/最大DD28,740円
+  // 2点=123.14%/117.04%/39/41,510円　3点=115.10%/109.41%/30/35,080円
+  // 6点(本線4+対抗2、デフォルト)=121.09%/113.77%/25程度/-
+  // 点数が少ないほど回収率・大穴依存耐性・金銭的ドローダウンは改善するが、連敗数（＝当たらない期間の長さ）は悪化する。
+  const [v2PointMode,setV2PointMode]=useState(6);
   const [fbRaceCsvPath,setFbRaceCsvPath]=useState("sheets\\{DATE}_全場_全レース.csv");
   const [fbBufferSec,setFbBufferSec]=useState(70);
   const [fbCopyMsg,setFbCopyMsg]=useState("");
@@ -3831,17 +3837,45 @@ function App() {
                           <div style={{fontSize:11,color:"#f9c513",marginTop:2}}>{(v2bet.P1[v2bet.taiko]*100).toFixed(1)}%</div>
                         </div>
                       </div>
-                      <div style={{fontSize:11,color:"#b9a6ff",marginBottom:4,fontWeight:700}}>推奨買い目（本線4点＋対抗2点・計6点）</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                        {v2bet.bet_honmei4_taiko2.map(function(t,ti){
+                      <div style={{fontSize:11,color:"#b9a6ff",marginBottom:6,fontWeight:700}}>持ち点を選択（精度分析ログ追記109、超鉄板レース70日実測）</div>
+                      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                        {[
+                          {n:1,label:"1点(スイチ)",desc:"回収率132.5%・大穴除後123.5%・最大連敗47・DD最大28,740円"},
+                          {n:2,label:"2点",desc:"回収率123.1%・大穴除後117.0%・最大連敗39・DD最大41,510円"},
+                          {n:3,label:"3点",desc:"回収率115.1%・大穴除後109.4%・最大連敗30・DD最大35,080円"},
+                          {n:6,label:"6点(本線4+対抗2)",desc:"回収率121.1%・大穴除後113.8%・最大連敗25程度（デフォルト）"},
+                        ].map(function(opt){
                           return (
-                            <span key={ti} style={{background:"#0e1b2c",borderRadius:6,padding:"5px 10px",fontSize:13,fontWeight:700,color:ti<4?"#fff":"#f9c513",letterSpacing:"0.03em"}}>
+                            <button key={opt.n} onClick={function(){setV2PointMode(opt.n);}} title={opt.desc}
+                              style={{padding:"6px 10px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                                border:v2PointMode===opt.n?"2px solid #8e5ce0":"1px solid #3a4a5c",
+                                background:v2PointMode===opt.n?"#3a2a5c":"#0e1b2c",
+                                color:v2PointMode===opt.n?"#c9a8ff":"#8b9bae"}}>
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{fontSize:10,color:"#8b9bae",marginBottom:8,lineHeight:1.5}}>
+                        点数を減らすほど回収率・大穴依存耐性・金銭的ドローダウンは改善するが、的中頻度が下がり連敗が伸びる（トリガミは1点なら原理的にゼロ）。資金力・メンタルに応じて選択してください。
+                      </div>
+                      <div style={{fontSize:11,color:"#b9a6ff",marginBottom:4,fontWeight:700}}>
+                        推奨買い目（{v2PointMode===6?"本線4点＋対抗2点":"本線上位"+v2PointMode+"点"}・計{v2PointMode}点）
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {(v2PointMode===6?v2bet.bet_honmei4_taiko2:
+                          v2bet.combos_ranked.slice(0,v2PointMode).map(function(c){return [v2bet.honmei,c.second,c.third];})
+                        ).map(function(t,ti){
+                          return (
+                            <span key={ti} style={{background:"#0e1b2c",borderRadius:6,padding:"5px 10px",fontSize:13,fontWeight:700,color:(v2PointMode===6&&ti<4)?"#fff":(v2PointMode===6?"#f9c513":"#fff"),letterSpacing:"0.03em"}}>
                               {t[0]}-{t[1]}-{t[2]}
                             </span>
                           );
                         })}
                       </div>
-                      <div style={{fontSize:11,color:"#b3bdcc",marginTop:8,lineHeight:1.5}}>白＝本命軸4点、黄＝対抗軸2点</div>
+                      <div style={{fontSize:11,color:"#b3bdcc",marginTop:8,lineHeight:1.5}}>
+                        {v2PointMode===6?"白＝本命軸4点、黄＝対抗軸2点":"本命軸のジョイント確率が高い順に"+v2PointMode+"点（対抗軸は含まず）"}
+                      </div>
                     </div>
                   )}
                   {!v2bet&&(
