@@ -4178,36 +4178,34 @@ function App() {
                         <div>
                           <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の2連単・全{axisPickCombos.length}通り（AI2着率順）</div>
                           <div style={{fontSize:9,color:"#8b9bae",marginBottom:8,lineHeight:1.4}}>
-                            競艇の控除率は券種を問わず一律25%のため、「3連単合成オッズ」（3着を残り4艇全通りにした場合の合成オッズ）は目安ではなく、2連単オッズの理論上の推定値そのものです。実際の2連単オッズと見比べて食い違いが大きい場合、割安な方を選ぶ判断材料になります。
+                            競艇の控除率は券種を問わず一律25%のため、「合成オッズ」（3着を残り4艇全通りにした場合の3連単合成オッズ）は目安ではなく、2連単オッズの理論上の推定値そのものです。実際の2連単オッズと見比べて食い違いが大きい場合、割安な方を選ぶ判断材料になります。
                           </div>
-                          <div style={{overflowX:"auto"}}>
-                            <table style={{borderCollapse:"collapse",fontSize:12,minWidth:"100%"}}>
-                              <tbody>
-                                <tr>
-                                  <td style={{padding:"4px 10px",color:"#8b9bae",fontSize:10,whiteSpace:"nowrap"}}>2着艇</td>
-                                  {axisPickCombos.map(function(c,ti){
-                                    return <td key={ti} style={{padding:"4px 10px",textAlign:"center",fontWeight:800,fontSize:14,color:ti===0?"#f9c513":"#7db4e8"}}>{c.boat}</td>;
-                                  })}
-                                </tr>
-                                <tr>
-                                  <td style={{padding:"4px 10px",color:"#8b9bae",fontSize:10,whiteSpace:"nowrap",borderTop:"1px solid #2c4762"}}>AI2着率</td>
-                                  {axisPickCombos.map(function(c,ti){
-                                    return <td key={ti} style={{padding:"4px 10px",textAlign:"center",fontWeight:700,color:"#5dd39e",borderTop:"1px solid #2c4762"}}>{c.aiP2!=null?c.aiP2+"%":"―"}</td>;
-                                  })}
-                                </tr>
-                                <tr>
-                                  <td style={{padding:"4px 10px",color:"#8b9bae",fontSize:10,whiteSpace:"nowrap",borderTop:"1px solid #2c4762"}}>3連単合成オッズ</td>
-                                  {axisPickCombos.map(function(c,ti){
-                                    var remaining4=[1,2,3,4,5,6].filter(function(b){return b!==axisPickBoat&&b!==c.boat;});
-                                    var combos3=remaining4.map(function(k){return [axisPickBoat,c.boat,k];});
-                                    var synth3=rd.odds3tan?synthesizeOdds(combos3,rd.odds3tan):null;
-                                    var label=rd.odds3tan?(synth3!=null?synth3.toFixed(1)+"倍":"一部未取得"):"未取得";
-                                    return <td key={ti} style={{padding:"4px 10px",textAlign:"center",fontWeight:700,color:synth3!=null?"#c9a8ff":"#8b9bae",borderTop:"1px solid #2c4762",fontSize:synth3!=null?12:9}}>{label}</td>;
-                                  })}
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                          <table style={{borderCollapse:"collapse",fontSize:11,width:"100%",tableLayout:"fixed"}}>
+                            <tbody>
+                              <tr>
+                                <td style={{padding:"3px 2px",color:"#8b9bae",fontSize:9,width:"15%"}}>2着艇</td>
+                                {axisPickCombos.map(function(c,ti){
+                                  return <td key={ti} style={{padding:"3px 2px",textAlign:"center",fontWeight:800,fontSize:13,color:ti===0?"#f9c513":"#7db4e8"}}>{c.boat}</td>;
+                                })}
+                              </tr>
+                              <tr>
+                                <td style={{padding:"3px 2px",color:"#8b9bae",fontSize:9,borderTop:"1px solid #2c4762"}}>AI2着率</td>
+                                {axisPickCombos.map(function(c,ti){
+                                  return <td key={ti} style={{padding:"3px 2px",textAlign:"center",fontWeight:700,fontSize:11,color:"#5dd39e",borderTop:"1px solid #2c4762"}}>{c.aiP2!=null?c.aiP2+"%":"―"}</td>;
+                                })}
+                              </tr>
+                              <tr>
+                                <td style={{padding:"3px 2px",color:"#8b9bae",fontSize:9,borderTop:"1px solid #2c4762"}}>合成オッズ</td>
+                                {axisPickCombos.map(function(c,ti){
+                                  var remaining4=[1,2,3,4,5,6].filter(function(b){return b!==axisPickBoat&&b!==c.boat;});
+                                  var combos3=remaining4.map(function(k){return [axisPickBoat,c.boat,k];});
+                                  var synth3=rd.odds3tan?synthesizeOdds(combos3,rd.odds3tan):null;
+                                  var label=rd.odds3tan?(synth3!=null?synth3.toFixed(1)+"倍":"一部未取得"):"未取得";
+                                  return <td key={ti} style={{padding:"3px 1px",textAlign:"center",fontWeight:700,color:synth3!=null?"#c9a8ff":"#8b9bae",borderTop:"1px solid #2c4762",fontSize:synth3!=null?11:8}}>{label}</td>;
+                                })}
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       )}
                       {axisPickMode==="3tan"&&axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
