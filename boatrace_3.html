@@ -3262,6 +3262,11 @@ function App() {
               {rd.tenjiMsg&&<span style={{fontSize:12,color:rd.tenjiMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80"}}>{rd.tenjiMsg}</span>}
               {(rd.weather||rd.waveHeight)&&<div style={{fontSize:11,color:"#9db5cc",marginTop:4}}>{rd.weather&&("天候:"+rd.weather)}{rd.weather&&rd.waveHeight&&"　"}{rd.waveHeight&&("波高:"+rd.waveHeight)}</div>}
               {rd.odds3tan&&<div style={{fontSize:11,color:"#5dd39e",marginTop:4}}>✓ オッズ120通り取得済み</div>}
+              {rd.odds2tan?(
+                <div style={{fontSize:11,color:"#5dd39e",marginTop:2}}>✓ 2連単オッズ30通り取得済み</div>
+              ):(
+                <div style={{fontSize:11,color:"#8b9bae",marginTop:2}}>― 2連単オッズは未取得（貼り付けテキストに「オッズ2連単」行が無いか、30通りに満たない可能性）</div>
+              )}
             </div>
           </div>
         )}
