@@ -807,6 +807,50 @@ function makeAi1chakuBet2ForAxis(rd,rowsByBoat,axis,maxN){
   var aiPlace2=allBoats.filter(function(b){return b!==axis;}).sort(function(a,b){return aiScore2(b)-aiScore2(a);});
   return aiPlace2.slice(0,maxN).map(function(b){return {boat:b,aiP2:rowsByBoat[b].aiP2!=null?rowsByBoat[b].aiP2:null};});
 }
+// 【追加】対角線バランス型の2着・3着組み合わせ生成（精度分析ログ参照：現行のp2外側ループ方式は
+// 持ち点が少ないとp2候補が実質1艇に固定され「2着のみハズレ」を量産する構造だった。
+// p2×p3のペアを「ランク合計（p2順位+p3順位）が小さい順」に選ぶことで、同じ持ち点のまま
+// 2着候補の2番手・3番手を早く取り込める。51日・約1,500レースの検証で、展示なし/ありとも
+// 現行方式を上回る（回収率+1.4〜+6.8pt、大穴上位10件除外後も+1.7〜+7.8ptで頑健性も改善）ことを確認済み。
+function makeAi1chakuBetForAxisBalanced(rd,rowsByBoat,axis,maxN){
+  function aiScore2(b){var rr=rowsByBoat[b];return ai1chakuR2(rr)*0.3+(rr.aiP2||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
+  function aiScore3(b){var rr=rowsByBoat[b];return ai1chakuR3(rr)*0.3+(rr.aiP3||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
+  var allBoats=[1,2,3,4,5,6];
+  var aiPlace2=allBoats.filter(function(b){return b!==axis&&ai1chakuR2(rowsByBoat[b])>=10;}).sort(function(a,b){return aiScore2(b)-aiScore2(a);});
+  var aiPlace3=allBoats.filter(function(b){return b!==axis&&ai1chakuR3(rowsByBoat[b])>=5;}).sort(function(a,b){return aiScore3(b)-aiScore3(a);});
+  var pairs=[];
+  for(var ri=0;ri<aiPlace2.length;ri++){
+    for(var rj=0;rj<aiPlace3.length;rj++){
+      if(aiPlace2[ri]===aiPlace3[rj])continue;
+      pairs.push([ri+rj,ri,aiPlace2[ri],aiPlace3[rj]]);
+    }
+  }
+  pairs.sort(function(a,b){return (a[0]-b[0])||(a[1]-b[1]);});
+  return pairs.slice(0,maxN).map(function(p){return [axis,p[2],p[3]];});
+}
+function computeAi1chakuFormationBalanced(result,rd,venue,pointOverride){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1==null)return null;
+  var cands=getAi1chakuCandidates(rowsByBoat);
+  var origCandsLen=cands.length;
+  if(cands.length===3){
+    cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
+  }
+  var effectivePoints=(origCandsLen===2&&pointOverride!=null)?pointOverride:(cands.length>=2?AI1CHAKU_TOTAL_POINTS_2PLUS:AI1CHAKU_TOTAL_POINTS);
+  var alloc=ai1chakuAllocatePoints(cands,rowsByBoat,effectivePoints);
+  var bet=[];
+  cands.forEach(function(axis){
+    bet=bet.concat(makeAi1chakuBetForAxisBalanced(rd,rowsByBoat,axis,alloc[axis]));
+  });
+  var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1||0)<=45);
+  return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc,origCandsLen:origCandsLen};
+}
 function computeAi1chakuFormation(result,rd,venue,pointOverride){
   if(!result||!result.rows||result.rows.length<6)return null;
   var rowsByBoat={};
@@ -2719,6 +2763,14 @@ function App() {
   const ai1chaku=useMemo(function(){
     return computeAi1chakuFormation(result,rd,venue,ai1PointMode);
   },[result,rd,venue,ai1PointMode]);
+  // 【追加】対角線バランス型（同じ持ち点で2着候補の偏りを減らす検証中の代替方式。精度分析ログ参照）
+  const ai1chakuBalanced=useMemo(function(){
+    return computeAi1chakuFormationBalanced(result,rd,venue,ai1PointMode);
+  },[result,rd,venue,ai1PointMode]);
+  const ai1chakuBalancedSynthOdds=useMemo(function(){
+    if(!ai1chakuBalanced)return null;
+    return synthesizeOdds(ai1chakuBalanced.bet,rd.odds3tan);
+  },[ai1chakuBalanced,rd.odds3tan]);
   // レース厳選バッジ判定＆AI1着%基準フォーメーションの合成オッズ（展示データ等が変わればai1chakuの再計算に追従して自動更新される）
   const isSelectedRace=useMemo(function(){
     return isRaceSelected(venue,ai1chaku);
@@ -3891,7 +3943,7 @@ function App() {
                   {ai1chaku&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:4}}>
-                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🎯 AI1着%基準フォーメーション（実験的）</div>
+                        <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🎯 AI1着%基準フォーメーション（実験的・ベース型）</div>
                         {ai1chaku.candidates.length>=2?(
                           <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🅰️ AI1着%使用推奨レース</span>
                         ):(
@@ -3979,6 +4031,38 @@ function App() {
                         )
                       ):(
                         <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
+                      )}
+                      {ai1chakuBalanced&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#8ad0ff",marginBottom:4}}>🆚 対角線バランス型（検証中・持ち点はベース型と共通）</div>
+                          <div style={{fontSize:10,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
+                            ベース型は持ち点が少ないと2着候補が実質1艇に固定され「2着のみハズレ」が多くなる構造だったため、
+                            p2×p3の組み合わせをランク合計が小さい順に選び直す代替方式。51日・約1,500レースの検証（精度分析ログ参照）では
+                            展示なし165.21%→172.02%・展示あり172.75%→174.15%と、大穴上位10件除外後の頑健性も含めて一貫して上回っています。
+                            まだ`boat_race.tsx`の正式ロジックへの切替えは未確定のため、参考表示として並べています。
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {ai1chakuBalanced.bet.map(function(t,ti){
+                              var key=t[0]+"-"+t[1]+"-"+t[2];
+                              var o=rd.odds3tan&&rd.odds3tan[key];
+                              var inBase=ai1chaku.bet.some(function(bb){return bb[0]===t[0]&&bb[1]===t[1]&&bb[2]===t[2];});
+                              return (
+                                <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:inBase?"#0e1b2c":"#15304a",borderRadius:6,padding:"5px 10px",border:inBase?"none":"1px solid #2f6a94"}}>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#8ad0ff",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                  {!inBase&&<span style={{fontSize:9,fontWeight:700,color:"#8ad0ff"}}>NEW</span>}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>青枠＋NEW＝ベース型の買い目には無い組番（バランス型が新たに拾っている分）</div>
+                          {rd.odds3tan&&ai1chakuBalancedSynthOdds!=null&&(
+                            <div style={{marginTop:6,fontSize:11,color:"#9db5cc"}}>
+                              合成オッズ：<span style={{color:"#f9c513",fontWeight:800,fontSize:13}}>{ai1chakuBalancedSynthOdds.toFixed(1)}倍</span>
+                              <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{ai1chakuBalanced.bet.length}点均等買いの想定払戻倍率）</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                       <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2a2140"}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🖥️ finalize_bet.py 実行コマンドをコピー</div>
