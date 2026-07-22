@@ -1181,7 +1181,7 @@ function emptyRace() {
     weights:{1:"",2:"",3:"",4:"",5:"",6:""},
     courses:{1:1,2:2,3:3,4:4,5:5,6:6},
     wind:"無風",
-    weather:"",waveHeight:"",odds3tan:null,oddsTime:null,
+    weather:"",waveHeight:"",odds3tan:null,odds2tan:null,oddsTime:null,
     tokuten:null,
   };
 }
@@ -1964,7 +1964,16 @@ function App() {
             if(op&&typeof op==="object"&&Object.keys(op).length===120)oddsParsed=op;
           }catch(e){oddsParsed=null;}
         }
-        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.odds3tan=oddsParsed||prev.odds3tan;n.oddsTime=oddsParsed?Date.now():prev.oddsTime;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
+        // 2連単オッズ（実測。取得できていれば以後、実測値優先で表示する）
+        var odds2Line=parseSingleLine(text,"オッズ2連単");
+        var odds2Parsed=null;
+        if(odds2Line){
+          try{
+            var op2=JSON.parse(odds2Line);
+            if(op2&&typeof op2==="object"&&Object.keys(op2).length===30)odds2Parsed=op2;
+          }catch(e){odds2Parsed=null;}
+        }
+        updateRd(function(prev){var n=Object.assign({},prev);n.inputs=ni;n.tilts=nt;n.weights=nw;n.courses=nc;n.wind=newWind;n.weather=weatherLine||prev.weather;n.waveHeight=waveLine||prev.waveHeight;n.odds3tan=oddsParsed||prev.odds3tan;n.odds2tan=odds2Parsed||prev.odds2tan;n.oddsTime=oddsParsed?Date.now():prev.oddsTime;n.tenjiMsg=(windLine&&WIND[windLine])?"✓ 6艇分＋風向を読み取りました":"✓ 6艇分を読み取りました";return n;});
         return;
       }
       updateRd(function(prev){var n=Object.assign({},prev);n.tenjiMsg="タイムが見つかりません";return n;});
@@ -4178,7 +4187,11 @@ function App() {
                         <div>
                           <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の2連単・全{axisPickCombos.length}通り（AI2着率順）</div>
                           <div style={{fontSize:9,color:"#8b9bae",marginBottom:8,lineHeight:1.4}}>
-                            競艇の控除率は券種を問わず一律25%のため、「合成オッズ」（3着を残り4艇全通りにした場合の3連単合成オッズ）は目安ではなく、2連単オッズの理論上の推定値そのものです。実際の2連単オッズと見比べて食い違いが大きい場合、割安な方を選ぶ判断材料になります。
+                            {rd.odds2tan?(
+                              "「2連単オッズ」は実測値です。「合成オッズ」（3着を残り4艇全通りにした場合の3連単合成オッズ）と見比べて食い違いが大きければ、割安な方を選ぶ判断材料になります。"
+                            ):(
+                              "「合成オッズ」（3着を残り4艇全通りにした場合の3連単合成オッズ）は、競艇の控除率が券種を問わず一律25%であることを利用した、2連単オッズの理論上の推定値です（実測の2連単オッズは未取得）。"
+                            )}
                           </div>
                           <table style={{borderCollapse:"collapse",fontSize:11,width:"100%",tableLayout:"fixed"}}>
                             <tbody>
@@ -4194,6 +4207,17 @@ function App() {
                                   return <td key={ti} style={{padding:"3px 2px",textAlign:"center",fontWeight:700,fontSize:11,color:"#5dd39e",borderTop:"1px solid #2c4762"}}>{c.aiP2!=null?c.aiP2+"%":"―"}</td>;
                                 })}
                               </tr>
+                              {rd.odds2tan&&(
+                                <tr>
+                                  <td style={{padding:"3px 2px",color:"#8b9bae",fontSize:9,borderTop:"1px solid #2c4762"}}>2連単オッズ</td>
+                                  {axisPickCombos.map(function(c,ti){
+                                    var key2=axisPickBoat+"-"+c.boat;
+                                    var o2=rd.odds2tan[key2];
+                                    var label2=(o2!=null&&!isNaN(o2))?o2+"倍":"―";
+                                    return <td key={ti} style={{padding:"3px 1px",textAlign:"center",fontWeight:800,fontSize:11,color:"#f9c513",borderTop:"1px solid #2c4762"}}>{label2}</td>;
+                                  })}
+                                </tr>
+                              )}
                               <tr>
                                 <td style={{padding:"3px 2px",color:"#8b9bae",fontSize:9,borderTop:"1px solid #2c4762"}}>合成オッズ</td>
                                 {axisPickCombos.map(function(c,ti){
