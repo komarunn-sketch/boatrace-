@@ -4177,13 +4177,29 @@ function App() {
                       {axisPickMode==="2tan"&&axisPickBoat&&axisPickCombos&&axisPickCombos.length>0&&(
                         <div>
                           <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>{axisPickBoat}号艇が1着と仮定した場合の2連単・全{axisPickCombos.length}通り（AI2着率順）</div>
-                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          <div style={{fontSize:9,color:"#8b9bae",marginBottom:6,lineHeight:1.4}}>
+                            右の「3連対合成」は、同じ（1着・2着）に対して3着を残り4艇全通りにした場合の3連単合成オッズ（1/Σ(1/オッズ)）。
+                            2連単は勝敗条件が全く同じ（1着・2着が合えば3着は問わない）ため、実際の2連単オッズと見比べて数字が大きく食い違う（捻れがある）場合は、割安な方を選ぶ判断材料になります。
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:6}}>
                             {axisPickCombos.map(function(c,ti){
+                              var remaining4=[1,2,3,4,5,6].filter(function(b){return b!==axisPickBoat&&b!==c.boat;});
+                              var combos3=remaining4.map(function(k){return [axisPickBoat,c.boat,k];});
+                              var synth3=rd.odds3tan?synthesizeOdds(combos3,rd.odds3tan):null;
                               return (
-                                <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                <div key={ti} style={{display:"inline-flex",alignItems:"center",gap:8,background:"#0e1b2c",borderRadius:6,padding:"5px 10px",flexWrap:"wrap"}}>
                                   <span style={{fontSize:13,fontWeight:700,color:ti===0?"#f9c513":"#7db4e8",letterSpacing:"0.03em"}}>{axisPickBoat}-{c.boat}</span>
-                                  <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{c.aiP2!=null?c.aiP2+"%":"―"}</span>
-                                </span>
+                                  <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>AI2着率 {c.aiP2!=null?c.aiP2+"%":"―"}</span>
+                                  {rd.odds3tan?(
+                                    synth3!=null?(
+                                      <span style={{fontSize:10,fontWeight:700,color:"#c9a8ff"}}>3連対合成 {synth3.toFixed(1)}倍</span>
+                                    ):(
+                                      <span style={{fontSize:9,color:"#8b9bae"}}>3連対合成：一部未取得</span>
+                                    )
+                                  ):(
+                                    <span style={{fontSize:9,color:"#8b9bae"}}>3連対合成：オッズ未取得</span>
+                                  )}
+                                </div>
                               );
                             })}
                           </div>
