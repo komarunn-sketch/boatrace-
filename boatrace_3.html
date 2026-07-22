@@ -3256,6 +3256,12 @@ function App() {
                 updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;n.oddsTime=Date.now();return n;});
               }catch(err){}
             }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+            <input type="text" id="odds2-data-input" value="" readOnly onChange={function(e){
+              try{
+                var parsed2=JSON.parse(e.target.value);
+                updateRd(function(prev){var n=Object.assign({},prev);n.odds2tan=parsed2;return n;});
+              }catch(err){}
+            }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
               <button onClick={parseTenji} style={btnS("#3d7ab8","#fff")}>解析して入力</button>
               <button onClick={function(){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText="";n.tenjiMsg="";return n;});}} style={btnS("#0e1b2c","#9db5cc",{border:"1px solid #2c4762"})}>クリア</button>
