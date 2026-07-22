@@ -926,10 +926,13 @@ function isWeakVenue(venue){
 function isRaceSelected(venue,ai1chaku){
   if(!RACE_SELECT_ENABLED)return false;
   if(!ai1chaku||!venue)return false;
-  // 新基準（精度分析ログ追記104）：場を問わず、候補2艇以上（b1_cut=30%）なら選定。
-  // 旧基準（RACE_SELECT_GOOD_VENUES×候補数、RACE_SELECT_GOOD_COMBOS_V2）は
-  // 月をまたぐ安定性が無かったため使用を停止（中身は将来の再検証用に保持）。
-  return ai1chaku.candidates.length>=2;
+  // 新基準（精度分析ログ参照：候補数の絞り込み検証、B2案）：
+  // 候補が「もともとちょうど2艇」のレースのみを選定対象とする。3艇→2艇に縮小したケースは
+  // 判定が際どい(3番目の候補も閾値を超えていた)ことが多く、含めると的中率・回収率がやや悪化する
+  // ことを6,063レースの実測で確認済み（候補2艇以上全体27.1%/151.07% → ちょうど2艇のみ28.3%/156.90%）。
+  // 旧基準（候補2艇以上、3艇縮小も含む）は下にコメントとして残す。
+  return ai1chaku.origCandsLen===2;
+  // return ai1chaku.candidates.length>=2; // 旧基準
 }
 // 合成オッズ＝1/Σ(1/オッズ)。買い目全点のオッズが揃っている時のみ算出（1点でも未取得ならnull）。
 function synthesizeOdds(combos,oddsObj){
@@ -3944,8 +3947,10 @@ function App() {
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:4}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🎯 AI1着%基準フォーメーション（実験的・ベース型）</div>
-                        {ai1chaku.candidates.length>=2?(
+                        {isSelectedRace?(
                           <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🅰️ AI1着%使用推奨レース</span>
+                        ):ai1chaku.candidates.length>=2?(
+                          <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#241a10",color:"#e8b98a",border:"2px solid #6b4a2c"}}>候補3艇→2艇に縮小（推奨対象外・参考）</span>
                         ):(
                           <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#0e1b2c",color:"#8b9bae",border:"2px solid #3a4a5c"}}>参考（上のV2買い目が推奨）</span>
                         )}
@@ -3991,7 +3996,7 @@ function App() {
                           <span style={{fontSize:14}}>🎯</span>
                           <div>
                             <div style={{color:"#5dd39e",fontWeight:700,fontSize:12}}>厳選レース該当</div>
-                            <div style={{color:"#8fae9d",fontSize:10,marginTop:2}}>{venue}・候補{ai1chaku.candidates.length}艇（場別×候補数の交差検証で回収率182%実績帯／候補3艇以上は上位2艇に自動で絞り込み済み）</div>
+                            <div style={{color:"#8fae9d",fontSize:10,marginTop:2}}>{venue}・候補ちょうど2艇（201日・6,063レースの実測で回収率156.90%・上位10件除外後140.14%・的中率28.3%。候補3艇→2艇に縮小したレースは判定が際どく的中率・回収率がやや落ちるため、推奨対象からは除外）</div>
                           </div>
                         </div>
                       )}
@@ -4001,12 +4006,13 @@ function App() {
                           <span style={{fontSize:11,color:ai1chaku.candidates.length>=2?"#5dd39e":"#e8b98a",fontWeight:700}}>{ai1chaku.candidates.length>=2?"参加検討":"見送り検討"}</span>
                         </div>
                         <div style={{fontSize:10,color:"#8fae9d",marginTop:4}}>
-                          109日実測（b1_cut=30%・候補3艇時は上位2艇に8点集中）：回収率151.40%・上位10件除外後135.23%・最大連敗23・最大ドローダウン29,310円。1号艇のAI1着%が30%以下、または他艇が閾値超の時に「候補2艇以上」と判定。精度分析ログ追記104参照。まだフォワードテスト継続検証中の基準です。
+                          201日・6,063レース実測（b1_cut=30%）：候補2艇以上全体では回収率151.07%・的中率27.1%。うち「候補ちょうど2艇」だけに絞ると回収率156.90%・上位10件除外後140.14%・的中率28.3%に改善（精度分析ログ参照）。上の🎯厳選レースバッジは「候補ちょうど2艇」の場合のみ点灯します（候補3艇→2艇縮小は参考表示に留めています）。
                         </div>
                       </div>
                       <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
                         1着候補：{ai1chaku.candidates.map(function(b){return b+"号艇";}).join("・")}
                         {ai1chaku.isFallback&&<span style={{color:"#8b9bae"}}>（他艇が閾値未満のため1号艇のみ）</span>}
+                        {ai1chaku.origCandsLen===3&&<span style={{color:"#e8b98a"}}>（候補3艇中、aiP1が最も低い1艇を除外し上位2艇に集中）</span>}
                       </div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                         {ai1chaku.bet.map(function(t,ti){
