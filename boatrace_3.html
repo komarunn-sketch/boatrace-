@@ -792,6 +792,16 @@ function getAi1chakuCandidates(rowsByBoat){
   if(cands.length===0)cands=[1];
   return cands;
 }
+// 【本セッションで発見・分離実装】展示なし時の1号艇ペナルティ誤発火バグを修正した版のaiP1Fixedを使う候補判定。
+// getAi1chakuCandidates（既存・未変更）とは完全に独立しており、V2ルーティングやisRaceSelectedには使わない。
+function getAi1chakuCandidatesFixed(rowsByBoat){
+  var aiP1={};for(var b=1;b<=6;b++)aiP1[b]=rowsByBoat[b].aiP1Fixed||0;
+  if(aiP1[1]>AI1CHAKU_B1_CUT)return [1];
+  var cands=[];
+  for(var b=2;b<=6;b++){if(aiP1[b]>=AI1CHAKU_THRESH[b])cands.push(b);}
+  if(cands.length===0)cands=[1];
+  return cands;
+}
 function makeAi1chakuBetForAxis(rd,rowsByBoat,axis,maxN){
   function aiScore2(b){var rr=rowsByBoat[b];return ai1chakuR2(rr)*0.3+(rr.aiP2||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
   function aiScore3(b){var rr=rowsByBoat[b];return ai1chakuR3(rr)*0.3+(rr.aiP3||0)*0.3+(rr.ren3total||0)*0.2+ai1chakuKimariScore(rd,rowsByBoat,b)*10*0.2;}
@@ -893,6 +903,36 @@ function computeAi1chakuFormation(result,rd,venue,pointOverride){
     bet=bet.concat(makeAi1chakuBetForAxis(rd,rowsByBoat,axis,alloc[axis]));
   });
   var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1||0)<=45);
+  return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc,origCandsLen:origCandsLen};
+}
+// 【本セッションで発見・分離実装】b1ペナルティ誤発火バグ修正版（aiP1Fixed使用）。既存の
+// computeAi1chakuFormationとは完全に別関数・別データフローで、V2ルーティング判定
+// （ai1chaku.candidates.length===1のバッジ表示）やisRaceSelected（厳選レース基準）には
+// 一切使わない参考表示専用。201日展示なしモードの実測：候補2艇以上143.24%→157.84%・
+// 候補ちょうど2艇143.46%→163.20%（奇数日161.25%／偶数日165.03%で安定）と明確に改善する
+// 一方、候補1艇（超鉄板、本来V2を使う区分）は103.26%→98.60%に悪化するというトレードオフを
+// 確認したため、既存ロジックを置き換えず対角線バランス型と同じ「参考表示」として追加した。
+function computeAi1chakuFormationFixed(result,rd,venue,pointOverride){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1Fixed==null)return null;
+  var cands=getAi1chakuCandidatesFixed(rowsByBoat);
+  var origCandsLen=cands.length;
+  if(cands.length===3){
+    cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1Fixed||0)-(rowsByBoat[a].aiP1Fixed||0);}).slice(0,2);
+  }
+  var effectivePoints=(origCandsLen===2&&pointOverride!=null)?pointOverride:(cands.length>=2?AI1CHAKU_TOTAL_POINTS_2PLUS:AI1CHAKU_TOTAL_POINTS);
+  var alloc=ai1chakuAllocatePoints(cands,rowsByBoat,effectivePoints);
+  var bet=[];
+  cands.forEach(function(axis){
+    bet=bet.concat(makeAi1chakuBetForAxis(rd,rowsByBoat,axis,alloc[axis]));
+  });
+  var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1Fixed||0)<=45);
   return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc,origCandsLen:origCandsLen};
 }
 // V2とAI1着%（超鉄板＝候補1艇の場合の1点目同士）がどこまで一致しているかを判定。
@@ -1164,25 +1204,39 @@ function computeResultForRd(venue,rd,racerCat){
       }
       var b1r=rows.filter(function(r){return r.boat===1;})[0];
       var b1diff=b1r&&b1r.diff!=null&&b1r.diff<=0;
-      var s1=[],s2=[],s3=[];
+      // 【本セッションで発見・分離実装】展示なし時、diffのデフォルト値が0.0のため
+      // b1diffが常にtrueになり1号艇へ意図しない-10点ペナルティが常時かかっていたバグの修正版。
+      // 既存のb1diff／aiP1（ルーティング・候補判定に使用中）は一切変更せず、
+      // 「avgが実在する（＝実際に展示データがある）時だけペナルティを課す」版を並行して
+      // aiP1Fixedとして計算する。201日展示なしモードの実測で候補2艇以上の回収率が
+      // 143.24%→157.84%に改善する一方、候補1艇（超鉄板、本来V2を使うべき区分）は
+      // 103.26%→98.60%に悪化するという区分間トレードオフを確認したため、切り替えず
+      // 参考表示として分離する方針とした（精度分析ログ参照）。
+      var b1diffFixed=b1r&&avg!=null&&b1r.diff!=null&&b1r.diff<=0;
+      var s1=[],s1Fixed=[],s2=[],s3=[];
       for(var i=0;i<rows.length;i++){
         var r=rows[i];
         var r1v=r.racerR1final!=null?r.racerR1final:r.final1;
         var r2v=r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;
         var r3v=r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;
         var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3+tokutenBonus(r.boat);
+        var ts1Fixed=ts1;
         if(r.boat===1&&b1diff)ts1-=10;
+        if(r.boat===1&&b1diffFixed)ts1Fixed-=10;
         var ts2=r2v*0.5+cScore(r.boat)*1.5+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.5;
         var ts3=r3v*0.7+cScore(r.boat)*1+kScore(r)*0.2+mScore(r.boat)*0.3;
         s1.push({boat:r.boat,s:Math.max(0,ts1)});
+        s1Fixed.push({boat:r.boat,s:Math.max(0,ts1Fixed)});
         s2.push({boat:r.boat,s:Math.max(0,ts2)});
         s3.push({boat:r.boat,s:Math.max(0,ts3)});
       }
       var sum1=s1.reduce(function(a,c){return a+c.s;},0)||1;
+      var sum1Fixed=s1Fixed.reduce(function(a,c){return a+c.s;},0)||1;
       var sum2=s2.reduce(function(a,c){return a+c.s;},0)||1;
       var sum3=s3.reduce(function(a,c){return a+c.s;},0)||1;
       for(var i=0;i<rows.length;i++){
         rows[i].aiP1=+(s1[i].s/sum1*100).toFixed(1);
+        rows[i].aiP1Fixed=+(s1Fixed[i].s/sum1Fixed*100).toFixed(1);
         rows[i].aiP2=+(s2[i].s/sum2*100).toFixed(1);
         rows[i].aiP3=+(s3[i].s/sum3*100).toFixed(1);
       }
@@ -2820,6 +2874,10 @@ function App() {
   const ai1chakuBalanced=useMemo(function(){
     return computeAi1chakuFormationBalanced(result,rd,venue,ai1PointMode);
   },[result,rd,venue,ai1PointMode]);
+  // 【追加】b1ペナルティ誤発火バグ修正版（参考表示。既存ai1chakuとは完全分離、V2ルーティング等には未使用）
+  const ai1chakuFixed=useMemo(function(){
+    return computeAi1chakuFormationFixed(result,rd,venue,ai1PointMode);
+  },[result,rd,venue,ai1PointMode]);
   const ai1chakuBalancedSynthOdds=useMemo(function(){
     if(!ai1chakuBalanced)return null;
     return synthesizeOdds(ai1chakuBalanced.bet,rd.odds3tan);
@@ -4157,6 +4215,35 @@ function App() {
                               <span style={{color:"#8b9bae",fontSize:9,marginLeft:6}}>（{ai1chakuBalanced.bet.length}点均等買いの想定払戻倍率）</span>
                             </div>
                           )}
+                        </div>
+                      )}
+                      {ai1chakuFixed&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#ff9f6b",marginBottom:4}}>🔧 1号艇ペナルティ修正版（検証中・展示なし時のバグ修正）</div>
+                          <div style={{fontSize:10,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
+                            展示データが無い時、diffのデフォルト値が0.0のため1号艇へ常に-10点ペナルティが誤ってかかっていたバグの修正版。
+                            201日展示なしモードの実測（精度分析ログ参照）で候補2艇以上143.24%→157.84%・候補ちょうど2艇143.46%→163.20%と改善する一方、
+                            候補1艇（超鉄板、本来V2を使う区分）は103.26%→98.60%に悪化するという区分間トレードオフがあるため、
+                            既存ロジックは変更せず参考表示として分離しています。
+                          </div>
+                          {ai1chakuFixed.candidates.length!==ai1chaku.candidates.length&&(
+                            <div style={{fontSize:10,color:"#ff9f6b",marginBottom:6}}>⚠️ このレースは候補数が変わります：ベース型{ai1chaku.candidates.length}艇 → 修正版{ai1chakuFixed.candidates.length}艇</div>
+                          )}
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {ai1chakuFixed.bet.map(function(t,ti){
+                              var key=t[0]+"-"+t[1]+"-"+t[2];
+                              var o=rd.odds3tan&&rd.odds3tan[key];
+                              var inBase=ai1chaku.bet.some(function(bb){return bb[0]===t[0]&&bb[1]===t[1]&&bb[2]===t[2];});
+                              return (
+                                <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:inBase?"#0e1b2c":"#3a2415",borderRadius:6,padding:"5px 10px",border:inBase?"none":"1px solid #944a2f"}}>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#ff9f6b",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                  {!inBase&&<span style={{fontSize:9,fontWeight:700,color:"#ff9f6b"}}>NEW</span>}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>橙枠＋NEW＝ベース型の買い目には無い組番（修正版が新たに拾っている分）</div>
                         </div>
                       )}
                       <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2a2140"}}>
