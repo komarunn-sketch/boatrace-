@@ -1313,6 +1313,15 @@ function parseCSVFull(text){
 function parseNewCSV(allRows){
   function pf(v){var n=parseFloat((v||"").replace(/%/g,"").trim());return isNaN(n)?null:n;}
   function pi(v){var n=parseInt(v);return isNaN(n)?null:n;}
+  // F数・L数・今節F持ち(Bファイル)は、日によって列位置が異なる（実測F/Lがある日と無い日で
+  // 後ろの列がズレる）ため、固定列番号ではなくヘッダー行から名前で位置を探す。
+  var flColIdx={"F数":-1,"L数":-1,"今節F持ち(Bファイル)":-1};
+  if(allRows[0]){
+    for(var hi=0;hi<allRows[0].length;hi++){
+      var hname=(allRows[0][hi]||"").trim();
+      if(flColIdx.hasOwnProperty(hname))flColIdx[hname]=hi;
+    }
+  }
   var raceMap={};
   for(var ri=1;ri<allRows.length;ri++){
     var row=allRows[ri];
@@ -1403,9 +1412,14 @@ function parseNewCSV(allRows){
       if(!base.tokuten)base.tokuten={};
       base.tokuten[b]={rate:pf(row[149]),score:pf(row[150]),minus:pf(row[151]),nodes:pi(row[152])};
       base.motors[b]={ren2:pf(row[142]),ren3:pf(row[143]),rank:pi(row[139]),rate:pf(row[141])};
-      // 【追加】F数/L数（153,154列目。build_race_sheet.py等の収集スクリプト側で追加した場合のみ存在。
-      // 無い場合はrow.length不足でpf/piがnullを返すだけなので、旧形式CSVとの後方互換性は保たれる）
-      var fCnt=pi(row[153]),lCnt=pi(row[154]);
+      // 【追加】F数/L数（実測、boatrace.jp由来）。無い場合は今節F持ち(Bファイル)を代替信号として使う
+      // （誤検出はほぼ無いが見逃しが多い粗い信号。精度分析ログ参照）。
+      var fCnt=flColIdx["F数"]>=0?pi(row[flColIdx["F数"]]):null;
+      var lCnt=flColIdx["L数"]>=0?pi(row[flColIdx["L数"]]):null;
+      if(fCnt==null&&flColIdx["今節F持ち(Bファイル)"]>=0){
+        var bflag=pi(row[flColIdx["今節F持ち(Bファイル)"]]);
+        if(bflag===1)fCnt=1; // Bファイル由来と分かるよう、fCountsには後段でsource情報を付与
+      }
       if(fCnt!=null||lCnt!=null){
         if(!base.fCounts)base.fCounts={1:null,2:null,3:null,4:null,5:null,6:null};
         if(!base.fHold)base.fHold={1:false,2:false,3:false,4:false,5:false,6:false};
