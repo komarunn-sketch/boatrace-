@@ -895,6 +895,39 @@ function computeAi1chakuFormation(result,rd,venue,pointOverride){
   var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1||0)<=45);
   return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc,origCandsLen:origCandsLen};
 }
+// V2とAI1着%（超鉄板＝候補1艇の場合の1点目同士）がどこまで一致しているかを判定。
+// 201日・超鉄板レース24,024件の実測で、一致度が下がるほど段階的に回収率が悪化することを確認：
+// 完全一致142.34%／軸2着一致・3着のみ不一致136.78%／軸のみ一致・2着から不一致129.79%／
+// 軸から不一致115.31%。3着だけの不一致は許容範囲だが、軸（1着候補）が食い違うケースは
+// 明確に危険信号（精度分析ログ参照。今回の検証はAI1着%ではなくV2買い目パネル側の話）。
+function computeV2Ai1chakuAgreement(result,rd,venue,ai1chaku,v2bet){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  if(!ai1chaku||ai1chaku.candidates.length!==1)return null;
+  if(!v2bet||!v2bet.combos_ranked||v2bet.combos_ranked.length===0)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  var aiAxis=ai1chaku.candidates[0];
+  var aiTopArr=makeAi1chakuBetForAxis(rd,rowsByBoat,aiAxis,1);
+  if(!aiTopArr||aiTopArr.length===0)return null;
+  var aiTop=aiTopArr[0]; // [axis,second,third]
+  var v2Top0=v2bet.combos_ranked[0];
+  var v2Top=[v2bet.honmei,v2Top0.second,v2Top0.third];
+  var tier, label, roiRef, color, bg, border;
+  if(v2Top[0]===aiTop[0]&&v2Top[1]===aiTop[1]&&v2Top[2]===aiTop[2]){
+    tier="full_agree";label="完全一致";roiRef="142.34%";color="#5dd39e";bg="#123a2a";border="#2e7d5c";
+  }else if(v2Top[0]===aiTop[0]&&v2Top[1]===aiTop[1]){
+    tier="third_differ";label="軸・2着は一致、3着のみ不一致";roiRef="136.78%";color="#9fe0c0";bg="#132b26";border="#2e6b52";
+  }else if(v2Top[0]===aiTop[0]){
+    tier="second_differ";label="軸は一致、2着から不一致";roiRef="129.79%";color="#f9c513";bg="#2b2410";border="#6b5a2c";
+  }else{
+    tier="axis_differ";label="軸（1着候補）から不一致";roiRef="115.31%";color="#ff8a8a";bg="#3a1e1e";border="#7d3a3a";
+  }
+  return {tier:tier,label:label,roiRef:roiRef,color:color,bg:bg,border:border,v2Top:v2Top,aiTop:aiTop};
+}
 // レース厳選（追記：場別回収率×候補数の交差検証済みルール、精度分析ログ参照）
 // 46日プールで奇数日/偶数日それぞれ独立に「回収率の良い場」を選定し、両方に共通した11場。
 const RACE_SELECT_GOOD_VENUES=["びわこ","三国","住之江","唐津","宮島","江戸川","津","芦屋","若松","蒲郡","鳴門"];
@@ -2799,6 +2832,10 @@ function App() {
     if(!ai1chaku)return null;
     return synthesizeOdds(ai1chaku.bet,rd.odds3tan);
   },[ai1chaku,rd.odds3tan]);
+  // V2とAI1着%の1点目同士がどこまで一致しているか（超鉄板＝候補1艇のみ判定。精度分析ログ参照）
+  const v2Ai1chakuAgreement=useMemo(function(){
+    return computeV2Ai1chakuAgreement(result,rd,venue,ai1chaku,v2bet);
+  },[result,rd,venue,ai1chaku,v2bet]);
   // V2＋AI1着%基準フォーメーションの合成買い目（重複する組番は1点にまとめる）。
   // 精度分析ログ追記79：47日実績で重複部分の回収率が最も高く（137.5%）、
   // 単体よりわずかに回収率は下がるが的中率が大きく向上する（30-37%→48.8%）ことを確認済み。
@@ -3915,6 +3952,15 @@ function App() {
                           <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#0e1b2c",color:"#8b9bae",border:"2px solid #3a4a5c"}}>参考（下のAI1着%が推奨）</span>
                         )}
                       </div>
+                      {v2Ai1chakuAgreement&&(
+                        <div style={{marginBottom:8,fontSize:11,fontWeight:800,padding:"6px 10px",borderRadius:6,background:v2Ai1chakuAgreement.bg,color:v2Ai1chakuAgreement.color,border:"1px solid "+v2Ai1chakuAgreement.border}}>
+                          {v2Ai1chakuAgreement.tier==="full_agree"?"✅":v2Ai1chakuAgreement.tier==="third_differ"?"🟢":v2Ai1chakuAgreement.tier==="second_differ"?"⚠️":"🚫"} AI1着%と{v2Ai1chakuAgreement.label}（参考回収率{v2Ai1chakuAgreement.roiRef}）
+                          <div style={{fontSize:10,fontWeight:400,color:v2Ai1chakuAgreement.color,opacity:0.85,marginTop:3}}>
+                            V2: {v2Ai1chakuAgreement.v2Top.join("-")} ／ AI1着%: {v2Ai1chakuAgreement.aiTop.join("-")}
+                            {v2Ai1chakuAgreement.tier==="axis_differ"&&"（軸から食い違うレースは的中率7.01%まで低下。特に注意）"}
+                          </div>
+                        </div>
+                      )}
                       <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
                         別の確率モデルによる買い目。展示あり70日の検証で、超鉄板（候補1艇）レースに限るとAI1着%(回収率95.71%・赤字)を上回る回収率121.76%を記録。逆に候補2艇以上のレースではAI1着%の方が明確に優位でした（精度分析ログ追記107参照）。
                       </div>
