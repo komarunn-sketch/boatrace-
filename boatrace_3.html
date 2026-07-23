@@ -1270,6 +1270,8 @@ function emptyRace() {
     sts:{1:"",2:"",3:"",4:"",5:"",6:""},
     fHold:{1:false,2:false,3:false,4:false,5:false,6:false},
     fSts:{1:"",2:"",3:"",4:"",5:"",6:""},
+    // 【追加】F数/L数（累積、boatrace.jp出走表ページより取得）。fHoldはF数>=1の派生値として自動セットされる。
+    fCounts:{1:null,2:null,3:null,4:null,5:null,6:null},
     tenjiText:"",tenjiMsg:"",
     inputs:{1:emptyInput(),2:emptyInput(),3:emptyInput(),4:emptyInput(),5:emptyInput(),6:emptyInput()},
     tilts:{1:"",2:"",3:"",4:"",5:"",6:""},
@@ -1401,6 +1403,15 @@ function parseNewCSV(allRows){
       if(!base.tokuten)base.tokuten={};
       base.tokuten[b]={rate:pf(row[149]),score:pf(row[150]),minus:pf(row[151]),nodes:pi(row[152])};
       base.motors[b]={ren2:pf(row[142]),ren3:pf(row[143]),rank:pi(row[139]),rate:pf(row[141])};
+      // 【追加】F数/L数（153,154列目。build_race_sheet.py等の収集スクリプト側で追加した場合のみ存在。
+      // 無い場合はrow.length不足でpf/piがnullを返すだけなので、旧形式CSVとの後方互換性は保たれる）
+      var fCnt=pi(row[153]),lCnt=pi(row[154]);
+      if(fCnt!=null||lCnt!=null){
+        if(!base.fCounts)base.fCounts={1:null,2:null,3:null,4:null,5:null,6:null};
+        if(!base.fHold)base.fHold={1:false,2:false,3:false,4:false,5:false,6:false};
+        base.fCounts[b]={f:fCnt||0,l:lCnt||0};
+        base.fHold[b]=(fCnt||0)>=1;
+      }
     }
     base.racerClass=racerClass;
     base.playerNums=playerNums;
@@ -2168,7 +2179,7 @@ function App() {
       var goods=0;var critVals=Object.values(crit);for(var i=0;i<critVals.length;i++)if(critVals[i]===true)goods++;
       var mark=goods>=2?"◎":goods===1?"○":"△";
       var warns=[],plus=[];
-      if(rd.fHold[r.boat])warns.push("F持ち注意");
+      if(rd.fHold[r.boat]){var fc=rd.fCounts&&rd.fCounts[r.boat];warns.push(fc?("F持ち注意（F"+fc.f+" L"+(fc.l||0)+"）"):"F持ち注意");}
       if(stAvg!=null&&effSt[r.boat]!=null&&effSt[r.boat]-stAvg>=0.03)warns.push("ST遅め注意");
       if(rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0)warns.push("チルト跳ね・伸び警戒");
       if(stAvg!=null&&effSt[r.boat]!=null&&stAvg-effSt[r.boat]>=0.03)plus.push("スリット先行候補");
@@ -2225,7 +2236,7 @@ function App() {
     else if(maxG>=2){badge="やや本命";badgeColor="#5a9e2e";}
     else{badge="混戦・波乱含み";badgeColor="#b3463f";}
     return{ranked:ranked,badge:badge,badgeColor:badgeColor};
-  },[result,rd.sts,rd.fHold,rd.fSts,rd.motors,rd.tilts,rd.wind,rd.kimari,kimariPeriod]);
+  },[result,rd.sts,rd.fHold,rd.fSts,rd.fCounts,rd.motors,rd.tilts,rd.wind,rd.kimari,kimariPeriod]);
 
   const yoso=useMemo(function(){
     if(!result)return null;
@@ -3363,6 +3374,26 @@ function App() {
               try{
                 var parsed2=JSON.parse(e.target.value);
                 updateRd(function(prev){var n=Object.assign({},prev);n.odds2tan=parsed2;return n;});
+              }catch(err){}
+            }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+            {/* 【追加】F数/L数連携用。拡張機能から {"登録番号":{"f":F数,"l":L数}, ...} 形式のJSONを受け取り、
+                現在の艇番(rd.playerNums)と突き合わせてfHold・fCountsへ反映する。 */}
+            <input type="text" id="fl-data-input" value="" readOnly onChange={function(e){
+              try{
+                var parsedFl=JSON.parse(e.target.value);
+                updateRd(function(prev){
+                  var n=Object.assign({},prev);
+                  var nh=Object.assign({},prev.fHold),nc=Object.assign({},prev.fCounts);
+                  for(var b=1;b<=6;b++){
+                    var toban=prev.playerNums&&prev.playerNums[b-1];
+                    if(toban&&parsedFl[toban]){
+                      nh[b]=(parsedFl[toban].f||0)>=1;
+                      nc[b]=parsedFl[toban];
+                    }
+                  }
+                  n.fHold=nh;n.fCounts=nc;
+                  return n;
+                });
               }catch(err){}
             }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
             <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap"}}>
