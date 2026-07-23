@@ -3433,6 +3433,7 @@ function App() {
                       {rd.tilts[b]!==""&&<div style={{color:parseFloat(rd.tilts[b])>=1.0?"#f9c513":"#9db5cc"}}>チルト <b>{rd.tilts[b]}</b></div>}
                       {rd.playerAreas&&rd.playerAreas[b-1]&&<div style={{color:"#7db4e8"}}>{rd.playerAreas[b-1]}</div>}
                       {rd.playerNums&&rd.playerNums[b-1]&&<div style={{color:"#5a7a9a",fontSize:9}}>{rd.playerNums[b-1]}</div>}
+                      {rd.fHold&&rd.fHold[b]&&<div style={{color:"#ff8a80",fontWeight:700,marginTop:2}}>⚠ F持ち注意{rd.fCounts&&rd.fCounts[b]&&("（F"+rd.fCounts[b].f+" L"+(rd.fCounts[b].l||0)+"）")}</div>}
                     </div>
                   </div>
                 );
@@ -3862,6 +3863,16 @@ function App() {
                         <div style={{fontSize:16,fontWeight:800,lineHeight:1.2,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":r.mark==="△"?"#7db4e8":"#9db5cc"}}>{r.mark}</div>
                         <div style={{fontSize:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
                         {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>モーター {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
+                        {r.warns&&r.warns.length>0&&(
+                          <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
+                            {r.warns.map(function(w,wi){return <div key={wi} style={{fontSize:9,fontWeight:700,color:"#ff8a80",lineHeight:1.3}}>⚠ {w}</div>;})}
+                          </div>
+                        )}
+                        {r.plus&&r.plus.length>0&&(
+                          <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
+                            {r.plus.map(function(p,pi){return <div key={pi} style={{fontSize:9,fontWeight:700,color:"#5dd39e",lineHeight:1.3}}>＋ {p}</div>;})}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
