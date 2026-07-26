@@ -1057,8 +1057,14 @@ function computeRen3AxisNagashiFormationAccel(result,rd,venue){
   }
   if(rowsByBoat[1].aiP1==null)return null;
   if(rowsByBoat[1].ren3total==null&&rowsByBoat[1].ren3raw1y==null)return null;
-  // 発動条件は既存のAI1着%基準のまま（候補2艇＝参加検討の時だけ）
+  // 発動条件は既存のAI1着%基準のまま（候補2艇＝参加検討の時だけ）。候補3艇の場合は
+  // 対角線バランス型・AI1着%版と同じ「aiP1上位2艇に絞る」処理を適用してから判定する
+  // （これをしないと、レース選択ボタンのAI1着%表示＝候補2艇なのに、こちらは絞り込み前の
+  // 3艇のままゲートに落ちて非表示になる不整合が起きる）。
   var gateCands=getAi1chakuCandidates(rowsByBoat);
+  if(gateCands.length===3){
+    gateCands=gateCands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
+  }
   if(gateCands.length!==2)return null;
   var accel=computeAccelScores(rd);
   if(!accel)return null; // 展示・直線が6艇揃っていなければ非表示
