@@ -1123,6 +1123,9 @@ function computeRen3AxisNagashiFormation(result,rd,venue){
 // 1号艇自身が入れば除外）。3着候補からはAI3連対率最下位を除外。
 // 全24会場を対象（3連対率軸2頭流しの対応7場限定とは異なる）。
 const B1_FIXED_AI1_THRESH=60;
+const B1_FIXED_AI1_PENDING_THRESH=50; // 展示データ取込前の「イン逃げ候補」点線表示だけに使う緩めの閾値。
+// 展示データの補正で1号艇のaiP1は平均+6pt前後・時には10pt以上動くため、正式な60%基準だと
+// 展示取込前はほとんど点線が表示されない（2026-07-25実測：確定21件中18件は展示前50%台以下だった）。
 function computeB1FixedRen3Axis(result,rd,venue){
   if(!result||!result.rows||result.rows.length<6)return null;
   if(!result.hasTime)return null; // 展示データが無いレースは対象外（バックテストで悪化を確認済み）
@@ -2348,6 +2351,16 @@ function App() {
       if(!res)continue;
       var f=computeAi1chakuFormationBalanced(res,rr,venue,null);
       if(!f)continue;
+      var b1f=computeB1FixedRen3Axis(res,rr,venue);
+      if(b1f){out[n]="b1fixed";continue;}
+      // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
+      // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
+      // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
+      // 展示なしだとこの戦略は逆効果なため）。
+      if(!res.hasTime){
+        var b1row=res.rows.filter(function(r){return r.boat===1;})[0];
+        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]="b1fixed_pending";continue;}
+      }
       out[n]=f.candidates.length===1?"v2":"ai1";
     }
     return out;
@@ -3563,17 +3576,18 @@ function App() {
               var r=races[rk(venue,n)]||emptyRace();
               var hasBas=r.racerStats!=null||r.stTable!=null||r.motors[1]!=null;
               var hasTen=Object.values(r.inputs).some(function(inp){return inp.tenji!=="";});
-              var rec=raceRecommendations[n]; // "v2" | "ai1" | undefined
+              var rec=raceRecommendations[n]; // "b1fixed" | "b1fixed_pending" | "v2" | "ai1" | undefined
               var isActive=curRace===n;
-              var bg=isActive?"#2c4762":rec==="v2"?"#1a3b2a":rec==="ai1"?"#2a1a3b":"#16273c";
-              var borderColor=isActive?"#5a87b8":rec==="v2"?"#2e9e6b":rec==="ai1"?"#7e4a9e":"#2c4762";
-              var borderW=isActive?"2px":"1px";
-              var textColor=isActive?"#fff":rec==="v2"?"#5dd39e":rec==="ai1"?"#c9a8ff":"#9db5cc";
+              var isB1=rec==="b1fixed"||rec==="b1fixed_pending";
+              var bg=isActive?"#2c4762":isB1?"#123a42":rec==="v2"?"#1a3b2a":rec==="ai1"?"#2a1a3b":"#16273c";
+              var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":rec==="v2"?"#2e9e6b":rec==="ai1"?"#7e4a9e":"#2c4762";
+              var borderW=isActive?"2px solid":(rec==="b1fixed_pending"?"1px dashed":"1px solid");
+              var textColor=isActive?"#fff":isB1?"#5dc9f9":rec==="v2"?"#5dd39e":rec==="ai1"?"#c9a8ff":"#9db5cc";
               return (
-                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:44,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" solid "+borderColor,background:bg,color:textColor,position:"relative"}}>
+                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:44,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative"}}>
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
-                  {rec&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:rec==="v2"?"#5dd39e":"#c9a8ff"}}>{rec==="v2"?"V2":"AI1着%"}</div>}
+                  {rec&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":rec==="v2"?"#5dd39e":"#c9a8ff"}}>{rec==="b1fixed"?"イン逃げ":rec==="b1fixed_pending"?"イン逃げ?":rec==="v2"?"V2":"AI1着%"}</div>}
                   <div style={{position:"absolute",bottom:3,left:0,right:0,display:"flex",justifyContent:"center",gap:2}}>
                     {hasBas&&<div style={{width:5,height:5,borderRadius:"50%",background:"#5dd39e"}}/>}
                     {hasTen&&<div style={{width:5,height:5,borderRadius:"50%",background:"#f9c513"}}/>}
@@ -3582,7 +3596,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
