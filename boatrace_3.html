@@ -2305,6 +2305,25 @@ function App() {
     return computeResultForRd(venue,rd,racerCat);
   },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue,racerCat]);
 
+  // レース選択ボタン用：各レースがV2向き（超鉄板＝候補1艇）かAI1着%向き（候補2艇以上）かを判定。
+  // 206日・約29,500レースの実測で、超鉄板はV2の方が優位（回収率117.0% vs 104.4%）、
+  // 候補2艇以上はAI1着%の方が優位（148.3% vs 123.0%）と確認済み（精度分析ログ追記107・108参照）。
+  const raceRecommendations=useMemo(function(){
+    var out={};
+    if(!venue)return out;
+    for(var n=1;n<=12;n++){
+      var rr=races[rk(venue,n)];
+      if(!rr)continue;
+      var res;
+      try{res=computeResultForRd(venue,rr,racerCat);}catch(e){continue;}
+      if(!res)continue;
+      var f=computeAi1chakuFormationBalanced(res,rr,venue,null);
+      if(!f)continue;
+      out[n]=f.candidates.length===1?"v2":"ai1";
+    }
+    return out;
+  },[venue,races,racerCat]);
+
   const kimariByBoat=useMemo(function(){
     if(!rd.kimariCount||!result)return null;
     return result.rows.map(function(r){
@@ -3509,28 +3528,17 @@ function App() {
               var r=races[rk(venue,n)]||emptyRace();
               var hasBas=r.racerStats!=null||r.stTable!=null||r.motors[1]!=null;
               var hasTen=Object.values(r.inputs).some(function(inp){return inp.tenji!=="";});
-              var isWave=false,isStrong=false;
-              if(r.kimariCount&&r.racerRaceCount){
-                var kc=r.kimariCount;
-                var rc=r.racerRaceCount[0];
-                if(rc!=null&&rc>9){
-                  var total=0;
-                  var arrs=[kc.nige,kc.sashi,kc.makuri,kc.makurizashi,kc.nuki];
-                  for(var ai=0;ai<arrs.length;ai++){if(arrs[ai]&&arrs[ai][0]!=null)total+=arrs[ai][0];}
-                  var ratio=total/rc;
-                  if(ratio<0.45)isWave=true;
-                  else if(ratio>=0.75)isStrong=true;
-                }
-              }
+              var rec=raceRecommendations[n]; // "v2" | "ai1" | undefined
               var isActive=curRace===n;
-              var bg=isActive?"#2c4762":isStrong?"#1a3b2a":isWave?"#3b1a3b":"#16273c";
-              var borderColor=isActive?"#5a87b8":isStrong?"#2e9e6b":isWave?"#8b3a8b":"#2c4762";
+              var bg=isActive?"#2c4762":rec==="v2"?"#1a3b2a":rec==="ai1"?"#2a1a3b":"#16273c";
+              var borderColor=isActive?"#5a87b8":rec==="v2"?"#2e9e6b":rec==="ai1"?"#7e4a9e":"#2c4762";
               var borderW=isActive?"2px":"1px";
-              var textColor=isActive?"#fff":isStrong?"#5dd39e":isWave?"#e08be0":"#9db5cc";
+              var textColor=isActive?"#fff":rec==="v2"?"#5dd39e":rec==="ai1"?"#c9a8ff":"#9db5cc";
               return (
                 <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:44,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" solid "+borderColor,background:bg,color:textColor,position:"relative"}}>
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
+                  {rec&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:rec==="v2"?"#5dd39e":"#c9a8ff"}}>{rec==="v2"?"V2":"AI1着%"}</div>}
                   <div style={{position:"absolute",bottom:3,left:0,right:0,display:"flex",justifyContent:"center",gap:2}}>
                     {hasBas&&<div style={{width:5,height:5,borderRadius:"50%",background:"#5dd39e"}}/>}
                     {hasTen&&<div style={{width:5,height:5,borderRadius:"50%",background:"#f9c513"}}/>}
@@ -3539,7 +3547,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑字＝鉄板（75%以上） ● 紫字＝波乱注意（45%以下）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
