@@ -1115,6 +1115,29 @@ function computeRen3AxisNagashiFormation(result,rd,venue){
   });
   return {candidates:cands,perAxis:perAxis,bet:bet};
 }
+// ==================== 1号艇固定・イン逃げ狙いフォーメーション（ユーザー考案・実験的） ====================
+// 1着：AI1着%候補に関係なく、常に1号艇固定。
+// 発動条件：1号艇のaiP1が60%以上、かつ展示データあり（この条件を外すと回収率が大きく悪化することを
+// バックテストで確認済み。精度分析ログ参照）。
+// 2着・3着の軸：3連対率軸2頭流しと同じ考え方（直近1年3連対率＋AI3連対率の合計、レース共通で1位・3位、
+// 1号艇自身が入れば除外）。3着候補からはAI3連対率最下位を除外。
+// 全24会場を対象（3連対率軸2頭流しの対応7場限定とは異なる）。
+const B1_FIXED_AI1_THRESH=60;
+function computeB1FixedRen3Axis(result,rd,venue){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  if(!result.hasTime)return null; // 展示データが無いレースは対象外（バックテストで悪化を確認済み）
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1==null||rowsByBoat[1].aiP1<B1_FIXED_AI1_THRESH)return null;
+  if(rowsByBoat[1].ren3total==null&&rowsByBoat[1].ren3raw1y==null)return null;
+  var globalAxisPair=computeGlobalRen3AxisPair(rowsByBoat);
+  var form=makeRen3AxisNagashiForAxis(rowsByBoat,1,globalAxisPair,false);
+  return {axis:1,axisPair:form.axisPair,broadGroup:form.broadGroup,worstAi3:form.worstAi3,bet:form.triples};
+}
 
 
 // 201日・超鉄板レース24,024件の実測で、一致度が下がるほど段階的に回収率が悪化することを確認：
@@ -3147,6 +3170,12 @@ function App() {
     if(method==="ai1chaku")return computeRen3AxisNagashiFormation(result,rd,venue);
     return null;
   },[result,rd,venue,racerCat]);
+  // 【追加・ユーザー考案】1号艇固定・イン逃げ狙いフォーメーション（実験的）。全24会場対象。
+  // 1号艇のaiP1が60%以上・展示ありの時だけ発動（精度分析ログ参照。閾値を外すと回収率が悪化する
+  // ことをバックテストで確認済み）。
+  const b1FixedRen3Axis=useMemo(function(){
+    return computeB1FixedRen3Axis(result,rd,venue);
+  },[result,rd,venue,racerCat]);
   // レース厳選バッジ判定＆AI1着%基準フォーメーションの合成オッズ（展示データ等が変わればai1chakuBalancedの再計算に追従して自動更新される）
   const isSelectedRace=useMemo(function(){
     return isRaceSelected(venue,ai1chakuBalanced);
@@ -4514,6 +4543,27 @@ function App() {
                             );
                           })}
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{ren3AxisNagashi.bet.length}点（軸が2艇の場合は候補ごとの点数を合算）</div>
+                        </div>
+                      )}
+                      {b1FixedRen3Axis&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#5dd39e",marginBottom:4}}>🚤 1号艇固定・イン逃げ狙い（全場対象・実験的、1号艇aiP1≥{B1_FIXED_AI1_THRESH}%＋展示ありの時のみ）</div>
+                          <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                            1着1号艇固定：2・3着軸＝{b1FixedRen3Axis.axisPair.join("・")}号艇（3連対率合計1位・3位）／除外（AI3連対率最下位）＝{b1FixedRen3Axis.worstAi3}号艇／フラッド＝{b1FixedRen3Axis.broadGroup.join("・")}号艇
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {b1FixedRen3Axis.bet.map(function(t,ti){
+                              var key=t[0]+"-"+t[1]+"-"+t[2];
+                              var o=rd.odds3tan&&rd.odds3tan[key];
+                              return (
+                                <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#5dd39e",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{b1FixedRen3Axis.bet.length}点</div>
                         </div>
                       )}
                     </div>
