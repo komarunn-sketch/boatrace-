@@ -714,7 +714,7 @@ function hasV2Data(rd){
   return !!(rd&&rd.racerClass&&rd.racerClass.filter(function(x){return !!x;}).length===6);
 }
 // tsxのrdから直接v2ロジックの結果を得るための入口関数
-function computeV2FromRd(rd,venue){
+function computeV2FromRd(rd,venue,racerCat){
   if(!hasV2Data(rd))return null;
   var boatsV2=buildBoatsForV2(rd);
   if(!boatsV2)return null;
@@ -723,7 +723,7 @@ function computeV2FromRd(rd,venue){
   var waveKey=waveBucket(rd.waveHeight);
   var weatherKey=rd.weather&&WEATHER[rd.weather]?rd.weather:null;
   var motorSpreadMult=tempMotorDampV2(rd.airTemp,rd.waterTemp);
-  return computeRaceV2(venue,boatsV2,exhV2,windKey,rd.courses,waveKey,weatherKey,{motorSpreadMult:motorSpreadMult});
+  return computeRaceV2(venue,boatsV2,exhV2,windKey,rd.courses,waveKey,weatherKey,{motorSpreadMult:motorSpreadMult,racerCat:racerCat||"直近1年"});
 }
 
 // ==================== AI1着%基準フォーメーション ====================
@@ -2371,6 +2371,25 @@ function App() {
     return computeResultForRd(venue,rd,racerCat);
   },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue,racerCat]);
 
+  // 【2026-07-26】買い方ごとに最適な選手成績期間(racerCat)が異なることが206日規模の検証で判明したため
+  // （精度分析ログ参照）、各フォーメーションはそれぞれ専用の期間で計算する。画面上部の選手成績期間トグル
+  // （racerCat、上のresult）は生データ一覧表示にのみ使う。
+  const AI1CHAKU_RACER_CAT="直近6ヶ月"; // 回収率142.7%（直近1年の114.0%より良好）
+  const REN3_RACER_CAT="直近1年"; // 回収率159.5%（他の期間より良好）
+  const B1_FIXED_RACER_CAT="直近3ヶ月"; // 回収率130.4%（直近1年の112.2%より良好、当地は異常値のため除外）
+  const resultForAi1=useMemo(function(){
+    return computeResultForRd(venue,rd,AI1CHAKU_RACER_CAT);
+  },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue]);
+  const resultForRen3=useMemo(function(){
+    return computeResultForRd(venue,rd,REN3_RACER_CAT);
+  },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue]);
+  const resultForB1=useMemo(function(){
+    return computeResultForRd(venue,rd,B1_FIXED_RACER_CAT);
+  },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue]);
+  // V2だけは選手成績期間を選べるようにする（従来は常に「直近1年」固定でトグルに一切連動していなかった
+  // バグ／仕様漏れがあったため。精度分析ログ参照）。
+  const [v2RacerCat,setV2RacerCat]=useState("直近6ヶ月"); // 206日実測で回収率140.0%と最良（精度分析ログ参照）
+
   // レース選択ボタン用：各レースがV2向き（超鉄板＝候補1艇）かAI1着%向き（候補2艇以上）かを判定。
   // 206日・約29,500レースの実測で、超鉄板はV2の方が優位（回収率117.0% vs 104.4%）、
   // 候補2艇以上はAI1着%の方が優位（148.3% vs 123.0%）と確認済み（精度分析ログ追記107・108参照）。
@@ -2380,25 +2399,26 @@ function App() {
     for(var n=1;n<=12;n++){
       var rr=races[rk(venue,n)];
       if(!rr)continue;
-      var res;
-      try{res=computeResultForRd(venue,rr,racerCat);}catch(e){continue;}
-      if(!res)continue;
-      var f=computeAi1chakuFormationBalanced(res,rr,venue,null);
+      var resAi1,resB1;
+      try{resAi1=computeResultForRd(venue,rr,AI1CHAKU_RACER_CAT);}catch(e){continue;}
+      if(!resAi1)continue;
+      var f=computeAi1chakuFormationBalanced(resAi1,rr,venue,null);
       if(!f)continue;
-      var b1f=computeB1FixedRen3Axis(res,rr,venue);
+      try{resB1=computeResultForRd(venue,rr,B1_FIXED_RACER_CAT);}catch(e){resB1=null;}
+      var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
       if(b1f){out[n]="b1fixed";continue;}
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
       // 展示なしだとこの戦略は逆効果なため）。
-      if(!res.hasTime){
-        var b1row=res.rows.filter(function(r){return r.boat===1;})[0];
+      if(resB1&&!resB1.hasTime){
+        var b1row=resB1.rows.filter(function(r){return r.boat===1;})[0];
         if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]="b1fixed_pending";continue;}
       }
       out[n]=f.candidates.length===1?"v2":"ai1";
     }
     return out;
-  },[venue,races,racerCat]);
+  },[venue,races]);
 
   const kimariByBoat=useMemo(function(){
     if(!rd.kimariCount||!result)return null;
@@ -3180,32 +3200,34 @@ function App() {
     };
   },[result,rd.inputs,rd.stScore,rd.courses,rd.kimariCount,rd.racerRaceCount,rd.playerAreas,rd.odds3tan]);
 
-  // v2ロジック（本線＋対抗2軸買い）の計算結果。既存yosoとは完全に独立。
+  // v2ロジック（本線＋対抗2軸買い）の計算結果。既存yosoとは完全に独立。選手成績期間はv2RacerCatで個別選択可能。
   const v2bet=useMemo(function(){
-    return computeV2FromRd(rd,venue);
-  },[rd,venue]);
+    return computeV2FromRd(rd,venue,v2RacerCat);
+  },[rd,venue,v2RacerCat]);
 
   // AI1着%基準フォーメーション（既存のtotalScore系aiP1を利用した別ルール。v2とは無関係）
   // 【2026-07-26】ベース型と対角線バランス型を206日・約29,500レースで横並び比較した結果、
   // 点数（買い目数）が同じにも関わらずバランス型が一貫して的中率・回収率とも上回ったため
   // （回収率110.9%→114.1%、的中率36.9%→38.2%）、正式にバランス型をメイン表示・厳選レース
   // 判定等の基準に採用。ベース型（ai1chaku）はコード上は残すが画面には出さない（現時点では未参照、将来の比較用）。
+  // 選手成績期間は専用のAI1CHAKU_RACER_CAT（直近6ヶ月）固定。
   const ai1chaku=useMemo(function(){
-    return computeAi1chakuFormation(result,rd,venue,ai1PointMode);
-  },[result,rd,venue,ai1PointMode]);
+    return computeAi1chakuFormation(resultForAi1,rd,venue,ai1PointMode);
+  },[resultForAi1,rd,venue,ai1PointMode]);
   const ai1chakuBalanced=useMemo(function(){
-    return computeAi1chakuFormationBalanced(result,rd,venue,ai1PointMode);
-  },[result,rd,venue,ai1PointMode]);
+    return computeAi1chakuFormationBalanced(resultForAi1,rd,venue,ai1PointMode);
+  },[resultForAi1,rd,venue,ai1PointMode]);
   // 【追加】b1ペナルティ誤発火バグ修正版（参考表示。既存ai1chakuBalancedとは完全分離、V2ルーティング等には未使用）
   const ai1chakuFixed=useMemo(function(){
-    return computeAi1chakuFormationFixed(result,rd,venue,ai1PointMode);
-  },[result,rd,venue,ai1PointMode]);
+    return computeAi1chakuFormationFixed(resultForAi1,rd,venue,ai1PointMode);
+  },[resultForAi1,rd,venue,ai1PointMode]);
   // 【追加・ユーザー考案】3連対率軸2頭流しフォーメーション（実験的・参考表示専用。
   // V2ルーティングやisRaceSelectedには一切使わない）
   // 会場別に「AI1着%版」「加速版（中間速+伸びスコア）」のどちらが効くかは会場ごとに異なるため、
   // 206日全量・全会場のバックテストで会場ごとに最良の方式を選定（精度分析ログ追記128・131・132・137）。
   // サンプル数30以上・回収率100%超を目安に、2026-07-26時点で以下7場に展開。それ以外の場では非表示
-  // （過学習リスクがあり残りの会場への一般化はまだ検証していないため）。
+  // （過学習リスクがあり残りの会場への一般化はまだ検証していないため）。選手成績期間は専用の
+  // REN3_RACER_CAT（直近1年）固定。
   const REN3_AXIS_VENUE_METHOD={
     "戸田":"accel","平和島":"ai1chaku",
     "丸亀":"ai1chaku","常滑":"ai1chaku","多摩川":"ai1chaku",
@@ -3213,16 +3235,16 @@ function App() {
   };
   const ren3AxisNagashi=useMemo(function(){
     var method=REN3_AXIS_VENUE_METHOD[venue];
-    if(method==="accel")return computeRen3AxisNagashiFormationAccel(result,rd,venue);
-    if(method==="ai1chaku")return computeRen3AxisNagashiFormation(result,rd,venue);
+    if(method==="accel")return computeRen3AxisNagashiFormationAccel(resultForRen3,rd,venue);
+    if(method==="ai1chaku")return computeRen3AxisNagashiFormation(resultForRen3,rd,venue);
     return null;
-  },[result,rd,venue,racerCat]);
+  },[resultForRen3,rd,venue]);
   // 【追加・ユーザー考案】1号艇固定・イン逃げ狙いフォーメーション（実験的）。全24会場対象。
   // 1号艇のaiP1が60%以上・展示ありの時だけ発動（精度分析ログ参照。閾値を外すと回収率が悪化する
-  // ことをバックテストで確認済み）。
+  // ことをバックテストで確認済み）。選手成績期間は専用のB1_FIXED_RACER_CAT（直近3ヶ月）固定。
   const b1FixedRen3Axis=useMemo(function(){
-    return computeB1FixedRen3Axis(result,rd,venue);
-  },[result,rd,venue,racerCat]);
+    return computeB1FixedRen3Axis(resultForB1,rd,venue);
+  },[resultForB1,rd,venue]);
   // レース厳選バッジ判定＆AI1着%基準フォーメーションの合成オッズ（展示データ等が変わればai1chakuBalancedの再計算に追従して自動更新される）
   const isSelectedRace=useMemo(function(){
     return isRaceSelected(venue,ai1chakuBalanced);
@@ -4383,6 +4405,21 @@ function App() {
                         ):(
                           <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#0e1b2c",color:"#8b9bae",border:"2px solid #3a4a5c"}}>参考（下のAI1着%が推奨）</span>
                         )}
+                      </div>
+                      <div style={{marginBottom:8,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{fontSize:10,color:"#b9a6ff"}}>選手成績期間：</span>
+                        {["直近1ヶ月","直近3ヶ月","直近6ヶ月","直近1年","全期間","当地"].map(function(cat){
+                          var isActive=v2RacerCat===cat;
+                          return (
+                            <button key={cat} onClick={function(){setV2RacerCat(cat);}}
+                              style={{padding:"3px 8px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:700,
+                                border:isActive?"2px solid #8e5ce0":"1px solid #3a4a5c",
+                                background:isActive?"#3a2a5c":"#0e1b2c",
+                                color:isActive?"#c9a8ff":"#8b9bae"}}>
+                              {cat}
+                            </button>
+                          );
+                        })}
                       </div>
                       {v2Ai1chakuAgreement&&(
                         <div style={{marginBottom:8,fontSize:11,fontWeight:800,padding:"6px 10px",borderRadius:6,background:v2Ai1chakuAgreement.bg,color:v2Ai1chakuAgreement.color,border:"1px solid "+v2Ai1chakuAgreement.border}}>
