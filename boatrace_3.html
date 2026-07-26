@@ -1511,6 +1511,35 @@ function initRaces(){
   return r;
 }
 
+// 取り込んだCSVをブラウザに保存する機能（ページ再読み込み・再訪問後も復元できるように）。
+// このツールはブラウザ上で完結するReactアプリ（GitHub Pages等でホストする通常のWebページ）
+// であり、Claudeのアーティファクトのようなサンドボックスではないため、localStorageが問題なく使える。
+const RACES_STORAGE_KEY="boatrace_tool_races_v1";
+function loadRacesFromStorage(){
+  var base=initRaces();
+  try{
+    var raw=(typeof localStorage!=="undefined")?localStorage.getItem(RACES_STORAGE_KEY):null;
+    if(!raw)return base;
+    var saved=JSON.parse(raw);
+    return Object.assign({},base,saved); // 新しい会場・レース枠が増えていてもbaseで補完される
+  }catch(e){
+    return base;
+  }
+}
+function saveRacesToStorage(races){
+  if(typeof localStorage==="undefined")return {ok:false,msg:"このブラウザではローカル保存が使えません"};
+  try{
+    localStorage.setItem(RACES_STORAGE_KEY,JSON.stringify(races));
+    return {ok:true};
+  }catch(e){
+    return {ok:false,msg:"保存に失敗しました（容量オーバーの可能性があります）: "+e.message};
+  }
+}
+function clearRacesStorage(){
+  if(typeof localStorage==="undefined")return;
+  try{localStorage.removeItem(RACES_STORAGE_KEY);}catch(e){}
+}
+
 function parseCSVFull(text){
   if(text&&text.charCodeAt(0)===0xFEFF)text=text.slice(1); // 先頭のBOMを除去（Excel/BOATCAST等が付与することがあり、付いたままだとヘッダー1列目の判定が常に失敗する）
   var rows=[],cur="",inQ=false,row=[];
@@ -2027,7 +2056,12 @@ function App() {
   const [stPeriod,setStPeriod]=useState("今期");
   const [kimariPeriod,setKimariPeriod]=useState("直近6ヶ月");
   const [curRace,setCurRace]=useState(1);
-  const [races,setRaces]=useState(initRaces);
+  const [races,setRaces]=useState(loadRacesFromStorage);
+  const [saveStatusMsg,setSaveStatusMsg]=useState("");
+  useEffect(function(){
+    var r=saveRacesToStorage(races);
+    setSaveStatusMsg(r.ok?("✓ ブラウザに保存済み（"+new Date().toLocaleTimeString()+"）"):("⚠ "+r.msg));
+  },[races]);
   const [openPanel,setOpenPanel]=useState(null);
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
@@ -3360,6 +3394,16 @@ function App() {
               <input type="file" accept=".csv" onChange={handleCSV} style={{display:"none"}}/>
             </label>
             {csvMsg&&<span style={{fontSize:12,color:csvMsg.indexOf("✓")===0?"#5dd39e":"#ff8a80",fontWeight:700}}>{csvMsg}</span>}
+          </div>
+          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            {saveStatusMsg&&<span style={{fontSize:10,color:saveStatusMsg.indexOf("✓")===0?"#8fae9d":"#ff9b9b"}}>{saveStatusMsg}（このブラウザに自動保存され、再訪問時に復元されます）</span>}
+            <button onClick={function(){
+              if(window.confirm("保存済みの取り込みデータを消去します。よろしいですか？")){
+                clearRacesStorage();
+                setRaces(initRaces());
+                setSaveStatusMsg("");
+              }
+            }} style={{fontSize:10,color:"#8b9bae",background:"none",border:"1px solid #3a4a5c",borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>保存データを消去</button>
           </div>
         </div>
 
