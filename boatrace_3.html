@@ -34,7 +34,6 @@
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
-
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
   "蒲郡":7,"常滑":8,"津":9,"三国":10,"びわこ":11,"住之江":12,
@@ -81,7 +80,7 @@ function waveBucket(raw){
 const SHOW_VALUE_BETS = false;
 // 結果CSV・直前情報CSVの一括取込ブロック（分析用・開発用機能）の表示切替。
 // tsx単体で使う時はtrueのまま、HTMLビルド時にfalseへ書き換える。
-const SHOW_BULK_CSV_IMPORT = false;
+const SHOW_BULK_CSV_IMPORT = false; // HTML(GitHub Pages)版では結果CSV・直前情報CSVの一括取り込みは不要のため非表示
 // スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
 // 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
 const SHOW_HONMEI_TAIKO_ANA = false;
@@ -935,7 +934,151 @@ function computeAi1chakuFormationFixed(result,rd,venue,pointOverride){
   var isFallback=(cands.length===1&&cands[0]===1&&(rowsByBoat[1].aiP1Fixed||0)<=45);
   return {candidates:cands,bet:bet,isFallback:isFallback,alloc:alloc,origCandsLen:origCandsLen};
 }
-// V2とAI1着%（超鉄板＝候補1艇の場合の1点目同士）がどこまで一致しているかを判定。
+// ==================== 3連対率軸2頭流しフォーメーション（ユーザー考案・実験的） ====================
+// 1着：AI1着%候補（getAi1chakuCandidatesを流用、3艇になった場合は上位2艇に絞る＝既存ロジックと同じ）
+// 2着・3着の軸2艇：「直近1年の3連対率(実測・racerCatトグルに関係なく常に直近1年)」＋「AI3連対率
+// (ren3total、racerCatトグルに連動)」を足した値で、1着候補も含めた6艇をランキングし、1位と3位を軸にする。
+// 3着候補からはAI3連対率(ren3total)のみで見た最下位艇を除外する（軸2艇・フラッド側どちらの
+// 3着候補プールからも除外）。
+// 買い目は軸2艇の2頭流し：[1着固定]-[軸2艇]-[フラッド(軸2艇を除く4艇)] と
+// [1着固定]-[フラッド]-[軸2艇] の2ライン。
+function makeRen3AxisNagashiForAxis(rowsByBoat,axis){
+  var pool=[1,2,3,4,5,6].filter(function(b){return b!==axis;});
+  function combined(b){
+    var r=rowsByBoat[b];
+    return (r.ren3raw1y!=null?r.ren3raw1y:0)+(r.ren3total!=null?r.ren3total:0);
+  }
+  function ai3(b){
+    var r=rowsByBoat[b];
+    return r.ren3total!=null?r.ren3total:-1; // データ無しは最下位扱い
+  }
+  // 【修正】ランキングは1着候補(axis)も含めた6艇全体で行う（axisも他艇と同じ土俵で競わせ、
+  // 全体順位の1位・3位を見る）。1位・3位の実際の枠にaxis自身が来てしまった場合のみ
+  // （1着に使う艇を2・3着にも使えないため）、その枠だけ次点（1つ下の順位）にスライドする。
+  var ranked6=[1,2,3,4,5,6].slice().sort(function(a,b){return combined(b)-combined(a);});
+  function pickRankLiteral(idx0){ // idx0=0始まりの順位インデックス（0=1位,2=3位）
+    var b=ranked6[idx0];
+    return b===axis?ranked6[idx0+1]:b;
+  }
+  var axis1=pickRankLiteral(0),axis3=pickRankLiteral(2);
+  var axisPair=[axis1,axis3];
+  var worstAi3=pool.slice().sort(function(a,b){return ai3(a)-ai3(b);})[0];
+  var broadGroup=pool.filter(function(b){return b!==worstAi3;});
+  var seen={};
+  var triples=[];
+  function addLine(seconds,thirds){
+    seconds.forEach(function(s){
+      thirds.forEach(function(t){
+        if(s===t)return;
+        var key=axis+"-"+s+"-"+t;
+        if(seen[key])return;
+        seen[key]=true;
+        triples.push([axis,s,t]);
+      });
+    });
+  }
+  addLine(axisPair,broadGroup);
+  addLine(broadGroup,axisPair);
+  return {
+    axis:axis,axisPair:axisPair,broadGroup:broadGroup,worstAi3:worstAi3,
+    triples:triples,
+    lines:[
+      {second:axisPair.slice(),third:broadGroup.slice()},
+      {second:broadGroup.slice(),third:axisPair.slice()},
+    ],
+  };
+}
+// 加速可視化パネル（出足・中間速・伸び）と同じ計算式を移植した純関数版。
+// 展示タイム・直線タイムから等加速度モデルで出足(0m)・中間速(150m)・伸び(300m)の瞬間速度を推定し、
+// 6艇内で15〜100点にレンジ正規化する。6艇すべての展示・直線が揃っていない場合はnullを返す。
+function computeAccelScores(rd){
+  var boats=[1,2,3,4,5,6].map(function(b){
+    var inp=rd.inputs[b];
+    var tenji=parseFloat(inp.tenji),choku=parseFloat(inp.chokusen);
+    if(isNaN(tenji)||isNaN(choku))return null;
+    var v1=150/choku, v2=150/tenji;
+    var a=2*(v2-v1)/(choku+tenji);
+    return{b:b,deashi:v1-a*choku/2,chukan:v1+a*choku/2,nobi:v2+a*tenji/2};
+  });
+  if(boats.some(function(x){return x===null;}))return null;
+  function normScore(key){
+    var vals=boats.map(function(x){return x[key];});
+    var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+    var out={};
+    boats.forEach(function(x){out[x.b]=max===min?100:15+(x[key]-min)/(max-min)*85;});
+    return out;
+  }
+  var scoreDeashi=normScore("deashi"),scoreChukan=normScore("chukan"),scoreNobi=normScore("nobi");
+  var out={};
+  boats.forEach(function(x){
+    out[x.b]={deashi:x.deashi,chukan:x.chukan,nobi:x.nobi,
+      scoreDeashi:scoreDeashi[x.b],scoreChukan:scoreChukan[x.b],scoreNobi:scoreNobi[x.b]};
+  });
+  return out;
+}
+// 1着候補の選び方を「中間速＋伸びスコアの上位2艇」に差し替えた版（ユーザー考案）。
+// レースが対象になるかどうかの判定（発動条件）自体は既存のAI1着%基準（getAi1chakuCandidates、
+// 候補ちょうど2艇＝参加検討）のまま変えていない。1着に実際に使う艇だけを差し替える。
+function computeRen3AxisNagashiFormationAccel(result,rd,venue){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1==null)return null;
+  if(rowsByBoat[1].ren3total==null&&rowsByBoat[1].ren3raw1y==null)return null;
+  // 発動条件は既存のAI1着%基準のまま（候補2艇＝参加検討の時だけ）
+  var gateCands=getAi1chakuCandidates(rowsByBoat);
+  if(gateCands.length!==2)return null;
+  var accel=computeAccelScores(rd);
+  if(!accel)return null; // 展示・直線が6艇揃っていなければ非表示
+  var cands=[1,2,3,4,5,6].slice().sort(function(a,b){
+    return (accel[b].scoreChukan+accel[b].scoreNobi)-(accel[a].scoreChukan+accel[a].scoreNobi);
+  }).slice(0,2);
+  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis);});
+  var bet=[];
+  var seen={};
+  perAxis.forEach(function(pa){
+    pa.triples.forEach(function(t){
+      var key=t.join("-");
+      if(seen[key])return;
+      seen[key]=true;
+      bet.push(t);
+    });
+  });
+  return {candidates:cands,perAxis:perAxis,bet:bet,gateCands:gateCands,accelScores:cands.map(function(b){return {b:b,score:+(accel[b].scoreChukan+accel[b].scoreNobi).toFixed(1)};})};
+}
+function computeRen3AxisNagashiFormation(result,rd,venue){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1==null)return null;
+  if(rowsByBoat[1].ren3total==null&&rowsByBoat[1].ren3raw1y==null)return null; // 3連対率データが無ければ非表示
+  var cands=getAi1chakuCandidates(rowsByBoat);
+  if(cands.length===3){
+    cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
+  }
+  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis);});
+  var bet=[];
+  var seen={};
+  perAxis.forEach(function(pa){
+    pa.triples.forEach(function(t){
+      var key=t.join("-");
+      if(seen[key])return;
+      seen[key]=true;
+      bet.push(t);
+    });
+  });
+  return {candidates:cands,perAxis:perAxis,bet:bet};
+}
+
+
 // 201日・超鉄板レース24,024件の実測で、一致度が下がるほど段階的に回収率が悪化することを確認：
 // 完全一致142.34%／軸2着一致・3着のみ不一致136.78%／軸のみ一致・2着から不一致129.79%／
 // 軸から不一致115.31%。3着だけの不一致は許容範囲だが、軸（1着候補）が食い違うケースは
@@ -1155,6 +1298,8 @@ function computeResultForRd(venue,rd,racerCat){
       var rr=rows[i];
       var rs2=rd.racerStats;
       var base3=rs2&&rs2.ren3raw&&rs2.ren3raw[racerCat]?rs2.ren3raw[racerCat][rr.boat-1]:null;
+      var base3_1y=rs2&&rs2.ren3raw&&rs2.ren3raw["直近1年"]?rs2.ren3raw["直近1年"][rr.boat-1]:null;
+      rows[i].ren3raw1y=base3_1y!=null?base3_1y:null;
       if(base3!=null){
         var m3=rd.motors[rr.boat];
         var motorAdj3=m3&&m3.ren3!=null&&motorRen3Avg!=null?(m3.ren3-motorRen3Avg)*0.1:0;
@@ -2903,6 +3048,16 @@ function App() {
   const ai1chakuFixed=useMemo(function(){
     return computeAi1chakuFormationFixed(result,rd,venue,ai1PointMode);
   },[result,rd,venue,ai1PointMode]);
+  // 【追加・ユーザー考案】3連対率軸2頭流しフォーメーション（実験的・参考表示専用。
+  // V2ルーティングやisRaceSelectedには一切使わない）
+  // バックテストで「戸田＝中間速+伸びスコア版（加速版）、平和島＝AI1着%版」の組み合わせが
+  // 最良という結果が出たため（精度分析ログ追記128・131・132）、この2場のみ・それぞれの方式で表示する。
+  // それ以外の場では非表示（過学習リスクがあり他場への一般化はまだ検証していないため）。
+  const ren3AxisNagashi=useMemo(function(){
+    if(venue==="戸田")return computeRen3AxisNagashiFormationAccel(result,rd,venue);
+    if(venue==="平和島")return computeRen3AxisNagashiFormation(result,rd,venue);
+    return null;
+  },[result,rd,venue,racerCat]);
   const ai1chakuBalancedSynthOdds=useMemo(function(){
     if(!ai1chakuBalanced)return null;
     return synthesizeOdds(ai1chakuBalanced.bet,rd.odds3tan);
@@ -3723,7 +3878,8 @@ function App() {
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想1着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想2着率</th>}
                         {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762"}}>予想3着率</th>}
-                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#c084fc"}}>3連対率</th>}
+                        {result.racerRank&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#c084fc"}}>AI3連対率</th>}
+                        {rd.racerStats&&rd.racerStats.ren3raw&&<th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#9db5cc"}}>3連対率</th>}
                         <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#f9c513"}}>AI1着</th>
                         <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#5dd39e"}}>AI2着</th>
                         <th style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #2c4762",color:"#7db4e8"}}>AI3着</th>
@@ -3790,6 +3946,7 @@ function App() {
                             {result.racerRank&&pctC(r.racerR2final)}
                             {result.racerRank&&pctC(r.racerR3final)}
                             {result.racerRank&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:r.ren3total!=null?"#c084fc":"#4a5d70"}}>{r.ren3total!=null?(fmt(r.ren3total,1)+"%"):"―"}</td>}
+                            {rd.racerStats&&rd.racerStats.ren3raw&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:600,color:r.ren3raw1y!=null?"#9db5cc":"#4a5d70"}}>{r.ren3raw1y!=null?(fmt(r.ren3raw1y,1)+"%"):"―"}</td>}
                             <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#f9c513"}}>{r.aiP1!=null?r.aiP1+"%":"―"}</td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#5dd39e"}}>{r.aiP2!=null?r.aiP2+"%":"―"}</td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#7db4e8"}}>{r.aiP3!=null?r.aiP3+"%":"―"}</td>
@@ -4302,6 +4459,37 @@ function App() {
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>橙枠＋NEW＝ベース型の買い目には無い組番（修正版が新たに拾っている分）</div>
                         </div>
                       )}
+                      {ren3AxisNagashi&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#c084fc",marginBottom:4}}>🧭 3連対率軸2頭流し（{venue==="戸田"?"加速版：中間速+伸びスコア":"AI1着%版"}・戸田/平和島限定・バックテスト済み）</div>
+                          <div style={{fontSize:10,color:"#b3bdcc",marginBottom:6,lineHeight:1.5}}>
+                            1着はAI1着%候補（上と同じ）。2着・3着の軸2艇は「直近1年3連対率（実測）＋AI3連対率」の合計値で1着候補も含めた6艇をランキングし、1位・3位の艇。
+                            3着候補からはAI3連対率のみで見た最下位艇を除外。軸2艇の2頭流し（[軸2艇]-[残り艇]と[残り艇]-[軸2艇]の2ライン）。まだ回収率の検証はしていません。
+                          </div>
+                          {ren3AxisNagashi.perAxis.map(function(pa,pi){
+                            return (
+                              <div key={pi} style={{marginBottom:8}}>
+                                <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                                  1着{pa.axis}号艇軸：2・3着軸＝{pa.axisPair.join("・")}号艇（3連対率合計1位・3位）／除外（AI3連対率最下位）＝{pa.worstAi3}号艇／フラッド＝{pa.broadGroup.join("・")}号艇
+                                </div>
+                                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                  {pa.triples.map(function(t,ti){
+                                    var key=t[0]+"-"+t[1]+"-"+t[2];
+                                    var o=rd.odds3tan&&rd.odds3tan[key];
+                                    return (
+                                      <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                        <span style={{fontSize:13,fontWeight:700,color:"#c084fc",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                        {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{ren3AxisNagashi.bet.length}点（軸が2艇の場合は候補ごとの点数を合算）</div>
+                        </div>
+                      )}
                       <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2a2140"}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff",marginBottom:6}}>🖥️ finalize_bet.py 実行コマンドをコピー</div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
@@ -4590,7 +4778,6 @@ function App() {
     </div>
   );
 }
-
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
