@@ -950,31 +950,46 @@ function computeAi1chakuFormationFixed(result,rd,venue,pointOverride){
 // ==================== 3連対率軸2頭流しフォーメーション（ユーザー考案・実験的） ====================
 // 1着：AI1着%候補（getAi1chakuCandidatesを流用、3艇になった場合は上位2艇に絞る＝既存ロジックと同じ）
 // 2着・3着の軸2艇：「直近1年の3連対率(実測・racerCatトグルに関係なく常に直近1年)」＋「AI3連対率
-// (ren3total、racerCatトグルに連動)」を足した値で、1着候補も含めた6艇をランキングし、1位と3位を軸にする。
-// 3着候補からはAI3連対率(ren3total)のみで見た最下位艇を除外する（軸2艇・フラッド側どちらの
-// 3着候補プールからも除外）。
+// (ren3total、racerCatトグルに連動)」を足した値で6艇全体をランキングした1位・3位。
+// 【2026-07-26修正】この軸2艇は1着候補がどちらであっても同じ（1着艇を除外して選び直すことはしない）。
+// レース単位で1回だけ計算し、両方の1着候補で共有する。1着候補自身が軸に含まれる場合は、
+// その1着候補自身の買い目を作る時だけその艇を軸から除いて使う（同じ艇が1着と2/3着を兼ねられないため）。
+// 3着候補からはAI3連対率(ren3total)のみで見た最下位艇を除外する（1着候補ごとに、その艇を除いた
+// 5艇プールの中で計算＝この部分は従来通り）。
 // 買い目は軸2艇の2頭流し：[1着固定]-[軸2艇]-[フラッド(軸2艇を除く4艇)] と
 // [1着固定]-[フラッド]-[軸2艇] の2ライン。
-function makeRen3AxisNagashiForAxis(rowsByBoat,axis){
-  var pool=[1,2,3,4,5,6].filter(function(b){return b!==axis;});
+function computeGlobalRen3AxisPair(rowsByBoat){
   function combined(b){
     var r=rowsByBoat[b];
     return (r.ren3raw1y!=null?r.ren3raw1y:0)+(r.ren3total!=null?r.ren3total:0);
   }
+  var ranked6=[1,2,3,4,5,6].slice().sort(function(a,b){return combined(b)-combined(a);});
+  return [ranked6[0],ranked6[2]]; // 1位・3位（1着候補による除外・スライドはしない）
+}
+function makeRen3AxisNagashiForAxis(rowsByBoat,axis,globalAxisPair,usePerAxisRanking){
+  var pool=[1,2,3,4,5,6].filter(function(b){return b!==axis;});
   function ai3(b){
     var r=rowsByBoat[b];
     return r.ren3total!=null?r.ren3total:-1; // データ無しは最下位扱い
   }
-  // 【修正】ランキングは1着候補(axis)も含めた6艇全体で行う（axisも他艇と同じ土俵で競わせ、
-  // 全体順位の1位・3位を見る）。1位・3位の実際の枠にaxis自身が来てしまった場合のみ
-  // （1着に使う艇を2・3着にも使えないため）、その枠だけ次点（1つ下の順位）にスライドする。
-  var ranked6=[1,2,3,4,5,6].slice().sort(function(a,b){return combined(b)-combined(a);});
-  function pickRankLiteral(idx0){ // idx0=0始まりの順位インデックス（0=1位,2=3位）
-    var b=ranked6[idx0];
-    return b===axis?ranked6[idx0+1]:b;
+  var axisPair;
+  if(usePerAxisRanking){
+    // 【旧ロジック・戸田/鳴門限定で継続使用】1着候補(axis)ごとにランキングし直す。
+    // 6艇全体でランキングし、1位・3位の枠にaxis自身が来た場合のみその枠を次点にスライド。
+    function combined(b){
+      var r=rowsByBoat[b];
+      return (r.ren3raw1y!=null?r.ren3raw1y:0)+(r.ren3total!=null?r.ren3total:0);
+    }
+    var ranked6=[1,2,3,4,5,6].slice().sort(function(a,b){return combined(b)-combined(a);});
+    function pickRankLiteral(idx0){
+      var b=ranked6[idx0];
+      return b===axis?ranked6[idx0+1]:b;
+    }
+    axisPair=[pickRankLiteral(0),pickRankLiteral(2)];
+  }else{
+    if(!globalAxisPair)globalAxisPair=computeGlobalRen3AxisPair(rowsByBoat);
+    axisPair=globalAxisPair.filter(function(b){return b!==axis;});
   }
-  var axis1=pickRankLiteral(0),axis3=pickRankLiteral(2);
-  var axisPair=[axis1,axis3];
   var worstAi3=pool.slice().sort(function(a,b){return ai3(a)-ai3(b);})[0];
   var broadGroup=pool.filter(function(b){return b!==worstAi3;});
   var seen={};
@@ -1050,7 +1065,10 @@ function computeRen3AxisNagashiFormationAccel(result,rd,venue){
   var cands=[1,2,3,4,5,6].slice().sort(function(a,b){
     return (accel[b].scoreChukan+accel[b].scoreNobi)-(accel[a].scoreChukan+accel[a].scoreNobi);
   }).slice(0,2);
-  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis);});
+  // 戸田・鳴門は旧ロジック（1着候補ごとに軸を再計算）を継続。三国など新規会場は新ロジック（軸共通）。
+  var usePerAxisRanking=(venue==="戸田"||venue==="鳴門");
+  var globalAxisPair=usePerAxisRanking?null:computeGlobalRen3AxisPair(rowsByBoat);
+  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis,globalAxisPair,usePerAxisRanking);});
   var bet=[];
   var seen={};
   perAxis.forEach(function(pa){
@@ -1077,7 +1095,8 @@ function computeRen3AxisNagashiFormation(result,rd,venue){
   if(cands.length===3){
     cands=cands.slice().sort(function(a,b){return (rowsByBoat[b].aiP1||0)-(rowsByBoat[a].aiP1||0);}).slice(0,2);
   }
-  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis);});
+  var globalAxisPair=computeGlobalRen3AxisPair(rowsByBoat);
+  var perAxis=cands.map(function(axis){return makeRen3AxisNagashiForAxis(rowsByBoat,axis,globalAxisPair);});
   var bet=[];
   var seen={};
   perAxis.forEach(function(pa){
