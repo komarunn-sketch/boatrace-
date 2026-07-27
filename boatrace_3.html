@@ -2382,7 +2382,7 @@ function App() {
   // （精度分析ログ参照）、各フォーメーションはそれぞれ専用の期間で計算する。画面上部の選手成績期間トグル
   // （racerCat、上のresult）は生データ一覧表示にのみ使う。
   const AI1CHAKU_RACER_CAT="直近6ヶ月"; // 回収率142.7%（直近1年の114.0%より良好）
-  const REN3_RACER_CAT="直近1年"; // 回収率159.5%（他の期間より良好）
+  const REN3_RACER_CAT="直近6ヶ月"; // 2026-07-27: 207日規模の再検証で直近1年(115.8%)より直近6ヶ月(146.1%)が良好と判明し変更
   const B1_FIXED_RACER_CAT="直近3ヶ月"; // 回収率130.4%（直近1年の112.2%より良好、当地は異常値のため除外）
   const resultForAi1=useMemo(function(){
     return computeResultForRd(venue,rd,AI1CHAKU_RACER_CAT);
