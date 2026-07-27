@@ -1296,10 +1296,12 @@ function compressFormation(combos){
 }
 
 // 今節F持ち(実測)による1着率補正の掛け目（実験的・2026-07-24セッションで導入）。
-// 85日分・艇番別層別分析（精度分析ログ追記130）の実測比率（F持ち1着率／F無し1着率）を元に、
-// サンプル数が少なく方向性も一貫しない艇番1・4は補正なし(1.00)、艇番2・3・5・6は
-// 一貫してF無しより低かった実測比率を安全側に丸めて採用。要フォワードテスト。
-const FHOLD_WIN_MULT = {1:1.00, 2:0.85, 3:0.85, 4:1.00, 5:0.93, 6:0.93};
+// 【2026-07-26訂正・再較正】F持ち判定を`F数(期)≥1`ベースに修正した後、87日分・艇番別層別分析
+// （n=4,618件、精度分析ログ追記145・146）で再計測した実測比率（F持ち1着率／F無し1着率）に
+// 差し替え。今回は全艇番で一貫してF持ちの方が低い（以前の「艇番1・4はサンプル不足で判断不能」から
+// 変化）。ただしバックテストでは回収率への効果は依然ほぼ誤差レベル（±0.3pt程度）だったため、
+// 実運用上の優先度は低いままだが、係数自体はより正確なものに更新。
+const FHOLD_WIN_MULT = {1:0.979, 2:0.985, 3:0.970, 4:0.880, 5:0.848, 6:0.827};
 
 function computeResultForRd(venue,rd,racerCat){
     if(!venue)return null;
@@ -1660,25 +1662,30 @@ function parseNewCSV(allRows){
       if(!base.tokuten)base.tokuten={};
       base.tokuten[b]={rate:pf(row[149]),score:pf(row[150]),minus:pf(row[151]),nodes:pi(row[152])};
       base.motors[b]={ren2:pf(row[142]),ren3:pf(row[143]),rank:pi(row[139]),rate:pf(row[141])};
-      // 【追加】F数/L数（実測、boatrace.jp由来、ただし「期」＝5/1・11/1リセットの約6ヶ月間ベース。
-      // 表示用の参考値としては使うが、今節（節間）の状態を示す信号としては粒度が粗すぎる）。
-      // fHold（今節F持ち判定）自体は、今節成績ブロックから直接抽出した「今節F持ち(実測)」列
-      // （節初日〜前レースまでの実際の着順に「Ｆ」があるかどうか、リークなし・今節ベースで正確）を
-      // 最優先で使う。無ければ従来通りF数(期)→今節F持ち(Bファイル)の順にフォールバック
-      // （精度分析ログ追記124・130参照。誤検出はほぼ無いが見逃しが多い粗い信号）。
+      // 【追加】F数/L数（実測、boatrace.jp由来、「期」＝5/1・11/1リセットの約6ヶ月間ベース）。
+      // 【2026-07-26訂正】フライングは節をまたいでも消えず、リセットは年2回（期の切り替わり）のみ。
+      // つまり「今節中にFがあったか」ではなく「F数(期)が1以上あるか」こそが、現在F持ちかどうかの
+      // 正しい判定基準（精度分析ログ追記145参照）。fHold（F持ち判定）はF数(期)≥1を主に使う。
+      // 今節F持ち(実測)は「今節中に実際にFが発生したか」という別の狭い情報としてfHoldTodayに保持し、
+      // F持ち判定そのもの（fHold）には使わない。F数(期)が取得できずBファイルの今節フラグしか無い日は
+      // 従来通りフォールバックとして使う（不完全略）。
       var fCnt=flColIdx["F数"]>=0?pi(row[flColIdx["F数"]]):null;
       var lCnt=flColIdx["L数"]>=0?pi(row[flColIdx["L数"]]):null;
       var konsetsuF=flColIdx["今節F持ち(実測)"]>=0?pi(row[flColIdx["今節F持ち(実測)"]]):null;
       var konsetsuL=flColIdx["今節L持ち(実測)"]>=0?pi(row[flColIdx["今節L持ち(実測)"]]):null;
-      if(fCnt==null&&flColIdx["今節F持ち(Bファイル)"]>=0){
-        var bflag=pi(row[flColIdx["今節F持ち(Bファイル)"]]);
-        if(bflag===1)fCnt=1; // Bファイル由来と分かるよう、fCountsには後段でsource情報を付与
+      var bflagForFallback=null;
+      if(flColIdx["今節F持ち(Bファイル)"]>=0){
+        bflagForFallback=pi(row[flColIdx["今節F持ち(Bファイル)"]]);
       }
-      if(fCnt!=null||lCnt!=null||konsetsuF!=null){
+      if(fCnt!=null||lCnt!=null||konsetsuF!=null||bflagForFallback!=null){
         if(!base.fCounts)base.fCounts={1:null,2:null,3:null,4:null,5:null,6:null};
         if(!base.fHold)base.fHold={1:false,2:false,3:false,4:false,5:false,6:false};
+        if(!base.fHoldToday)base.fHoldToday={1:false,2:false,3:false,4:false,5:false,6:false};
         base.fCounts[b]={f:fCnt||0,l:lCnt||0};
-        base.fHold[b]=konsetsuF!=null?konsetsuF===1:(fCnt||0)>=1;
+        // F持ち判定はF数(期)≥1が主。F数が取得できない日だけBファイルの今節フラグにフォールバック
+        // （Bファイルは今節ベースの粗い代替信号のため、期の情報が無い場合の次善策として使う）。
+        base.fHold[b]=fCnt!=null?fCnt>=1:(bflagForFallback===1);
+        base.fHoldToday[b]=konsetsuF===1; // 参考情報：今節中に実際にFが発生したか（F持ち判定には使わない）
       }
     }
     base.racerClass=racerClass;
