@@ -4233,6 +4233,91 @@ function App() {
                 </div>
               </div>
             )}
+
+            {aiEval&&(
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:12,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>評価内訳（項目別グラフ）</div>
+                <div style={{display:"grid",gap:10}}>
+                  {(function(){
+                    function rankPts(getVal){
+                      var arr=aiEval.ranked.map(function(r){return {boat:r.boat,v:getVal(r)};});
+                      var sorted=arr.slice().sort(function(a,b){
+                        var av=a.v==null?-Infinity:a.v, bv=b.v==null?-Infinity:b.v;
+                        return bv-av;
+                      });
+                      var pts={};var lastV=null,lastPts=null;
+                      sorted.forEach(function(item,idx){
+                        var p;
+                        if(lastV!==null&&item.v===lastV)p=lastPts;
+                        else p=Math.max(0,5-idx)*2;
+                        pts[item.boat]=item.v==null?null:p;
+                        lastV=item.v;lastPts=p;
+                      });
+                      return pts;
+                    }
+                    var effSt={};
+                    if(slit){slit.forEach(function(s){effSt[s.boat]=s.st;});}
+                    var ptSeiseki=rankPts(function(r){return r.racerR1final;});
+                    var ptTenji=rankPts(function(r){return r.diff;});
+                    var ptMotor=rankPts(function(r){return r.motorRen2;});
+                    var ptRen3=rankPts(function(r){return r.ren3total;});
+                    var ptSt=rankPts(function(r){return effSt[r.boat]!=null?-effSt[r.boat]:null;});
+                    var ptKimari=rankPts(function(r){
+                      var kc=rd.kimariCount;
+                      if(!kc)return null;
+                      var arr=r.boat===1?kc.nige:kc.sashi;
+                      if(!arr||arr[r.boat-1]==null)return null;
+                      var cnt=arr[r.boat-1];
+                      var tot=rd.racerRaceCount&&rd.racerRaceCount[r.boat-1];
+                      return tot?cnt/tot*100:cnt;
+                    });
+                    var accelScores=computeAccelScores(rd);
+                    var ptAccel=rankPts(function(r){
+                      if(!accelScores||!accelScores[r.boat])return null;
+                      return accelScores[r.boat].scoreChukan+accelScores[r.boat].scoreNobi;
+                    });
+                    var CATS=[
+                      {label:"成績",pts:ptSeiseki,color:"#3d7ab8"},
+                      {label:"展示",pts:ptTenji,color:"#5dd39e"},
+                      {label:"モーター",pts:ptMotor,color:"#f9c513"},
+                      {label:"3連対率",pts:ptRen3,color:"#9c5ec7"},
+                      {label:"ST",pts:ptSt,color:"#e08a8a"},
+                      {label:"決まり手",pts:ptKimari,color:"#7db4e8"},
+                      {label:"加速",pts:ptAccel,color:"#6fd6c4"},
+                    ];
+                    return aiEval.ranked.map(function(r){
+                      var total=0;
+                      CATS.forEach(function(cat){var v=cat.pts[r.boat];if(v!=null)total+=v;});
+                      return (
+                        <div key={r.boat} style={{background:"#16273c",borderRadius:10,padding:"10px 12px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                            <LB b={r.boat}/>
+                            <span style={{fontSize:11,color:"#a9cbea"}}>{r.course}C</span>
+                            {rd.fHold[r.boat]&&<span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:"#3a1a1a",color:"#ff8a80",border:"1px solid #6b3530"}}>F持ち</span>}
+                            <span style={{marginLeft:"auto",fontSize:20,fontWeight:800,color:"#f9c513"}}>{total}<span style={{fontSize:11,color:"#a9cbea",fontWeight:400}}> /70</span></span>
+                          </div>
+                          <div style={{display:"grid",gap:4}}>
+                            {CATS.map(function(cat){
+                              var v=cat.pts[r.boat];
+                              var has=v!=null;
+                              return (
+                                <div key={cat.label} style={{display:"flex",alignItems:"center",gap:6}}>
+                                  <span style={{width:52,fontSize:10,color:"#a9cbea",flexShrink:0}}>{cat.label}</span>
+                                  <div style={{flex:1,height:10,background:"#0e1b2c",borderRadius:3,overflow:"hidden"}}>
+                                    {has&&<div style={{width:(v*10)+"%",height:"100%",background:cat.color}}/>}
+                                  </div>
+                                  <span style={{width:20,fontSize:10,color:"#a9cbea",textAlign:"right",flexShrink:0}}>{has?v:"―"}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
