@@ -4256,7 +4256,7 @@ function App() {
                       return pts;
                     }
                     var effSt={};
-                    for(var b=1;b<=6;b++){if(rd.sts[b]!=="")effSt[b]=rd.fHold[b]&&rd.fSts[b]!==""?parseFloat(rd.fSts[b]):parseFloat(rd.sts[b]);}
+                    if(slit){slit.forEach(function(s){effSt[s.boat]=s.st;});}
                     var ptSeiseki=rankPts(function(r){return r.racerR1final;});
                     var ptTenji=rankPts(function(r){return r.diff;});
                     var ptMotor=rankPts(function(r){return r.motorRen2;});
