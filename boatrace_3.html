@@ -3230,21 +3230,13 @@ function App() {
   },[resultForAi1,rd,venue,ai1PointMode]);
   // 【追加・ユーザー考案】3連対率軸2頭流しフォーメーション（実験的・参考表示専用。
   // V2ルーティングやisRaceSelectedには一切使わない）
-  // 会場別に「AI1着%版」「加速版（中間速+伸びスコア）」のどちらが効くかは会場ごとに異なるため、
-  // 206日全量・全会場のバックテストで会場ごとに最良の方式を選定（精度分析ログ追記128・131・132・137）。
-  // サンプル数30以上・回収率100%超を目安に、2026-07-26時点で以下7場に展開。それ以外の場では非表示
-  // （過学習リスクがあり残りの会場への一般化はまだ検証していないため）。選手成績期間は専用の
-  // REN3_RACER_CAT（直近1年）固定。
-  const REN3_AXIS_VENUE_METHOD={
-    "戸田":"accel","平和島":"ai1chaku",
-    "丸亀":"ai1chaku","常滑":"ai1chaku","多摩川":"ai1chaku",
-    "三国":"accel","鳴門":"accel",
-  };
+  // 会場別に「AI1着%版」「加速版（中間速+伸びスコア）」のどちらが効くかは会場ごとに異なるとしていたが、
+  // 【2026-07-27変更】207日規模の再検証（進入変更バグ修正後のパイプライン）で、加速版はどの会場でも
+  // AI1着%版に大きく劣ることが判明（例：戸田146.0%対68.2%、三国172.3%対76.0%）。AI1着%版で
+  // 全24会場を検証したところ残23会場が回収率100%超えだったため、対応会場を全24会場にAI1着%版のみで展開に変更。選手成績期間は専用の
+  // REN3_RACER_CAT（直近6ヶ月、2026-07-27変更）固定。
   const ren3AxisNagashi=useMemo(function(){
-    var method=REN3_AXIS_VENUE_METHOD[venue];
-    if(method==="accel")return computeRen3AxisNagashiFormationAccel(resultForRen3,rd,venue);
-    if(method==="ai1chaku")return computeRen3AxisNagashiFormation(resultForRen3,rd,venue);
-    return null;
+    return computeRen3AxisNagashiFormation(resultForRen3,rd,venue);
   },[resultForRen3,rd,venue]);
   // 【追加・ユーザー考案】1号艇固定・イン逃げ狙いフォーメーション（実験的）。全24会場対象。
   // 1号艇のaiP1が60%以上・展示ありの時だけ発動（精度分析ログ参照。閾値を外すと回収率が悪化する
