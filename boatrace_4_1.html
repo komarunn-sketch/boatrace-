@@ -4257,19 +4257,25 @@ function App() {
                     }
                     var effSt={};
                     if(slit){slit.forEach(function(s){effSt[s.boat]=s.st;});}
+                    var km=rd.kimari?rd.kimari[kimariPeriod]:null;
                     var ptSeiseki=rankPts(function(r){return r.racerR1final;});
                     var ptTenji=rankPts(function(r){return r.diff;});
                     var ptMotor=rankPts(function(r){return r.motorRen2;});
-                    var ptWaku=rankPts(function(r){return r.final1;});
+                    var ptRen3=rankPts(function(r){return r.ren3total;});
                     var ptSt=rankPts(function(r){return effSt[r.boat]!=null?-effSt[r.boat]:null;});
-                    var ptKaze=rankPts(function(r){return rd.wind==="無風"?null:r.windAdj;});
+                    var ptKimari=rankPts(function(r){
+                      if(!km)return null;
+                      if(r.boat===1)return km.nige!=null?km.nige:null;
+                      var idx=r.boat-2;
+                      return (km.sashi&&km.sashi[idx]!=null)?km.sashi[idx]:null;
+                    });
                     var CATS=[
                       {label:"成績",pts:ptSeiseki,color:"#3d7ab8"},
                       {label:"展示",pts:ptTenji,color:"#5dd39e"},
                       {label:"モーター",pts:ptMotor,color:"#f9c513"},
-                      {label:"枠基準",pts:ptWaku,color:"#9c5ec7"},
+                      {label:"3連対率",pts:ptRen3,color:"#9c5ec7"},
                       {label:"ST",pts:ptSt,color:"#e08a8a"},
-                      {label:"風",pts:ptKaze,color:"#7db4e8"},
+                      {label:"決まり手",pts:ptKimari,color:"#7db4e8"},
                     ];
                     return aiEval.ranked.map(function(r){
                       return (
@@ -4277,6 +4283,7 @@ function App() {
                           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                             <LB b={r.boat}/>
                             <span style={{fontSize:11,color:"#a9cbea"}}>{r.course}C</span>
+                            {rd.fHold[r.boat]&&<span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:"#3a1a1a",color:"#ff8a80",border:"1px solid #6b3530"}}>F持ち</span>}
                           </div>
                           <div style={{display:"grid",gap:4}}>
                             {CATS.map(function(cat){
