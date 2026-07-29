@@ -2489,18 +2489,28 @@ function App() {
         var v2res=computeV2FromRd(rr,venue,v2RacerCat);
         if(v2res&&v2res.combos_ranked&&v2res.combos_ranked.length)v2Conf=v2res.combos_ranked[0].joint;
       }catch(e){}
+      var ren3Conf=null;
+      try{
+        var resRen3ForConf=computeResultForRd(venue,rr,REN3_RACER_CAT);
+        var ren3form=resRen3ForConf?computeRen3AxisNagashiFormation(resRen3ForConf,rr,venue):null;
+        if(ren3form&&ren3form.candidates&&ren3form.candidates.length){
+          var rowsByBoatConf={};
+          resRen3ForConf.rows.forEach(function(r){rowsByBoatConf[r.boat]=r;});
+          ren3Conf=Math.max.apply(null,ren3form.candidates.map(function(b){return rowsByBoatConf[b]?(rowsByBoatConf[b].aiP1||0):0;}));
+        }
+      }catch(e){}
       try{resB1=computeResultForRd(venue,rr,B1_FIXED_RACER_CAT);}catch(e){resB1=null;}
       var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
-      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf};continue;}
+      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf};continue;}
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
       // 展示なしだとこの戦略は逆効果なため）。
       if(resB1&&!resB1.hasTime){
         var b1row=resB1.rows.filter(function(r){return r.boat===1;})[0];
-        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf};continue;}
+        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf,ren3Conf:ren3Conf};continue;}
       }
-      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf};
+      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf,ren3Conf:ren3Conf};
     }
     return out;
   },[venue,races,v2RacerCat]);
@@ -3733,6 +3743,7 @@ function App() {
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
                   {recType&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":recType==="v2"?"#5dd39e":"#c9a8ff"}}>{recType==="b1fixed"?"イン逃げ":recType==="b1fixed_pending"?"イン逃げ?":recType==="v2"?"V2":"AI1着%"}</div>}
                   {rec&&rec.v2Conf!=null&&<div style={{fontSize:7,lineHeight:1,marginTop:1,color:rec.v2Conf>=V2_SUICHI_CONF_THRESH?"#5dd39e":"#6b7d94"}}>V2確信{(rec.v2Conf*100).toFixed(0)}%</div>}
+                  {rec&&rec.ren3Conf!=null&&<div style={{fontSize:7,lineHeight:1,marginTop:1,color:"#c084fc"}}>3軸確信{rec.ren3Conf.toFixed(0)}%</div>}
                   <div style={{position:"absolute",bottom:3,left:0,right:0,display:"flex",justifyContent:"center",gap:2}}>
                     {hasBas&&<div style={{width:5,height:5,borderRadius:"50%",background:"#5dd39e"}}/>}
                     {hasTen&&<div style={{width:5,height:5,borderRadius:"50%",background:"#f9c513"}}/>}
@@ -3741,7 +3752,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上） ● 3軸確信N%＝3連対率軸2頭流しの軸候補の最大aiP1（207日実測でこの値の上位15〜20件/日に絞ると回収率144%前後を維持しつつ最大連敗を半減できることを確認済み。絞りすぎ（50%以上等）は逆に回収率が急落するため要注意）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
