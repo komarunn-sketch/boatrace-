@@ -2411,21 +2411,30 @@ function App() {
       if(!resAi1)continue;
       var f=computeAi1chakuFormationBalanced(resAi1,rr,venue,null);
       if(!f)continue;
+      // V2確信度（本命軸の2・3着同時的中確率、combos_ranked[0].joint）。V2向き・AI1着%向き・
+      // イン逃げ狙いいずれのタグでも算出し、レース選択ボタンに%表示する。207日規模の実測で、
+      // V2はこの値の上位20〜25件/日に絞っても回収率150%前後を維持しつつ最大連敗を半減できることを確認済み
+      // （精度分析ログ参照）。1日の実処理可能件数に絞る際の優先順位付けに使う想定。
+      var v2Conf=null;
+      try{
+        var v2res=computeV2FromRd(rr,venue,v2RacerCat);
+        if(v2res&&v2res.combos_ranked&&v2res.combos_ranked.length)v2Conf=v2res.combos_ranked[0].joint;
+      }catch(e){}
       try{resB1=computeResultForRd(venue,rr,B1_FIXED_RACER_CAT);}catch(e){resB1=null;}
       var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
-      if(b1f){out[n]="b1fixed";continue;}
+      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf};continue;}
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
       // 展示なしだとこの戦略は逆効果なため）。
       if(resB1&&!resB1.hasTime){
         var b1row=resB1.rows.filter(function(r){return r.boat===1;})[0];
-        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]="b1fixed_pending";continue;}
+        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf};continue;}
       }
-      out[n]=f.candidates.length===1?"v2":"ai1";
+      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf};
     }
     return out;
-  },[venue,races]);
+  },[venue,races,v2RacerCat]);
 
   const kimariByBoat=useMemo(function(){
     if(!rd.kimariCount||!result)return null;
@@ -3641,18 +3650,20 @@ function App() {
               var r=races[rk(venue,n)]||emptyRace();
               var hasBas=r.racerStats!=null||r.stTable!=null||r.motors[1]!=null;
               var hasTen=Object.values(r.inputs).some(function(inp){return inp.tenji!=="";});
-              var rec=raceRecommendations[n]; // "b1fixed" | "b1fixed_pending" | "v2" | "ai1" | undefined
+              var rec=raceRecommendations[n]; // {type:"b1fixed"|"b1fixed_pending"|"v2"|"ai1",v2Conf:number|null} | undefined
+              var recType=rec&&rec.type;
               var isActive=curRace===n;
-              var isB1=rec==="b1fixed"||rec==="b1fixed_pending";
-              var bg=isActive?"#2c4762":isB1?"#123a42":rec==="v2"?"#1a3b2a":rec==="ai1"?"#2a1a3b":"#16273c";
-              var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":rec==="v2"?"#2e9e6b":rec==="ai1"?"#7e4a9e":"#2c4762";
-              var borderW=isActive?"2px solid":(rec==="b1fixed_pending"?"1px dashed":"1px solid");
-              var textColor=isActive?"#fff":isB1?"#5dc9f9":rec==="v2"?"#5dd39e":rec==="ai1"?"#c9a8ff":"#9db5cc";
+              var isB1=recType==="b1fixed"||recType==="b1fixed_pending";
+              var bg=isActive?"#2c4762":isB1?"#123a42":recType==="v2"?"#1a3b2a":recType==="ai1"?"#2a1a3b":"#16273c";
+              var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":recType==="v2"?"#2e9e6b":recType==="ai1"?"#7e4a9e":"#2c4762";
+              var borderW=isActive?"2px solid":(recType==="b1fixed_pending"?"1px dashed":"1px solid");
+              var textColor=isActive?"#fff":isB1?"#5dc9f9":recType==="v2"?"#5dd39e":recType==="ai1"?"#c9a8ff":"#9db5cc";
               return (
                 <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:44,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative"}}>
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
-                  {rec&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":rec==="v2"?"#5dd39e":"#c9a8ff"}}>{rec==="b1fixed"?"イン逃げ":rec==="b1fixed_pending"?"イン逃げ?":rec==="v2"?"V2":"AI1着%"}</div>}
+                  {recType&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":recType==="v2"?"#5dd39e":"#c9a8ff"}}>{recType==="b1fixed"?"イン逃げ":recType==="b1fixed_pending"?"イン逃げ?":recType==="v2"?"V2":"AI1着%"}</div>}
+                  {rec&&rec.v2Conf!=null&&<div style={{fontSize:7,lineHeight:1,marginTop:1,color:rec.v2Conf>=V2_SUICHI_CONF_THRESH?"#5dd39e":"#6b7d94"}}>V2確信{(rec.v2Conf*100).toFixed(0)}%</div>}
                   <div style={{position:"absolute",bottom:3,left:0,right:0,display:"flex",justifyContent:"center",gap:2}}>
                     {hasBas&&<div style={{width:5,height:5,borderRadius:"50%",background:"#5dd39e"}}/>}
                     {hasTen&&<div style={{width:5,height:5,borderRadius:"50%",background:"#f9c513"}}/>}
@@ -3661,7 +3672,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
