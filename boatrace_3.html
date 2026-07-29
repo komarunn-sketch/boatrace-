@@ -1142,6 +1142,72 @@ function computeB1FixedRen3Axis(result,rd,venue){
   return {axis:1,axisPair:form.axisPair,broadGroup:form.broadGroup,worstAi3:form.worstAi3,bet:form.triples};
 }
 
+const COMPOSITE_TOP8_VENUES=["津","蒲郡","福岡","三国","丸亀","多摩川","下関","常滑"];
+const COMPOSITE_GAP_THRESHOLD=6;
+function compositeRankPts(rows,getVal){
+  var arr=rows.map(function(r){return {boat:r.boat,v:getVal(r)};});
+  var sorted=arr.slice().sort(function(a,b){
+    var av=a.v==null?-Infinity:a.v, bv=b.v==null?-Infinity:b.v;
+    return bv-av;
+  });
+  var pts={};var lastV=null,lastPts=null;
+  sorted.forEach(function(item,idx){
+    var p;
+    if(lastV!==null&&item.v===lastV)p=lastPts;
+    else p=Math.max(0,5-idx)*2;
+    pts[item.boat]=item.v==null?null:p;
+    lastV=item.v;lastPts=p;
+  });
+  return pts;
+}
+function compositePermutations(arr){
+  var out=[];
+  for(var i=0;i<arr.length;i++)for(var j=0;j<arr.length;j++){
+    if(i===j)continue;
+    out.push([arr[i],arr[j]]);
+  }
+  return out;
+}
+function computeCompositeFormation(result,rd,venue){
+  if(COMPOSITE_TOP8_VENUES.indexOf(venue)<0)return null;
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var accel=computeAccelScores(rd);
+  if(!accel)return null;
+  var rows=result.rows;
+  var ptSeiseki=compositeRankPts(rows,function(r){return r.racerR1final;});
+  var ptTenji=compositeRankPts(rows,function(r){return r.diff;});
+  var ptMotor=compositeRankPts(rows,function(r){return rd.motors[r.boat]&&rd.motors[r.boat].ren2!=null?rd.motors[r.boat].ren2:null;});
+  var ptRen3=compositeRankPts(rows,function(r){return r.ren3total;});
+  var ptSt=compositeRankPts(rows,function(r){return rd.stScore&&rd.stScore.st1y&&rd.stScore.st1y[r.boat-1]!=null?-rd.stScore.st1y[r.boat-1]:null;});
+  var ptAccel=compositeRankPts(rows,function(r){return accel[r.boat]?accel[r.boat].scoreChukan+accel[r.boat].scoreNobi:null;});
+  var total={};
+  for(var b=1;b<=6;b++){
+    var t=0;
+    if(ptSeiseki[b]!=null)t+=ptSeiseki[b];
+    if(ptTenji[b]!=null)t+=ptTenji[b];
+    if(ptMotor[b]!=null)t+=ptMotor[b]*2;
+    if(ptRen3[b]!=null)t+=ptRen3[b];
+    if(ptSt[b]!=null)t+=ptSt[b]*2;
+    if(ptAccel[b]!=null)t+=ptAccel[b];
+    total[b]=t;
+  }
+  var ranked=[1,2,3,4,5,6].slice().sort(function(a,b){return total[b]-total[a];});
+  var first=ranked[0];
+  var pool1=[ranked[1],ranked[2],ranked[3]];
+  var bet=compositePermutations(pool1).map(function(pair){return [first,pair[0],pair[1]];});
+  var gap=total[ranked[0]]-total[ranked[1]];
+  var usedSecondAxis=false;
+  if(gap<COMPOSITE_GAP_THRESHOLD){
+    usedSecondAxis=true;
+    var second=ranked[1];
+    var pool2=[ranked[0],ranked[2],ranked[3]];
+    var bet2=compositePermutations(pool2).map(function(pair){return [second,pair[0],pair[1]];});
+    var seen={};bet.forEach(function(x){seen[x.join("-")]=true;});
+    bet2.forEach(function(x){var k=x.join("-");if(!seen[k]){seen[k]=true;bet.push(x);}});
+  }
+  return {total:total,ranked:ranked,bet:bet,gap:gap,usedSecondAxis:usedSecondAxis};
+}
+
 
 // 201日・超鉄板レース24,024件の実測で、一致度が下がるほど段階的に回収率が悪化することを確認：
 // 完全一致142.34%／軸2着一致・3着のみ不一致136.78%／軸のみ一致・2着から不一致129.79%／
@@ -2393,6 +2459,9 @@ function App() {
   const resultForB1=useMemo(function(){
     return computeResultForRd(venue,rd,B1_FIXED_RACER_CAT);
   },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue]);
+  const compositeForm=useMemo(function(){
+    return computeCompositeFormation(resultForAi1,rd,venue);
+  },[resultForAi1,rd.motors,rd.stScore,rd.kimariCount,rd.racerRaceCount,venue]);
   // V2だけは選手成績期間を選べるようにする（従来は常に「直近1年」固定でトグルに一切連動していなかった
   // バグ／仕様漏れがあったため。精度分析ログ参照）。
   const [v2RacerCat,setV2RacerCat]=useState("直近6ヶ月"); // 206日実測で回収率140.0%と最良（精度分析ログ参照）
@@ -4754,6 +4823,33 @@ function App() {
                             })}
                           </div>
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{b1FixedRen3Axis.bet.length}点</div>
+                        </div>
+                      )}
+                      {COMPOSITE_TOP8_VENUES.indexOf(venue)>=0&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#f9c513",marginBottom:4}}>📊 合計得点フォーメーション（対象8場限定・試験導入中）</div>
+                          {compositeForm?(
+                            <>
+                              <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                                1着＝合計得点1位（{compositeForm.ranked[0]}号艇）固定・2/3着＝2～4位の順列{compositeForm.usedSecondAxis?"／点差"+compositeForm.gap+"点<6点のため2位（"+compositeForm.ranked[1]+"号艇）も軸に追加":"（1位と2位の点差"+compositeForm.gap+"点≥6点のため1軸のみ）"}
+                              </div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                {compositeForm.bet.map(function(t,ti){
+                                  var key=t[0]+"-"+t[1]+"-"+t[2];
+                                  var o=rd.odds3tan&&rd.odds3tan[key];
+                                  return (
+                                    <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                      <span style={{fontSize:13,fontWeight:700,color:"#f9c513",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                      {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{compositeForm.bet.length}点（207日規模で回収率133.8%・前半131.0%/後半134.3%・的中率31.8%、8月以降のフォワードテストで継続確認中）</div>
+                            </>
+                          ):(
+                            <div style={{fontSize:10,color:"#6b7a8c"}}>展示・直線タイムが6艇分揃うと表示されます</div>
+                          )}
                         </div>
                       )}
                     </div>
