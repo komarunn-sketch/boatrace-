@@ -84,6 +84,10 @@ const SHOW_BULK_CSV_IMPORT = false; // HTML(GitHub Pages)版では結果CSV・�
 // スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
 // 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
 const SHOW_HONMEI_TAIKO_ANA = false;
+// ６x６択チャレンジ（軸ボタンで任意艇を1着仮定する出目一覧）とモーターB1軸買い目・レース一覧の
+// 表示切替。2026-07-30ユーザー要望により非表示化（内部計算は維持、表示のみオフ）。
+const SHOW_6X6_CHALLENGE = false;
+const SHOW_MOTOR_B1_AXIS = false;
 const COMBO_PROB_TABLE = {"不安定":{"honmei_rate":39.4,"rank_probs_pct":[7.19,3.74,2.72,3.26,3.86,2.17]},"中間":{"honmei_rate":58.4,"rank_probs_pct":[10.56,6.85,5.1,5.1,5.42,3.64]},"堅い":{"honmei_rate":75.7,"rank_probs_pct":[13.11,8.61,7.73,7.52,6.25,3.51]}};
 const VENUE_TENJI_IMPORTANCE = {"びわこ": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 21.2, "isshu": 28.9, "mawari": 40.4, "chokusen": -10.0}, "top": "mawari"}, "三国": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 15.3, "isshu": 31.3, "mawari": 27.3, "chokusen": 15.4}, "top": "isshu"}, "下関": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 20.4, "isshu": 39.5, "mawari": 28.7, "chokusen": 18.9}, "top": "isshu"}, "丸亀": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 29.1, "isshu": 35.5, "mawari": 16.7, "chokusen": 22.3}, "top": "isshu"}, "児島": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 21.3, "isshu": 30.4, "mawari": 7.5, "chokusen": 35.5}, "top": "chokusen"}, "唐津": {"ranking": ["mawari", "tenji", "isshu", "chokusen"], "gaps": {"tenji": 23.7, "isshu": 23.2, "mawari": 40.2, "chokusen": -1.3}, "top": "mawari"}, "常滑": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.1, "isshu": 42.8, "mawari": 15.9, "chokusen": 23.8}, "top": "isshu"}, "平和島": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 14.0, "isshu": 29.1, "mawari": 19.7, "chokusen": 12.4}, "top": "isshu"}, "戸田": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.8, "isshu": 36.8, "mawari": 15.6, "chokusen": 23.0}, "top": "isshu"}, "江戸川": {"ranking": ["tenji"], "gaps": {"tenji": 9.9}, "top": "tenji"}, "津": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 20.2, "isshu": 40.1, "mawari": 40.2, "chokusen": -4.0}, "top": "mawari"}, "浜名湖": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 25.7, "isshu": 40.4, "mawari": 30.4, "chokusen": 0.4}, "top": "isshu"}, "福岡": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 24.4, "isshu": 40.7, "mawari": 27.6, "chokusen": 12.4}, "top": "isshu"}, "若松": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 16.9, "isshu": 36.7, "mawari": 29.3, "chokusen": 20.4}, "top": "isshu"}, "鳴門": {"ranking": ["chokusen", "tenji", "isshu", "mawari"], "gaps": {"tenji": 21.0, "isshu": 20.6, "mawari": 10.8, "chokusen": 26.8}, "top": "chokusen"}, "多摩川": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 23.9, "isshu": 29.7, "mawari": -0.4, "chokusen": 39.2}, "top": "chokusen"}, "大村": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 22.7, "isshu": 33.8, "mawari": 12.5, "chokusen": 21.9}, "top": "isshu"}, "徳山": {"ranking": ["tenji"], "gaps": {"tenji": 23.6}, "top": "tenji"}, "桐生": {"ranking": ["isshu", "chokusen", "mawari", "tenji"], "gaps": {"tenji": 7.1, "isshu": 34.1, "mawari": 19.9, "chokusen": 20.1}, "top": "isshu"}, "住之江": {"ranking": ["tenji"], "gaps": {"tenji": 22.7}, "top": "tenji"}, "尼崎": {"ranking": ["tenji"], "gaps": {"tenji": 27.0}, "top": "tenji"}, "芦屋": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 23.8, "isshu": 43.1, "mawari": 38.6, "chokusen": 18.9}, "top": "isshu"}, "蒲郡": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 27.8, "isshu": 28.2, "mawari": 32.2, "chokusen": 0.9}, "top": "mawari"}, "宮島": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 23.5, "isshu": 35.9, "mawari": 3.4, "chokusen": 28.3}, "top": "isshu"}};
 
@@ -3425,26 +3429,41 @@ function App() {
       fallbackCopy();
     }
   },[fbCommand]);
-  // 厳選レース一覧（B1軸レースと同じ方式：全venue横断、締切時間順、開閉タブ）。
-  // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
+  // 厳選レース一覧（2026-07-30改修：レース選択ボタンと同じ色分け基準に統一。
+  // 紫＝AI1着%基準・候補ちょうど2艇（AI1CHAKU_RACER_CAT固定）、水色＝1号艇固定基準・
+  // 1号艇aiP1≥60%（B1_FIXED_RACER_CAT固定）。UI上部のracerCatトグルには依存せず、
+  // レース選択ボタンの表示と常に一致するようにする。全venue横断、締切時間順、開閉タブ）。
   const senbatsuList=useMemo(function(){
     var out=[];
-    if(!RACE_SELECT_ENABLED)return out;
     Object.keys(races).forEach(function(key){
       var raceEntry=races[key];
       if(!raceEntry||!raceEntry.racerStats)return;
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      // 【修正済み】以前はここで旧基準の場（RACE_SELECT_GOOD_VENUES）だけに絞る早期リターンが
-      // 残っており、isRaceSelected自体は場を問わない新基準（候補2艇以上）に直していたにも関わらず、
-      // この一覧だけ旧11場に限定されてしまっていたバグを修正（精度分析ログ追記111参照）。
-      var r=computeResultForRd(vname,raceEntry,racerCat);
-      if(!r)return;
-      var formation=computeAi1chakuFormationBalanced(r,raceEntry,vname);
-      if(formation&&isRaceSelected(vname,formation)){
-        out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,candidates:formation.candidates});
+
+      var purple=false,formation=null;
+      var rAi1=computeResultForRd(vname,raceEntry,AI1CHAKU_RACER_CAT);
+      if(rAi1){
+        formation=computeAi1chakuFormationBalanced(rAi1,raceEntry,vname);
+        if(formation&&isRaceSelected(vname,formation))purple=true;
       }
+
+      var cyan=false,b1Ai1=null;
+      var rB1=computeResultForRd(vname,raceEntry,B1_FIXED_RACER_CAT);
+      if(rB1&&rB1.rows){
+        var b1row=rB1.rows.filter(function(r){return r.boat===1;})[0];
+        if(b1row&&b1row.aiP1!=null){
+          b1Ai1=b1row.aiP1;
+          if(b1Ai1>=B1_FIXED_AI1_THRESH)cyan=true;
+        }
+      }
+
+      if(!purple&&!cyan)return;
+      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
+        type:purple?"purple":"cyan",
+        candidates:formation?formation.candidates:null,
+        b1Ai1:b1Ai1});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -3452,7 +3471,7 @@ function App() {
       return ta-tb||(a.rnum-b.rnum);
     });
     return out;
-  },[races,racerCat]);
+  },[races]);
 
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
@@ -3614,20 +3633,22 @@ function App() {
         {senbatsuList.length>0&&(
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openSenbatsu?5:0}}>
-              <div style={{fontSize:10,color:"#5dd39e",fontWeight:700}}>🎯 厳選レースあり</div>
-              <button onClick={function(){setOpenSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#5dd39e",border:"1px solid #2e6b52",fontWeight:700}}>{openSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
+              <div style={{fontSize:10,color:"#c9a8ff",fontWeight:700}}>🎯 厳選レースあり</div>
+              <button onClick={function(){setOpenSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#c9a8ff",border:"1px solid #4a2c6b",fontWeight:700}}>{openSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
             </div>
             {openSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
               {senbatsuList.map(function(item){
                 var isActive=venue===item.vname&&curRace===item.rnum;
+                var c=item.type==="cyan"?"#5dc9f9":"#c9a8ff";
+                var borderC=item.type==="cyan"?"#2ea9c9":"#4a2c6b";
                 return (
                   <button key={item.vname+"_"+item.rnum}
                     onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
                       background:isActive?"#2c4762":"#0e1b2c",
-                      color:"#5dd39e",
-                      border:isActive?"2px solid #5dd39e":"1px solid #2e6b52",textAlign:"left"}}>
-                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　候補{item.candidates.length}艇</div>
+                      color:c,
+                      border:isActive?"2px solid "+c:"1px solid "+borderC,textAlign:"left"}}>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.type==="cyan"?"aiP1 "+item.b1Ai1:"候補"+item.candidates.length+"艇"}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                   </button>
                 );
@@ -3636,7 +3657,7 @@ function App() {
           </div>
         )}
 
-        {(function(){
+        {SHOW_MOTOR_B1_AXIS&&(function(){
           var items=[];
           Object.keys(races).forEach(function(key){
             var r=races[key];
@@ -4880,7 +4901,7 @@ function App() {
                       )}
                     </div>
                   )}
-                  {axisPickRowsByBoat&&(
+                  {SHOW_6X6_CHALLENGE&&axisPickRowsByBoat&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
                       <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.4}}>６x６択チャレンジ！<br/>てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
                       <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
@@ -5068,7 +5089,7 @@ function App() {
                 </div>
               </div>
             )}
-                  {yoso&&yoso.motorB1Boats&&yoso.motorB1Boats.length>0&&(
+                  {SHOW_MOTOR_B1_AXIS&&yoso&&yoso.motorB1Boats&&yoso.motorB1Boats.length>0&&(
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,color:"#c084fc",marginBottom:6,fontWeight:700}}>
                         ⚙ モーターB1軸（{yoso.motorB1Boats.map(function(b){return b+"号艇";}).join("・")}）
