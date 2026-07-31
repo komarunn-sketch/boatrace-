@@ -2484,6 +2484,19 @@ function App() {
       if(!resAi1)continue;
       var f=computeAi1chakuFormationBalanced(resAi1,rr,venue,null);
       if(!f)continue;
+      // 2026-07-30ユーザー要望：展示データ投入前は緑文字（候補1艇）だったが、投入後に
+      // 紫文字（候補2艇以上）へ変化したレースを検出する。210日バックテストで、この変化が
+      // 起きたレースはAI1着%の回収率215.6%（n=301、前半443.0%・後半175.1%と両期間で黒字）
+      // と、最初から紫文字だったレース（207.9%）と同等以上に良い実測結果が出ている。
+      // 展示データなしの状態を再現するため、inputs（tenji/isshu/mawari/chokusen）を
+      // 全艇空にしたクローンで候補数を再計算し、現在の候補数と比較する。
+      var tenjiFlip=false;
+      try{
+        var rrNoTenji=Object.assign({},rr,{inputs:{1:{tenji:"",isshu:"",mawari:"",chokusen:""},2:{tenji:"",isshu:"",mawari:"",chokusen:""},3:{tenji:"",isshu:"",mawari:"",chokusen:""},4:{tenji:"",isshu:"",mawari:"",chokusen:""},5:{tenji:"",isshu:"",mawari:"",chokusen:""},6:{tenji:"",isshu:"",mawari:"",chokusen:""}}});
+        var resNoTenji=computeResultForRd(venue,rrNoTenji,AI1CHAKU_RACER_CAT);
+        var fNoTenji=resNoTenji?computeAi1chakuFormationBalanced(resNoTenji,rrNoTenji,venue,null):null;
+        if(fNoTenji&&fNoTenji.candidates.length===1&&f.candidates.length>=2)tenjiFlip=true;
+      }catch(e){}
       // V2確信度（本命軸の2・3着同時的中確率、combos_ranked[0].joint）。V2向き・AI1着%向き・
       // イン逃げ狙いいずれのタグでも算出し、レース選択ボタンに%表示する。207日規模の実測で、
       // V2はこの値の上位20〜25件/日に絞っても回収率150%前後を維持しつつ最大連敗を半減できることを確認済み
@@ -2513,16 +2526,16 @@ function App() {
         b1Ai1=b1AiRow&&b1AiRow.aiP1!=null?b1AiRow.aiP1:null;
       }
       var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
-      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1};continue;}
+      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};continue;}
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
       // 展示なしだとこの戦略は逆効果なため）。
       if(resB1&&!resB1.hasTime){
         var b1row=resB1.rows.filter(function(r){return r.boat===1;})[0];
-        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1};continue;}
+        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};continue;}
       }
-      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1};
+      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};
     }
     return out;
   },[venue,races,v2RacerCat]);
@@ -3766,8 +3779,13 @@ function App() {
               var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":recType==="v2"?"#2e9e6b":recType==="ai1"?"#7e4a9e":"#2c4762";
               var borderW=isActive?"2px solid":(recType==="b1fixed_pending"?"1px dashed":"1px solid");
               var textColor=isActive?"#fff":isB1?"#5dc9f9":recType==="v2"?"#5dd39e":recType==="ai1"?"#c9a8ff":"#9db5cc";
+              // 2026-07-30追加：展示データ投入で緑→紫に変化したレース（210日実測で回収率215.6%、
+              // n=301、前半443.0%・後半175.1%と両期間で黒字）を、金色の枠で目立たせる。
+              var isFlip=rec&&rec.tenjiFlip;
+              if(isFlip&&!isActive){borderColor="#f9c513";borderW="2px solid";}
               return (
-                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative"}}>
+                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
+                  {isFlip&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>⚡変化</div>}
                   {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}</div>}
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
@@ -3782,7 +3800,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上） ● 3軸確信N%＝3連対率軸2頭流しの軸候補の最大aiP1（207日実測でこの値の上位15〜20件/日に絞ると回収率144%前後を維持しつつ最大連敗を半減できることを確認済み。絞りすぎ（50%以上等）は逆に回収率が急落するため要注意） ● ボタン上部のaiP1 N＝1号艇のaiP1（直近3ヶ月基準、1号艇固定・イン逃げ狙いの判定基準そのもの。水色＝{B1_FIXED_AI1_THRESH}%以上で発動条件を満たす）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上） ● 3軸確信N%＝3連対率軸2頭流しの軸候補の最大aiP1（207日実測でこの値の上位15〜20件/日に絞ると回収率144%前後を維持しつつ最大連敗を半減できることを確認済み。絞りすぎ（50%以上等）は逆に回収率が急落するため要注意） ● ボタン上部のaiP1 N＝1号艇のaiP1（直近3ヶ月基準、1号艇固定・イン逃げ狙いの判定基準そのもの。水色＝{B1_FIXED_AI1_THRESH}%以上で発動条件を満たす） ● ⚡変化＝展示データ投入で候補1艇（緑文字）→2艇以上（紫文字）に変わったレース（210日実測でAI1着%の回収率215.6%、n=301、前半443.0%・後半175.1%と両期間で黒字を確認済み。金枠で強調）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
