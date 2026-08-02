@@ -84,6 +84,22 @@ const SHOW_BULK_CSV_IMPORT = false; // HTML(GitHub Pages)版では結果CSV・�
 // スイチ・本線・対抗・穴（旧来のtotalScore系買い目）の表示切替。v2買い目・AI1着%基準フォーメーション・
 // 6x6チャレンジ・モーターB1軸買い目と買い目欄が並立して選びにくいとのユーザー要望により非表示化。
 const SHOW_HONMEI_TAIKO_ANA = false;
+// ６x６択チャレンジ（軸ボタンで任意艇を1着仮定する出目一覧）とモーターB1軸買い目・レース一覧の
+// 表示切替。2026-07-30ユーザー要望により非表示化（内部計算は維持、表示のみオフ）。
+const SHOW_6X6_CHALLENGE = false;
+const SHOW_MOTOR_B1_AXIS = false;
+// 1号艇ペナルティ修正版：206日実測で回収率102.5%（採用中の対角線バランス型114.1%・
+// 旧ベース版110.9%のいずれよりも悪化）と不採用が確定したため、2026-07-31ユーザー要望で非表示化。
+const SHOW_B1_PENALTY_FIXED = false;
+// 2026-08-01ユーザー要望：枠番別の物理的な距離差（1号艇はコース取りで一周・回り足が
+// 不利になりやすい等）を補正するための基準値。展示タイム一覧に表示専用（買い目・スコア
+// 計算には一切使わない）。単位は秒、枠1〜6の順。
+const WAKU_TIME_CORRECTION = {
+  tenji:    [0.02, 0.01, 0.00, -0.01, -0.01, -0.02],
+  isshu:    [0.40, 0.30, 0.20,  0.10,  0.05,  0.00],
+  mawari:   [0.20, 0.10, 0.00, -0.05, -0.10, -0.15],
+  chokusen: [0.00, 0.00, 0.00, -0.01, -0.02, -0.02]
+};
 const COMBO_PROB_TABLE = {"不安定":{"honmei_rate":39.4,"rank_probs_pct":[7.19,3.74,2.72,3.26,3.86,2.17]},"中間":{"honmei_rate":58.4,"rank_probs_pct":[10.56,6.85,5.1,5.1,5.42,3.64]},"堅い":{"honmei_rate":75.7,"rank_probs_pct":[13.11,8.61,7.73,7.52,6.25,3.51]}};
 const VENUE_TENJI_IMPORTANCE = {"びわこ": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 21.2, "isshu": 28.9, "mawari": 40.4, "chokusen": -10.0}, "top": "mawari"}, "三国": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 15.3, "isshu": 31.3, "mawari": 27.3, "chokusen": 15.4}, "top": "isshu"}, "下関": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 20.4, "isshu": 39.5, "mawari": 28.7, "chokusen": 18.9}, "top": "isshu"}, "丸亀": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 29.1, "isshu": 35.5, "mawari": 16.7, "chokusen": 22.3}, "top": "isshu"}, "児島": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 21.3, "isshu": 30.4, "mawari": 7.5, "chokusen": 35.5}, "top": "chokusen"}, "唐津": {"ranking": ["mawari", "tenji", "isshu", "chokusen"], "gaps": {"tenji": 23.7, "isshu": 23.2, "mawari": 40.2, "chokusen": -1.3}, "top": "mawari"}, "常滑": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.1, "isshu": 42.8, "mawari": 15.9, "chokusen": 23.8}, "top": "isshu"}, "平和島": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 14.0, "isshu": 29.1, "mawari": 19.7, "chokusen": 12.4}, "top": "isshu"}, "戸田": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 22.8, "isshu": 36.8, "mawari": 15.6, "chokusen": 23.0}, "top": "isshu"}, "江戸川": {"ranking": ["tenji"], "gaps": {"tenji": 9.9}, "top": "tenji"}, "津": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 20.2, "isshu": 40.1, "mawari": 40.2, "chokusen": -4.0}, "top": "mawari"}, "浜名湖": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 25.7, "isshu": 40.4, "mawari": 30.4, "chokusen": 0.4}, "top": "isshu"}, "福岡": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 24.4, "isshu": 40.7, "mawari": 27.6, "chokusen": 12.4}, "top": "isshu"}, "若松": {"ranking": ["isshu", "mawari", "chokusen", "tenji"], "gaps": {"tenji": 16.9, "isshu": 36.7, "mawari": 29.3, "chokusen": 20.4}, "top": "isshu"}, "鳴門": {"ranking": ["chokusen", "tenji", "isshu", "mawari"], "gaps": {"tenji": 21.0, "isshu": 20.6, "mawari": 10.8, "chokusen": 26.8}, "top": "chokusen"}, "多摩川": {"ranking": ["chokusen", "isshu", "tenji", "mawari"], "gaps": {"tenji": 23.9, "isshu": 29.7, "mawari": -0.4, "chokusen": 39.2}, "top": "chokusen"}, "大村": {"ranking": ["isshu", "tenji", "chokusen", "mawari"], "gaps": {"tenji": 22.7, "isshu": 33.8, "mawari": 12.5, "chokusen": 21.9}, "top": "isshu"}, "徳山": {"ranking": ["tenji"], "gaps": {"tenji": 23.6}, "top": "tenji"}, "桐生": {"ranking": ["isshu", "chokusen", "mawari", "tenji"], "gaps": {"tenji": 7.1, "isshu": 34.1, "mawari": 19.9, "chokusen": 20.1}, "top": "isshu"}, "住之江": {"ranking": ["tenji"], "gaps": {"tenji": 22.7}, "top": "tenji"}, "尼崎": {"ranking": ["tenji"], "gaps": {"tenji": 27.0}, "top": "tenji"}, "芦屋": {"ranking": ["isshu", "mawari", "tenji", "chokusen"], "gaps": {"tenji": 23.8, "isshu": 43.1, "mawari": 38.6, "chokusen": 18.9}, "top": "isshu"}, "蒲郡": {"ranking": ["mawari", "isshu", "tenji", "chokusen"], "gaps": {"tenji": 27.8, "isshu": 28.2, "mawari": 32.2, "chokusen": 0.9}, "top": "mawari"}, "宮島": {"ranking": ["isshu", "chokusen", "tenji", "mawari"], "gaps": {"tenji": 23.5, "isshu": 35.9, "mawari": 3.4, "chokusen": 28.3}, "top": "isshu"}};
 
@@ -1140,6 +1156,72 @@ function computeB1FixedRen3Axis(result,rd,venue){
   var globalAxisPair=computeGlobalRen3AxisPair(rowsByBoat);
   var form=makeRen3AxisNagashiForAxis(rowsByBoat,1,globalAxisPair,false);
   return {axis:1,axisPair:form.axisPair,broadGroup:form.broadGroup,worstAi3:form.worstAi3,bet:form.triples};
+}
+
+const COMPOSITE_TOP8_VENUES=["津","蒲郡","福岡","三国","丸亀","多摩川","下関","常滑"];
+const COMPOSITE_GAP_THRESHOLD=6;
+function compositeRankPts(rows,getVal){
+  var arr=rows.map(function(r){return {boat:r.boat,v:getVal(r)};});
+  var sorted=arr.slice().sort(function(a,b){
+    var av=a.v==null?-Infinity:a.v, bv=b.v==null?-Infinity:b.v;
+    return bv-av;
+  });
+  var pts={};var lastV=null,lastPts=null;
+  sorted.forEach(function(item,idx){
+    var p;
+    if(lastV!==null&&item.v===lastV)p=lastPts;
+    else p=Math.max(0,5-idx)*2;
+    pts[item.boat]=item.v==null?null:p;
+    lastV=item.v;lastPts=p;
+  });
+  return pts;
+}
+function compositePermutations(arr){
+  var out=[];
+  for(var i=0;i<arr.length;i++)for(var j=0;j<arr.length;j++){
+    if(i===j)continue;
+    out.push([arr[i],arr[j]]);
+  }
+  return out;
+}
+function computeCompositeFormation(result,rd,venue){
+  if(COMPOSITE_TOP8_VENUES.indexOf(venue)<0)return null;
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var accel=computeAccelScores(rd);
+  if(!accel)return null;
+  var rows=result.rows;
+  var ptSeiseki=compositeRankPts(rows,function(r){return r.racerR1final;});
+  var ptTenji=compositeRankPts(rows,function(r){return r.diff;});
+  var ptMotor=compositeRankPts(rows,function(r){return rd.motors[r.boat]&&rd.motors[r.boat].ren2!=null?rd.motors[r.boat].ren2:null;});
+  var ptRen3=compositeRankPts(rows,function(r){return r.ren3total;});
+  var ptSt=compositeRankPts(rows,function(r){return rd.stScore&&rd.stScore.st1y&&rd.stScore.st1y[r.boat-1]!=null?-rd.stScore.st1y[r.boat-1]:null;});
+  var ptAccel=compositeRankPts(rows,function(r){return accel[r.boat]?accel[r.boat].scoreChukan+accel[r.boat].scoreNobi:null;});
+  var total={};
+  for(var b=1;b<=6;b++){
+    var t=0;
+    if(ptSeiseki[b]!=null)t+=ptSeiseki[b];
+    if(ptTenji[b]!=null)t+=ptTenji[b];
+    if(ptMotor[b]!=null)t+=ptMotor[b]*2;
+    if(ptRen3[b]!=null)t+=ptRen3[b];
+    if(ptSt[b]!=null)t+=ptSt[b]*2;
+    if(ptAccel[b]!=null)t+=ptAccel[b];
+    total[b]=t;
+  }
+  var ranked=[1,2,3,4,5,6].slice().sort(function(a,b){return total[b]-total[a];});
+  var first=ranked[0];
+  var pool1=[ranked[1],ranked[2],ranked[3]];
+  var bet=compositePermutations(pool1).map(function(pair){return [first,pair[0],pair[1]];});
+  var gap=total[ranked[0]]-total[ranked[1]];
+  var usedSecondAxis=false;
+  if(gap<COMPOSITE_GAP_THRESHOLD){
+    usedSecondAxis=true;
+    var second=ranked[1];
+    var pool2=[ranked[0],ranked[2],ranked[3]];
+    var bet2=compositePermutations(pool2).map(function(pair){return [second,pair[0],pair[1]];});
+    var seen={};bet.forEach(function(x){seen[x.join("-")]=true;});
+    bet2.forEach(function(x){var k=x.join("-");if(!seen[k]){seen[k]=true;bet.push(x);}});
+  }
+  return {total:total,ranked:ranked,bet:bet,gap:gap,usedSecondAxis:usedSecondAxis};
 }
 
 
@@ -2393,6 +2475,9 @@ function App() {
   const resultForB1=useMemo(function(){
     return computeResultForRd(venue,rd,B1_FIXED_RACER_CAT);
   },[rd.inputs,rd.courses,rd.wind,rd.racerStats,rd.motors,rd.racerClass,rd.kimariCount,rd.racerRaceCount,rd.stScore,rd.tokuten,rd.waveHeight,rd.weather,venue]);
+  const compositeForm=useMemo(function(){
+    return computeCompositeFormation(resultForAi1,rd,venue);
+  },[resultForAi1,rd.motors,rd.stScore,rd.kimariCount,rd.racerRaceCount,venue]);
   // V2だけは選手成績期間を選べるようにする（従来は常に「直近1年」固定でトグルに一切連動していなかった
   // バグ／仕様漏れがあったため。精度分析ログ参照）。
   const [v2RacerCat,setV2RacerCat]=useState("直近6ヶ月"); // 206日実測で回収率140.0%と最良（精度分析ログ参照）
@@ -2411,21 +2496,61 @@ function App() {
       if(!resAi1)continue;
       var f=computeAi1chakuFormationBalanced(resAi1,rr,venue,null);
       if(!f)continue;
+      // 2026-07-30ユーザー要望：展示データ投入前は緑文字（候補1艇）だったが、投入後に
+      // 紫文字（候補2艇以上）へ変化したレースを検出する。210日バックテストで、この変化が
+      // 起きたレースはAI1着%の回収率215.6%（n=301、前半443.0%・後半175.1%と両期間で黒字）
+      // と、最初から紫文字だったレース（207.9%）と同等以上に良い実測結果が出ている。
+      // 展示データなしの状態を再現するため、inputs（tenji/isshu/mawari/chokusen）を
+      // 全艇空にしたクローンで候補数を再計算し、現在の候補数と比較する。
+      var tenjiFlip=false;
+      try{
+        var rrNoTenji=Object.assign({},rr,{inputs:{1:{tenji:"",isshu:"",mawari:"",chokusen:""},2:{tenji:"",isshu:"",mawari:"",chokusen:""},3:{tenji:"",isshu:"",mawari:"",chokusen:""},4:{tenji:"",isshu:"",mawari:"",chokusen:""},5:{tenji:"",isshu:"",mawari:"",chokusen:""},6:{tenji:"",isshu:"",mawari:"",chokusen:""}}});
+        var resNoTenji=computeResultForRd(venue,rrNoTenji,AI1CHAKU_RACER_CAT);
+        var fNoTenji=resNoTenji?computeAi1chakuFormationBalanced(resNoTenji,rrNoTenji,venue,null):null;
+        if(fNoTenji&&fNoTenji.candidates.length===1&&f.candidates.length>=2)tenjiFlip=true;
+      }catch(e){}
+      // V2確信度（本命軸の2・3着同時的中確率、combos_ranked[0].joint）。V2向き・AI1着%向き・
+      // イン逃げ狙いいずれのタグでも算出し、レース選択ボタンに%表示する。207日規模の実測で、
+      // V2はこの値の上位20〜25件/日に絞っても回収率150%前後を維持しつつ最大連敗を半減できることを確認済み
+      // （精度分析ログ参照）。1日の実処理可能件数に絞る際の優先順位付けに使う想定。
+      var v2Conf=null;
+      try{
+        var v2res=computeV2FromRd(rr,venue,v2RacerCat);
+        if(v2res&&v2res.combos_ranked&&v2res.combos_ranked.length)v2Conf=v2res.combos_ranked[0].joint;
+      }catch(e){}
+      var ren3Conf=null;
+      try{
+        var resRen3ForConf=computeResultForRd(venue,rr,REN3_RACER_CAT);
+        var ren3form=resRen3ForConf?computeRen3AxisNagashiFormation(resRen3ForConf,rr,venue):null;
+        if(ren3form&&ren3form.candidates&&ren3form.candidates.length){
+          var rowsByBoatConf={};
+          resRen3ForConf.rows.forEach(function(r){rowsByBoatConf[r.boat]=r;});
+          ren3Conf=Math.max.apply(null,ren3form.candidates.map(function(b){return rowsByBoatConf[b]?(rowsByBoatConf[b].aiP1||0):0;}));
+        }
+      }catch(e){}
       try{resB1=computeResultForRd(venue,rr,B1_FIXED_RACER_CAT);}catch(e){resB1=null;}
+      // レース選択ボタンに1号艇固定の判定基準そのもの（1号艇のaiP1、B1_FIXED_RACER_CAT=直近3ヶ月基準）を
+      // 大き目に表示するための値。2026-07-30ユーザー要望：どのレースが1号艇固定の閾値(60%)に近いか
+      // 一覧で見えるようにしたい、との理由で追加。
+      var b1Ai1=null;
+      if(resB1){
+        var b1AiRow=resB1.rows.filter(function(r){return r.boat===1;})[0];
+        b1Ai1=b1AiRow&&b1AiRow.aiP1!=null?b1AiRow.aiP1:null;
+      }
       var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
-      if(b1f){out[n]="b1fixed";continue;}
+      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};continue;}
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
       // 展示なしだとこの戦略は逆効果なため）。
       if(resB1&&!resB1.hasTime){
         var b1row=resB1.rows.filter(function(r){return r.boat===1;})[0];
-        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]="b1fixed_pending";continue;}
+        if(b1row&&b1row.aiP1!=null&&b1row.aiP1>=B1_FIXED_AI1_PENDING_THRESH){out[n]={type:"b1fixed_pending",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};continue;}
       }
-      out[n]=f.candidates.length===1?"v2":"ai1";
+      out[n]={type:f.candidates.length===1?"v2":"ai1",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};
     }
     return out;
-  },[venue,races]);
+  },[venue,races,v2RacerCat]);
 
   const kimariByBoat=useMemo(function(){
     if(!rd.kimariCount||!result)return null;
@@ -3329,26 +3454,41 @@ function App() {
       fallbackCopy();
     }
   },[fbCommand]);
-  // 厳選レース一覧（B1軸レースと同じ方式：全venue横断、締切時間順、開閉タブ）。
-  // races内の全レースを走査し、読み込み済みのデータ（展示入力前でも枠別成績・級別・モーター・節間得点率等で計算可能）で厳選判定する。
+  // 厳選レース一覧（2026-07-30改修：レース選択ボタンと同じ色分け基準に統一。
+  // 紫＝AI1着%基準・候補ちょうど2艇（AI1CHAKU_RACER_CAT固定）、水色＝1号艇固定基準・
+  // 1号艇aiP1≥60%（B1_FIXED_RACER_CAT固定）。UI上部のracerCatトグルには依存せず、
+  // レース選択ボタンの表示と常に一致するようにする。全venue横断、締切時間順、開閉タブ）。
   const senbatsuList=useMemo(function(){
     var out=[];
-    if(!RACE_SELECT_ENABLED)return out;
     Object.keys(races).forEach(function(key){
       var raceEntry=races[key];
       if(!raceEntry||!raceEntry.racerStats)return;
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      // 【修正済み】以前はここで旧基準の場（RACE_SELECT_GOOD_VENUES）だけに絞る早期リターンが
-      // 残っており、isRaceSelected自体は場を問わない新基準（候補2艇以上）に直していたにも関わらず、
-      // この一覧だけ旧11場に限定されてしまっていたバグを修正（精度分析ログ追記111参照）。
-      var r=computeResultForRd(vname,raceEntry,racerCat);
-      if(!r)return;
-      var formation=computeAi1chakuFormationBalanced(r,raceEntry,vname);
-      if(formation&&isRaceSelected(vname,formation)){
-        out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,candidates:formation.candidates});
+
+      var purple=false,formation=null;
+      var rAi1=computeResultForRd(vname,raceEntry,AI1CHAKU_RACER_CAT);
+      if(rAi1){
+        formation=computeAi1chakuFormationBalanced(rAi1,raceEntry,vname);
+        if(formation&&isRaceSelected(vname,formation))purple=true;
       }
+
+      var cyan=false,b1Ai1=null;
+      var rB1=computeResultForRd(vname,raceEntry,B1_FIXED_RACER_CAT);
+      if(rB1&&rB1.rows){
+        var b1row=rB1.rows.filter(function(r){return r.boat===1;})[0];
+        if(b1row&&b1row.aiP1!=null){
+          b1Ai1=b1row.aiP1;
+          if(b1Ai1>=B1_FIXED_AI1_THRESH)cyan=true;
+        }
+      }
+
+      if(!purple&&!cyan)return;
+      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
+        type:purple?"purple":"cyan",
+        candidates:formation?formation.candidates:null,
+        b1Ai1:b1Ai1});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -3356,7 +3496,7 @@ function App() {
       return ta-tb||(a.rnum-b.rnum);
     });
     return out;
-  },[races,racerCat]);
+  },[races]);
 
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
@@ -3518,20 +3658,22 @@ function App() {
         {senbatsuList.length>0&&(
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openSenbatsu?5:0}}>
-              <div style={{fontSize:10,color:"#5dd39e",fontWeight:700}}>🎯 厳選レースあり</div>
-              <button onClick={function(){setOpenSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#5dd39e",border:"1px solid #2e6b52",fontWeight:700}}>{openSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
+              <div style={{fontSize:10,color:"#c9a8ff",fontWeight:700}}>🎯 厳選レースあり</div>
+              <button onClick={function(){setOpenSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#c9a8ff",border:"1px solid #4a2c6b",fontWeight:700}}>{openSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
             </div>
             {openSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
               {senbatsuList.map(function(item){
                 var isActive=venue===item.vname&&curRace===item.rnum;
+                var c=item.type==="cyan"?"#5dc9f9":"#c9a8ff";
+                var borderC=item.type==="cyan"?"#2ea9c9":"#4a2c6b";
                 return (
                   <button key={item.vname+"_"+item.rnum}
                     onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
                       background:isActive?"#2c4762":"#0e1b2c",
-                      color:"#5dd39e",
-                      border:isActive?"2px solid #5dd39e":"1px solid #2e6b52",textAlign:"left"}}>
-                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　候補{item.candidates.length}艇</div>
+                      color:c,
+                      border:isActive?"2px solid "+c:"1px solid "+borderC,textAlign:"left"}}>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.type==="cyan"?"aiP1 "+item.b1Ai1:"候補"+item.candidates.length+"艇"}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                   </button>
                 );
@@ -3540,7 +3682,7 @@ function App() {
           </div>
         )}
 
-        {(function(){
+        {SHOW_MOTOR_B1_AXIS&&(function(){
           var items=[];
           Object.keys(races).forEach(function(key){
             var r=races[key];
@@ -3641,18 +3783,27 @@ function App() {
               var r=races[rk(venue,n)]||emptyRace();
               var hasBas=r.racerStats!=null||r.stTable!=null||r.motors[1]!=null;
               var hasTen=Object.values(r.inputs).some(function(inp){return inp.tenji!=="";});
-              var rec=raceRecommendations[n]; // "b1fixed" | "b1fixed_pending" | "v2" | "ai1" | undefined
+              var rec=raceRecommendations[n]; // {type:"b1fixed"|"b1fixed_pending"|"v2"|"ai1",v2Conf:number|null} | undefined
+              var recType=rec&&rec.type;
               var isActive=curRace===n;
-              var isB1=rec==="b1fixed"||rec==="b1fixed_pending";
-              var bg=isActive?"#2c4762":isB1?"#123a42":rec==="v2"?"#1a3b2a":rec==="ai1"?"#2a1a3b":"#16273c";
-              var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":rec==="v2"?"#2e9e6b":rec==="ai1"?"#7e4a9e":"#2c4762";
-              var borderW=isActive?"2px solid":(rec==="b1fixed_pending"?"1px dashed":"1px solid");
-              var textColor=isActive?"#fff":isB1?"#5dc9f9":rec==="v2"?"#5dd39e":rec==="ai1"?"#c9a8ff":"#9db5cc";
+              var isB1=recType==="b1fixed"||recType==="b1fixed_pending";
+              var bg=isActive?"#2c4762":isB1?"#123a42":recType==="v2"?"#1a3b2a":recType==="ai1"?"#2a1a3b":"#16273c";
+              var borderColor=isActive?"#5a87b8":isB1?"#2ea9c9":recType==="v2"?"#2e9e6b":recType==="ai1"?"#7e4a9e":"#2c4762";
+              var borderW=isActive?"2px solid":(recType==="b1fixed_pending"?"1px dashed":"1px solid");
+              var textColor=isActive?"#fff":isB1?"#5dc9f9":recType==="v2"?"#5dd39e":recType==="ai1"?"#c9a8ff":"#9db5cc";
+              // 2026-07-30追加：展示データ投入で緑→紫に変化したレース（210日実測で回収率215.6%、
+              // n=301、前半443.0%・後半175.1%と両期間で黒字）を、金色の枠で目立たせる。
+              var isFlip=rec&&rec.tenjiFlip;
+              if(isFlip&&!isActive){borderColor="#f9c513";borderW="2px solid";}
               return (
-                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:44,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative"}}>
+                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
+                  {isFlip&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>⚡変化</div>}
+                  {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}</div>}
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
-                  {rec&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":rec==="v2"?"#5dd39e":"#c9a8ff"}}>{rec==="b1fixed"?"イン逃げ":rec==="b1fixed_pending"?"イン逃げ?":rec==="v2"?"V2":"AI1着%"}</div>}
+                  {recType&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":recType==="v2"?"#5dd39e":"#c9a8ff"}}>{recType==="b1fixed"?"イン逃げ":recType==="b1fixed_pending"?"イン逃げ?":recType==="v2"?"V2":"AI1着%"}</div>}
+                  {rec&&rec.v2Conf!=null&&<div style={{fontSize:11,fontWeight:700,lineHeight:1.3,marginTop:2,color:rec.v2Conf>=V2_SUICHI_CONF_THRESH?"#5dd39e":"#6b7d94"}}>V2 {(rec.v2Conf*100).toFixed(0)}%</div>}
+                  {rec&&rec.ren3Conf!=null&&<div style={{fontSize:11,fontWeight:700,lineHeight:1.3,marginTop:2,color:"#c084fc"}}>3軸 {rec.ren3Conf.toFixed(0)}%</div>}
                   <div style={{position:"absolute",bottom:3,left:0,right:0,display:"flex",justifyContent:"center",gap:2}}>
                     {hasBas&&<div style={{width:5,height:5,borderRadius:"50%",background:"#5dd39e"}}/>}
                     {hasTen&&<div style={{width:5,height:5,borderRadius:"50%",background:"#f9c513"}}/>}
@@ -3661,7 +3812,7 @@ function App() {
               );
             })}
           </div>
-          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示）</div>
+          <div style={{fontSize:10,color:"#a9cbea",marginTop:5}}>● 緑点＝基本情報入力済 ● 黄点＝展示タイム入力済 ● 緑文字＝V2向き（超鉄板・候補1艇） ● 紫文字＝AI1着%向き（候補2艇以上） ● 水色文字＝1号艇固定・イン逃げ狙い該当（点線＝展示データ未取込のため参考値、実際の買い目は展示取込後に表示） ● V2確信N%＝本命軸の2・3着同時的中確率（207日実測でこの値の上位20〜25件/日に絞ると回収率150%前後を維持しつつ最大連敗を半減できることを確認済み。濃い緑＝{(V2_SUICHI_CONF_THRESH*100).toFixed(0)}%以上） ● 3軸確信N%＝3連対率軸2頭流しの軸候補の最大aiP1（207日実測でこの値の上位15〜20件/日に絞ると回収率144%前後を維持しつつ最大連敗を半減できることを確認済み。絞りすぎ（50%以上等）は逆に回収率が急落するため要注意） ● ボタン上部のaiP1 N＝1号艇のaiP1（直近3ヶ月基準、1号艇固定・イン逃げ狙いの判定基準そのもの。水色＝{B1_FIXED_AI1_THRESH}%以上で発動条件を満たす） ● ⚡変化＝展示データ投入で候補1艇（緑文字）→2艇以上（紫文字）に変わったレース（210日実測でAI1着%の回収率215.6%、n=301、前半443.0%・後半175.1%と両期間で黒字を確認済み。金枠で強調）</div>
         </div>
 
         <div style={{marginBottom:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
@@ -3993,6 +4144,13 @@ function App() {
                     var s=[...new Set(vals)].sort(function(a,b){return a-b;});
                     return{first:s[0],second:s[1]};
                   });
+                  // 2026-08-01追加：枠番別タイム補正値（WAKU_TIME_CORRECTION）を差し引いた
+                  // 「補正後タイム」の順位も別途計算し、セル内に小さく色分け表示する（表示専用）。
+                  var correctedRanks=keys.map(function(k){
+                    var vals=[1,2,3,4,5,6].map(function(b){var n=parseFloat(rd.inputs[b][k]);return isNaN(n)?null:n+WAKU_TIME_CORRECTION[k][b-1];}).filter(function(v){return v!=null;});
+                    var s=[...new Set(vals)].sort(function(a,b){return a-b;});
+                    return{first:s[0],second:s[1]};
+                  });
                   return [1,2,3,4,5,6].map(function(b){
                     var inp=rd.inputs[b];
                     var isEmpty=["tenji","isshu","mawari","chokusen"].every(function(k){return inp[k]==="";});
@@ -4001,7 +4159,13 @@ function App() {
                         <td style={{padding:"8px 10px",textAlign:"center"}}><LB b={b}/></td>
                         {[inp.isshu,inp.mawari,inp.chokusen,inp.tenji].map(function(v,i){
                           var num=parseFloat(v),isF=!isNaN(num)&&num===ranks[i].first,isS=!isNaN(num)&&num===ranks[i].second;
-                          return <td key={i} style={{padding:"6px 10px",textAlign:"center"}}><span style={{display:"inline-block",minWidth:48,padding:"4px 8px",borderRadius:6,background:isF?"rgba(217,48,37,0.55)":isS?"rgba(249,197,19,0.35)":"transparent",fontWeight:700,color:isF||isS?"#fff":v?"#fff":"#4a5d70"}}>{v||"―"}</span></td>;
+                          var k=keys[i];
+                          var corrected=isNaN(num)?null:num+WAKU_TIME_CORRECTION[k][b-1];
+                          var cIsF=corrected!=null&&corrected===correctedRanks[i].first,cIsS=corrected!=null&&corrected===correctedRanks[i].second;
+                          return <td key={i} style={{padding:"6px 10px",textAlign:"center",whiteSpace:"nowrap"}}>
+                            <span style={{display:"inline-block",minWidth:48,padding:"4px 8px",borderRadius:6,background:isF?"rgba(217,48,37,0.55)":isS?"rgba(249,197,19,0.35)":"transparent",fontWeight:700,color:isF||isS?"#fff":v?"#fff":"#4a5d70"}}>{v||"―"}</span>
+                            {corrected!=null&&<span style={{fontSize:9,fontWeight:700,marginLeft:4,color:cIsF?"#ff6b5c":cIsS?"#f9c513":"#6b7d94"}}>補正{corrected.toFixed(2)}</span>}
+                          </td>;
                         })}
                       </tr>
                     );
@@ -4027,6 +4191,12 @@ function App() {
               {rd.shimekiri&&<span style={{fontSize:13,color:"#f9c513",fontWeight:700,marginLeft:6}}>締切 {rd.shimekiri}</span>}
               <span style={{fontSize:10,color:"#9db5cc"}}>風　{rd.wind}{rd.weather&&"　　天候　"+rd.weather}{rd.waveHeight&&"　　波高　"+rd.waveHeight}</span>
               {aiEval&&<span style={{fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>}
+              {(function(){
+                var b1r=resultForB1&&resultForB1.rows?resultForB1.rows.filter(function(r){return r.boat===1;})[0]:null;
+                if(!b1r||b1r.aiP1==null)return null;
+                var over=b1r.aiP1>=B1_FIXED_AI1_THRESH;
+                return <span style={{fontSize:15,fontWeight:800,padding:"4px 12px",borderRadius:999,background:over?"#123a42":"#16273c",color:over?"#5dc9f9":"#6b7d94",border:over?"1px solid #2ea9c9":"1px solid #2c4762"}}>1号艇aiP1 {b1r.aiP1}%</span>;
+              })()}
             </div>
             {result.dup&&<div style={{fontSize:12,color:"#f9c513",background:"#2e2710",border:"1px solid #6b5a1d",borderRadius:8,padding:"8px 10px",marginBottom:12}}>⚠ 同じコースに複数の艇が入っています。</div>}
 
@@ -4674,7 +4844,7 @@ function App() {
                       ):(
                         <div style={{marginTop:8,fontSize:10,color:"#8b9bae"}}>オッズ未取得（オッズ取得後に合成オッズを表示）</div>
                       )}
-                      {ai1chakuFixed&&(
+                      {SHOW_B1_PENALTY_FIXED&&ai1chakuFixed&&(
                         <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
                           <div style={{fontSize:11,fontWeight:800,color:"#ff9f6b",marginBottom:4}}>🔧 1号艇ペナルティ修正版（検証中・展示なし時のバグ修正）</div>
                           {ai1chakuFixed.candidates.length!==ai1chakuBalanced.candidates.length&&(
@@ -4745,9 +4915,36 @@ function App() {
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{b1FixedRen3Axis.bet.length}点</div>
                         </div>
                       )}
+                      {COMPOSITE_TOP8_VENUES.indexOf(venue)>=0&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#f9c513",marginBottom:4}}>📊 合計得点フォーメーション（対象8場限定・試験導入中）</div>
+                          {compositeForm?(
+                            <>
+                              <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                                1着＝合計得点1位（{compositeForm.ranked[0]}号艇）固定・2/3着＝2～4位の順列{compositeForm.usedSecondAxis?"／点差"+compositeForm.gap+"点<6点のため2位（"+compositeForm.ranked[1]+"号艇）も軸に追加":"（1位と2位の点差"+compositeForm.gap+"点≥6点のため1軸のみ）"}
+                              </div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                {compositeForm.bet.map(function(t,ti){
+                                  var key=t[0]+"-"+t[1]+"-"+t[2];
+                                  var o=rd.odds3tan&&rd.odds3tan[key];
+                                  return (
+                                    <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                      <span style={{fontSize:13,fontWeight:700,color:"#f9c513",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                      {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{compositeForm.bet.length}点（207日規模で回収率133.8%・前半131.0%/後半134.3%・的中率31.8%、8月以降のフォワードテストで継続確認中）</div>
+                            </>
+                          ):(
+                            <div style={{fontSize:10,color:"#6b7a8c"}}>展示・直線タイムが6艇分揃うと表示されます</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {axisPickRowsByBoat&&(
+                  {SHOW_6X6_CHALLENGE&&axisPickRowsByBoat&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #2c4762"}}>
                       <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.4}}>６x６択チャレンジ！<br/>てめぇらの力で勝ち取ってみろコノヤロー！ダァー！</div>
                       <div style={{fontSize:11,color:"#b3bdcc",marginBottom:8,lineHeight:1.5}}>
@@ -4935,7 +5132,7 @@ function App() {
                 </div>
               </div>
             )}
-                  {yoso&&yoso.motorB1Boats&&yoso.motorB1Boats.length>0&&(
+                  {SHOW_MOTOR_B1_AXIS&&yoso&&yoso.motorB1Boats&&yoso.motorB1Boats.length>0&&(
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,color:"#c084fc",marginBottom:6,fontWeight:700}}>
                         ⚙ モーターB1軸（{yoso.motorB1Boats.map(function(b){return b+"号艇";}).join("・")}）
