@@ -4085,12 +4085,15 @@ function App() {
               if(isNaN(tenji)||isNaN(choku))return null;
               var v1=150/choku, v2=150/tenji;
               var a=2*(v2-v1)/(choku+tenji);
-              return{b:b,deashi:v1-a*choku/2,chukan:v1+a*choku/2,nobi:v2+a*tenji/2};
+              // 2026-08-02追加：中間速90m（スタート前後45mずつ・計90m区間の平均速度）を、
+              // 既存の出足・中間速・伸びと同じ棒グラフに4つ目のセクションとして追加。
+              var est90=estimateMidSpeed90m(inp.chokusen,inp.tenji);
+              return{b:b,deashi:v1-a*choku/2,chukan:v1+a*choku/2,nobi:v2+a*tenji/2,chukan90:est90?est90.midSpeed90mKmh/3.6:null};
             });
             if(boats.some(function(x){return x===null;})){
               return <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべての展示・直線を入力すると表示します</div>;
             }
-            var sections=[["出足（0m地点）","deashi"],["中間速（150m地点）","chukan"],["伸び（300m地点）","nobi"]];
+            var sections=[["出足（0m地点）","deashi"],["中間速（150m地点）","chukan"],["伸び（300m地点）","nobi"],["中間速90m（スタート前後45m・平均）","chukan90"]];
             var FLOOR=15;
             function normScore(key){
               var vals=boats.map(function(x){return x[key];});
@@ -4131,6 +4134,16 @@ function App() {
                 {sections.map(function(sec){
                   var label=sec[0],key=sec[1];
                   var vals=boats.map(function(x){return x[key];});
+                  // 2026-08-02追加：中間速90m(chukan90)は推定計算が失敗してnullになるケースがあるため、
+                  // 1艇でも欠けていたらグラフ化せず注記のみ表示する（他の3セクションには影響しない）。
+                  if(vals.some(function(v){return v==null;})){
+                    return (
+                      <div key={key}>
+                        <div style={{fontSize:11,color:"#9db5cc",marginBottom:6}}>{label}</div>
+                        <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",fontSize:11,color:"#6b7d94"}}>一部艇で推定できませんでした（データ異常の可能性）</div>
+                      </div>
+                    );
+                  }
                   var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
                   return (
                     <div key={key}>
