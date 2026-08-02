@@ -1224,6 +1224,61 @@ function computeCompositeFormation(result,rd,venue){
   return {total:total,ranked:ranked,bet:bet,gap:gap,usedSecondAxis:usedSecondAxis};
 }
 
+function accelUpsetRankPts(rows,getVal){
+  var arr=rows.map(function(r){return {boat:r.boat,v:getVal(r)};});
+  var sorted=arr.slice().sort(function(a,b){
+    var av=a.v==null?-Infinity:a.v, bv=b.v==null?-Infinity:b.v;
+    return bv-av;
+  });
+  var pts={};var lastV=null,lastPts=null;
+  sorted.forEach(function(item,idx){
+    var p;
+    if(lastV!==null&&item.v===lastV)p=lastPts;
+    else p=Math.max(0,5-idx)*2;
+    pts[item.boat]=item.v==null?null:p;
+    lastV=item.v;lastPts=p;
+  });
+  return pts;
+}
+function computeAccelUpsetFormation(result,rd,venue){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  var accel=computeAccelScores(rd);
+  if(!accel)return null;
+  var rows=result.rows;
+  var aiP1ByBoat={};
+  rows.forEach(function(r){aiP1ByBoat[r.boat]=r.aiP1||0;});
+  var predRanked=[1,2,3,4,5,6].slice().sort(function(a,b){return aiP1ByBoat[b]-aiP1ByBoat[a];});
+  var axis=predRanked[1];
+  var accelCombined={};
+  for(var b=1;b<=6;b++)accelCombined[b]=accel[b].scoreChukan+accel[b].scoreNobi;
+  var accelRank=[1,2,3,4,5,6].filter(function(b){return accelCombined[b]>accelCombined[axis];}).length+1;
+  if(accelRank>2)return null;
+  var ptSeiseki=accelUpsetRankPts(rows,function(r){return r.racerR1final;});
+  var ptTenji=accelUpsetRankPts(rows,function(r){return r.diff;});
+  var ptMotor=accelUpsetRankPts(rows,function(r){return rd.motors[r.boat]&&rd.motors[r.boat].ren2!=null?rd.motors[r.boat].ren2:null;});
+  var ptRen3=accelUpsetRankPts(rows,function(r){return r.ren3total;});
+  var ptSt=accelUpsetRankPts(rows,function(r){return rd.stScore&&rd.stScore.st1y&&rd.stScore.st1y[r.boat-1]!=null?-rd.stScore.st1y[r.boat-1]:null;});
+  var kc=rd.kimariCount;
+  var ptKimari=accelUpsetRankPts(rows,function(r){
+    if(!kc)return null;
+    var arr2=r.boat===1?kc.nige:kc.sashi;
+    if(!arr2||arr2[r.boat-1]==null)return null;
+    var cnt=arr2[r.boat-1];
+    var tot=rd.racerRaceCount&&rd.racerRaceCount[r.boat-1];
+    return tot?cnt/tot*100:cnt;
+  });
+  var ptAccel=accelUpsetRankPts(rows,function(r){return accel[r.boat]?accel[r.boat].scoreChukan+accel[r.boat].scoreNobi:null;});
+  var totals={};
+  for(var bb=1;bb<=6;bb++){
+    var t=0;
+    [ptSeiseki,ptTenji,ptMotor,ptRen3,ptSt,ptKimari,ptAccel].forEach(function(pt){if(pt[bb]!=null)t+=pt[bb];});
+    totals[bb]=t;
+  }
+  var pool=[1,2,3,4,5,6].filter(function(b){return b!==axis;}).sort(function(a,b){return totals[b]-totals[a];}).slice(0,3);
+  var bet=[];
+  pool.forEach(function(s){pool.forEach(function(t){if(s!==t)bet.push([axis,s,t]);});});
+  return {axis:axis,accelRank:accelRank,totals:totals,pool:pool,bet:bet};
+}
 
 // 201日・超鉄板レース24,024件の実測で、一致度が下がるほど段階的に回収率が悪化することを確認：
 // 完全一致142.34%／軸2着一致・3着のみ不一致136.78%／軸のみ一致・2着から不一致129.79%／
@@ -3369,6 +3424,9 @@ function App() {
   const b1FixedRen3Axis=useMemo(function(){
     return computeB1FixedRen3Axis(resultForB1,rd,venue);
   },[resultForB1,rd,venue]);
+  const accelUpsetForm=useMemo(function(){
+    return computeAccelUpsetFormation(resultForAi1,rd,venue);
+  },[resultForAi1,rd.motors,rd.stScore,rd.kimariCount,rd.racerRaceCount,venue]);
   // レース厳選バッジ判定＆AI1着%基準フォーメーションの合成オッズ（展示データ等が変わればai1chakuBalancedの再計算に追従して自動更新される）
   const isSelectedRace=useMemo(function(){
     return isRaceSelected(venue,ai1chakuBalanced);
@@ -4940,6 +4998,27 @@ function App() {
                           ):(
                             <div style={{fontSize:10,color:"#6b7a8c"}}>展示・直線タイムが6艇分揃うと表示されます</div>
                           )}
+                        </div>
+                      )}
+                      {accelUpsetForm&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#ff9166",marginBottom:4}}>⚡ accel上位の2番手評価艇（全場対象・ユーザー発案）</div>
+                          <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                            AI1着%基準で2番手評価の{accelUpsetForm.axis}号艇が、accel（中間速+伸び）スコア6艇中{accelUpsetForm.accelRank}位と上位のため発動。{accelUpsetForm.axis}号艇固定・相手：{accelUpsetForm.pool.join("・")}号艇（評価内訳合計上位3艇）
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {accelUpsetForm.bet.map(function(t,ti){
+                              var key=t[0]+"-"+t[1]+"-"+t[2];
+                              var o=rd.odds3tan&&rd.odds3tan[key];
+                              return (
+                                <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#ff9166",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計6点（207日規模で回収率113.0%、前半118.5%/後半112.1%で両期間とも黒字を確認済み。既存5方式との重複確認済みで的中の43.0%は独立した的中。詳細は精度分析ログ追記147参照。）発動対象外のレースでは非表示。</div>
                         </div>
                       )}
                     </div>
