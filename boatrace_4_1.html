@@ -3754,7 +3754,7 @@ function App() {
               var hasBas=RNUMS.some(function(n){var r=races[rk(v,n)];return r&&(r.racerStats!=null||r.stTable!=null||r.motors[1]!=null);});
               var isWeak=isWeakVenue(v);
               return (
-                <button key={v} onClick={function(){setVenue(v);}} style={{padding:"8px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:venue===v?"2px solid #5a87b8":isWeak?"1px solid #6b4a2c":"1px solid #2c4762",background:venue===v?"#2c4762":"#16273c",color:venue===v?"#fff":"#9db5cc",textAlign:"center",position:"relative"}}>
+                <button key={v} data-venue={v} onClick={function(){setVenue(v);}} style={{padding:"8px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:venue===v?"2px solid #5a87b8":isWeak?"1px solid #6b4a2c":"1px solid #2c4762",background:venue===v?"#2c4762":"#16273c",color:venue===v?"#fff":"#9db5cc",textAlign:"center",position:"relative"}}>
                   {v}{hasBas&&<span style={{position:"absolute",top:3,right:4,width:6,height:6,borderRadius:"50%",background:"#5dd39e"}}/>}
                   {isWeak&&<span style={{position:"absolute",top:2,left:4,fontSize:9}} title="過去データで回収率が低い場">⚠️</span>}
                 </button>
@@ -3796,7 +3796,7 @@ function App() {
               var isFlip=rec&&rec.tenjiFlip;
               if(isFlip&&!isActive){borderColor="#f9c513";borderW="2px solid";}
               return (
-                <button key={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
+                <button key={n} data-race={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
                   {isFlip&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>⚡変化</div>}
                   {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}</div>}
                   {n}R
