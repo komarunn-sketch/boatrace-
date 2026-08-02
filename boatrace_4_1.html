@@ -4167,6 +4167,35 @@ function App() {
                     </div>
                   );
                 })}
+                {(function(){
+                  // 中間速+伸びの合成スコア（accel上位の2番手評価艇フォーメーションが実際に使っている指標と同一：
+                  // scoreChukan+scoreNobi、各15〜100点の正規化スコアを合算＝範囲30〜200）。
+                  var combined={};
+                  boats.forEach(function(x){combined[x.b]=scoreChukan[x.b]+scoreNobi[x.b];});
+                  var vals=boats.map(function(x){return combined[x.b];});
+                  var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+                  return (
+                    <div>
+                      <div style={{fontSize:11,color:"#9db5cc",marginBottom:6}}>中間速+伸び（合成スコア）</div>
+                      <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",display:"grid",gap:6}}>
+                        {boats.map(function(x){
+                          var v=combined[x.b];
+                          var pct=max===min?100:FLOOR+(v-min)/(max-min)*(100-FLOOR);
+                          return (
+                            <div key={x.b} style={{display:"flex",alignItems:"center",gap:8}}>
+                              <LB b={x.b}/>
+                              <div style={{flex:1,position:"relative",height:18,background:"#0e1b2c",borderRadius:5,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:pct+"%",background:"#ff9166",borderRadius:5}}/>
+                              </div>
+                              <span style={{width:52,fontSize:11,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{v.toFixed(1)}点</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>⚡ accel上位の2番手評価艇フォーメーションの判定に使っている指標と同一（各項目15〜100点を正規化して合算、範囲30〜200点）</div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
