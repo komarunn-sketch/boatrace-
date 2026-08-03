@@ -4195,6 +4195,34 @@ function App() {
                     </div>
                   );
                 })()}
+                {(function(){
+                  // 出足+中間速の合成スコア（中間速+伸びと対になる表示。スコアリングには未使用、表示のみ）。
+                  var combined={};
+                  boats.forEach(function(x){combined[x.b]=scoreDeashi[x.b]+scoreChukan[x.b];});
+                  var vals=boats.map(function(x){return combined[x.b];});
+                  var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+                  return (
+                    <div>
+                      <div style={{fontSize:11,color:"#9db5cc",marginBottom:6}}>出足+中間速（合成スコア）</div>
+                      <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",display:"grid",gap:6}}>
+                        {boats.map(function(x){
+                          var v=combined[x.b];
+                          var pct=max===min?100:FLOOR+(v-min)/(max-min)*(100-FLOOR);
+                          return (
+                            <div key={x.b} style={{display:"flex",alignItems:"center",gap:8}}>
+                              <LB b={x.b}/>
+                              <div style={{flex:1,position:"relative",height:18,background:"#0e1b2c",borderRadius:5,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:pct+"%",background:"#5dd39e",borderRadius:5}}/>
+                              </div>
+                              <span style={{width:52,fontSize:11,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{v.toFixed(1)}点</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>スタート反応〜150m通過までの立ち上がりの良さを見る表示専用の指標（買い目ロジックには未使用、各項目15〜100点を正規化して合算、範囲30〜200点）</div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
