@@ -2593,7 +2593,12 @@ function App() {
         b1Ai1=b1AiRow&&b1AiRow.aiP1!=null?b1AiRow.aiP1:null;
       }
       var b1f=resB1?computeB1FixedRen3Axis(resB1,rr,venue):null;
-      if(b1f){out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip};continue;}
+      if(b1f){
+        // 合成オッズ（既存のsynthesizeOdds関数、rr.odds3tanはBOATCAST自動取込で取得済みのデータを使用）。
+        // 精度分析ログ追記164参照：合成オッズが低い（5倍未満）レースは回収率が悪化する傾向を207日規模弱で確認済み。
+        var compOdds=rr.odds3tan?synthesizeOdds(b1f.bet,rr.odds3tan):null;
+        out[n]={type:"b1fixed",v2Conf:v2Conf,ren3Conf:ren3Conf,b1Ai1:b1Ai1,tenjiFlip:tenjiFlip,compOdds:compOdds};continue;
+      }
       // 展示データがまだ無い場合でも、1号艇のaiP1だけで今節・全レースCSV取込直後に目星を付けられるように、
       // 展示なしの粗いaiP1だけでB1_FIXED_AI1_THRESH以上なら「イン逃げ候補（展示待ち）」として水色にする。
       // ただし実際の買い目（b1FixedRen3Axis）は展示データが揃うまで発動しない（精度分析ログ追記140参照：
@@ -3857,6 +3862,7 @@ function App() {
                 <button key={n} data-race={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
                   {isFlip&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>⚡変化</div>}
                   {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}</div>}
+                  {rec&&rec.compOdds!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,marginTop:1,color:rec.compOdds>=5?"#5dd39e":"#ff8a80"}}>合成{rec.compOdds.toFixed(1)}倍</div>}
                   {n}R
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
                   {recType&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":recType==="v2"?"#5dd39e":"#c9a8ff"}}>{recType==="b1fixed"?"イン逃げ":recType==="b1fixed_pending"?"イン逃げ?":recType==="v2"?"V2":"AI1着%"}</div>}
