@@ -1158,6 +1158,26 @@ function computeB1FixedRen3Axis(result,rd,venue){
   return {axis:1,axisPair:form.axisPair,broadGroup:form.broadGroup,worstAi3:form.worstAi3,bet:form.triples};
 }
 
+const B1_FIXED_NIREN_WEAK_VENUES=["戸田","江戸川","平和島"];
+function computeB1FixedNirentan(result,rd,venue){
+  if(!result||!result.rows||result.rows.length<6)return null;
+  if(!result.hasTime)return null;
+  if(B1_FIXED_NIREN_WEAK_VENUES.indexOf(venue)!==-1)return null;
+  var rowsByBoat={};
+  for(var b=1;b<=6;b++){
+    var found=result.rows.filter(function(r){return r.boat===b;})[0];
+    if(!found)return null;
+    rowsByBoat[b]=found;
+  }
+  if(rowsByBoat[1].aiP1==null||rowsByBoat[1].aiP1<B1_FIXED_AI1_THRESH)return null;
+  var others=[2,3,4,5,6];
+  var rankAiP2=others.slice().sort(function(a,c){return (rowsByBoat[c].aiP2||0)-(rowsByBoat[a].aiP2||0);});
+  var betCandidates=rankAiP2.slice(0,2);
+  var displayCandidates=rankAiP2.slice(0,3);
+  var bet=betCandidates.map(function(s){return [1,s];});
+  return {axis:1,betCandidates:betCandidates,displayCandidates:displayCandidates,bet:bet};
+}
+
 const COMPOSITE_TOP8_VENUES=["津","蒲郡","福岡","三国","丸亀","多摩川","下関","常滑"];
 const COMPOSITE_GAP_THRESHOLD=6;
 function compositeRankPts(rows,getVal){
@@ -3429,6 +3449,9 @@ function App() {
   const b1FixedRen3Axis=useMemo(function(){
     return computeB1FixedRen3Axis(resultForB1,rd,venue);
   },[resultForB1,rd,venue]);
+  const b1FixedNirentan=useMemo(function(){
+    return computeB1FixedNirentan(resultForB1,rd,venue);
+  },[resultForB1,rd,venue]);
   const accelUpsetForm=useMemo(function(){
     return computeAccelUpsetFormation(resultForAi1,rd,venue);
   },[resultForAi1,rd.motors,rd.stScore,rd.kimariCount,rd.racerRaceCount,venue]);
@@ -5033,6 +5056,41 @@ function App() {
                             })}
                           </div>
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:2}}>合計{b1FixedRen3Axis.bet.length}点</div>
+                        </div>
+                      )}
+                      {b1FixedNirentan&&(
+                        <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#5dc9f9",marginBottom:4}}>🎯 1号艇固定・イン逃げ狙い【2連単モード】（実験的、弱会場除外・1号艇aiP1≥{B1_FIXED_AI1_THRESH}%）</div>
+                          <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>
+                            1着1号艇固定・2着＝aiP2上位2艇（買い目本線、38日規模で的中率53.7%・回収率108.2%）
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
+                            {b1FixedNirentan.betCandidates.map(function(s,si){
+                              var key="1-"+s;
+                              var o=rd.odds2tan&&rd.odds2tan[key];
+                              return (
+                                <span key={si} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#5dc9f9",letterSpacing:"0.03em"}}>1-{s}</span>
+                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          {b1FixedNirentan.displayCandidates.length>b1FixedNirentan.betCandidates.length&&(
+                            <div style={{fontSize:10,color:"#6b7a8c"}}>
+                              参考（3艇目まで含めると的中率66.5%まで伸びるが回収率92.8%とやや悪化、精度分析ログ追記165参照）：
+                              {b1FixedNirentan.displayCandidates.slice(b1FixedNirentan.betCandidates.length).map(function(s,si){
+                                var key="1-"+s;
+                                var o=rd.odds2tan&&rd.odds2tan[key];
+                                return (
+                                  <span key={si} style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:6,opacity:0.6}}>
+                                    <span style={{fontSize:12,fontWeight:700,color:"#8b9bae"}}>1-{s}</span>
+                                    {o!=null&&!isNaN(o)&&<span style={{fontSize:10,color:"#8b9bae"}}>{o}倍</span>}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                       {COMPOSITE_TOP8_VENUES.indexOf(venue)>=0&&(
