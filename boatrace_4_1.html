@@ -1159,10 +1159,11 @@ function computeB1FixedRen3Axis(result,rd,venue){
 }
 
 const B1_FIXED_NIREN_WEAK_VENUES=["戸田","江戸川","平和島"];
-const B1_FIXED_NIREN_RACER_CAT="直近1年";
+const B1_FIXED_NIREN_GATE_CAT="直近3ヶ月";
+const B1_FIXED_NIREN_RANK_CAT="直近1年";
 function computeB1FixedNirentan(rd,venue){
   if(B1_FIXED_NIREN_WEAK_VENUES.indexOf(venue)!==-1)return null;
-  var result=computeResultForRd(venue,rd,B1_FIXED_NIREN_RACER_CAT);
+  var result=computeResultForRd(venue,rd,B1_FIXED_NIREN_GATE_CAT);
   if(!result||!result.rows||result.rows.length<6)return null;
   if(!result.hasTime)return null;
   var rowsByBoat={};
@@ -1172,8 +1173,16 @@ function computeB1FixedNirentan(rd,venue){
     rowsByBoat[b]=found;
   }
   if(rowsByBoat[1].aiP1==null||rowsByBoat[1].aiP1<B1_FIXED_AI1_THRESH)return null;
+  var resultRank=computeResultForRd(venue,rd,B1_FIXED_NIREN_RANK_CAT);
+  if(!resultRank||!resultRank.rows)return null;
+  var rowsByBoatRank={};
+  for(var b2=1;b2<=6;b2++){
+    var found2=resultRank.rows.filter(function(r){return r.boat===b2;})[0];
+    if(!found2)return null;
+    rowsByBoatRank[b2]=found2;
+  }
   var others=[2,3,4,5,6];
-  var rankAiP2=others.slice().sort(function(a,c){return (rowsByBoat[c].aiP2||0)-(rowsByBoat[a].aiP2||0);});
+  var rankAiP2=others.slice().sort(function(a,c){return (rowsByBoatRank[c].aiP2||0)-(rowsByBoatRank[a].aiP2||0);});
   var betCandidates=rankAiP2.slice(0,2);
   var displayCandidates=rankAiP2.slice(0,3);
   var bet=betCandidates.map(function(s){return [1,s];});
