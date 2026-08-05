@@ -1159,10 +1159,12 @@ function computeB1FixedRen3Axis(result,rd,venue){
 }
 
 const B1_FIXED_NIREN_WEAK_VENUES=["戸田","江戸川","平和島"];
-function computeB1FixedNirentan(result,rd,venue){
+const B1_FIXED_NIREN_RACER_CAT="直近1年";
+function computeB1FixedNirentan(rd,venue){
+  if(B1_FIXED_NIREN_WEAK_VENUES.indexOf(venue)!==-1)return null;
+  var result=computeResultForRd(venue,rd,B1_FIXED_NIREN_RACER_CAT);
   if(!result||!result.rows||result.rows.length<6)return null;
   if(!result.hasTime)return null;
-  if(B1_FIXED_NIREN_WEAK_VENUES.indexOf(venue)!==-1)return null;
   var rowsByBoat={};
   for(var b=1;b<=6;b++){
     var found=result.rows.filter(function(r){return r.boat===b;})[0];
@@ -3450,8 +3452,8 @@ function App() {
     return computeB1FixedRen3Axis(resultForB1,rd,venue);
   },[resultForB1,rd,venue]);
   const b1FixedNirentan=useMemo(function(){
-    return computeB1FixedNirentan(resultForB1,rd,venue);
-  },[resultForB1,rd,venue]);
+    return computeB1FixedNirentan(rd,venue);
+  },[rd,venue]);
   const accelUpsetForm=useMemo(function(){
     return computeAccelUpsetFormation(resultForAi1,rd,venue);
   },[resultForAi1,rd.motors,rd.stScore,rd.kimariCount,rd.racerRaceCount,venue]);
