@@ -1138,7 +1138,27 @@ function simSampleST(course){
   }
   return ST_HIST_MIN+(hist.length-0.5)*ST_HIST_BIN_WIDTH;
 }
-function simulateRaceOnce(canVal){
+// アウト艇（コース3以上）の中から「まくり／まくり差し」の実際の勝者を選ぶ。accelスコアを
+// 主軸にしつつ、選手個人の決まり手成績（rd.kimariCount、直近1年固定・実測）が使える場合は
+// まくり＋まくり差しの個人発生率で重みを追加する（データが無い/薄い艇は実質的にaccelのみで決まる）。
+function simPickOuterWinner(courseAssignment,canVal,personalKimari){
+  var candidates=[];
+  for(var b=1;b<=6;b++)if(courseAssignment[b]>=3)candidates.push(b);
+  var weights=candidates.map(function(b){
+    var accelW=Math.max(0.01,canVal[b]);
+    var rate=0;
+    if(personalKimari&&personalKimari.raceCount&&personalKimari.raceCount[b-1]){
+      var mk=(personalKimari.makuri[b-1]||0)+(personalKimari.makurizashi[b-1]||0);
+      rate=mk/personalKimari.raceCount[b-1];
+    }
+    return accelW*(1+rate*3);
+  });
+  var total=0;weights.forEach(function(w){total+=w;});
+  var r=Math.random()*total;
+  for(var i=0;i<candidates.length;i++){r-=weights[i];if(r<=0)return candidates[i];}
+  return candidates[candidates.length-1];
+}
+function simulateRaceOnce(canVal,personalKimari){
   var courseAssignment=simSampleEntryCourses();
   var stSample={};
   for(var b=1;b<=6;b++)stSample[b]=simSampleST(courseAssignment[b]);
@@ -1162,7 +1182,7 @@ function simulateRaceOnce(canVal){
   for(var di=0;di<dkeys.length;di++){rr-=dist[dkeys[di]];if(rr<=0){kimarite=dkeys[di];break;}}
   var winner;
   if(kimarite==="まくり"||kimarite==="まくり差し"){
-    winner=outerBestBoat;
+    winner=simPickOuterWinner(courseAssignment,canVal,personalKimari);
   }else if(kimarite==="差し"){
     winner=null;
     for(var bb2=1;bb2<=6;bb2++)if(courseAssignment[bb2]===2){winner=bb2;break;}
@@ -1181,6 +1201,11 @@ function computeRaceSimulation(rd,trials){
   if(!accel)return null;
   var canVal={};
   for(var cb=1;cb<=6;cb++)canVal[cb]=accel[cb].scoreChukan+accel[cb].scoreNobi;
+  // 選手個人の決まり手成績（直近1年固定・実測）。データが無いレースはnullのまま
+  // （simPickOuterWinner側でaccelのみのフォールバックになる）。
+  var personalKimari=(rd.kimariCount&&rd.racerRaceCount)?{
+    makuri:rd.kimariCount.makuri,makurizashi:rd.kimariCount.makurizashi,raceCount:rd.racerRaceCount
+  }:null;
   var N=trials||3000;
   var sigParts=[];
   for(var sb=1;sb<=6;sb++)sigParts.push(rd.inputs[sb].tenji+"|"+rd.inputs[sb].chokusen);
@@ -1189,7 +1214,7 @@ function computeRaceSimulation(rd,trials){
   var winnerTally={1:0,2:0,3:0,4:0,5:0,6:0};
   var crossTally={1:{},2:{},3:{},4:{},5:{},6:{}};
   for(var t=0;t<N;t++){
-    var res=simulateRaceOnce(canVal);
+    var res=simulateRaceOnce(canVal,personalKimari);
     winnerTally[res.winner]++;
     crossTally[res.winner][res.kimarite]=(crossTally[res.winner][res.kimarite]||0)+1;
   }
