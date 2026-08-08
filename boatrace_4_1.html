@@ -1060,6 +1060,149 @@ function computeAccelScores(rd){
   });
   return out;
 }
+// ===== レース展開モンテカルロシミュレーション（独立検証・参考表示専用、買い目ロジックには使用しない） =====
+// 全期間実測（219日、進入コース遷移n=201,411／ST分布n≈33,000/コース／決まり手n=10,703）から
+// 求めた確率テーブルを静的定数として埋め込み、選択中レースについて艇番×決まり手のクロス集計を
+// ブラウザ内でモンテカルロサンプリングする。導出過程はbacktest\entry_course_transition.js・
+// st_timing_sampling.js・kimarite_accel_probability.js・race_simulator.js（2026-08-08作成）を参照。
+var ENTRY_TRANSITION_MATRIX={
+  1:{1:0.989,2:0.009,3:0.001,4:0.000,5:0.000,6:0.000},
+  2:{1:0.008,2:0.942,3:0.040,4:0.006,5:0.002,6:0.002},
+  3:{1:0.002,2:0.019,3:0.921,4:0.045,5:0.009,6:0.005},
+  4:{1:0.001,2:0.009,3:0.023,4:0.885,5:0.056,6:0.026},
+  5:{1:0.001,2:0.010,3:0.009,4:0.046,5:0.843,6:0.091},
+  6:{1:0.001,2:0.013,3:0.008,4:0.019,5:0.092,6:0.868}
+};
+var ST_HIST_BIN_WIDTH=0.01;
+var ST_HIST_MIN=0;
+var ST_HISTOGRAM={
+  1:[0.00121,0.00555,0.0066,0.0092,0.01303,0.01788,0.02467,0.03293,0.04011,0.05058,0.03887,0.06517,0.06086,0.06234,0.06243,0.06216,0.06186,0.05597,0.05121,0.05082,0.03067,0.03719,0.03085,0.02373,0.01885,0.01674,0.01387,0.01116,0.01897,0,0.00374,0.00564,0.00368,0.0028,0.00226,0.00202,0.00178,0.00106,0.00081,0.00072],
+  2:[0.00039,0.0029,0.00362,0.00613,0.00884,0.01343,0.01823,0.02245,0.03042,0.0441,0.03395,0.05768,0.05855,0.05922,0.06392,0.06401,0.06347,0.05864,0.05611,0.05852,0.03287,0.04585,0.03471,0.02982,0.02472,0.02086,0.01838,0.0147,0.02016,0,0.00552,0.00782,0.00486,0.00368,0.00335,0.00193,0.00229,0.0019,0.00115,0.00085],
+  3:[0.00097,0.00342,0.00478,0.00771,0.01158,0.014,0.01951,0.02779,0.03424,0.04942,0.0366,0.06524,0.05973,0.06363,0.06339,0.06354,0.06004,0.05704,0.05414,0.05417,0.03145,0.04277,0.02897,0.02807,0.02217,0.01881,0.01564,0.01297,0.01969,0,0.00466,0.00647,0.00411,0.00299,0.00275,0.00227,0.00178,0.00121,0.0013,0.00097],
+  4:[0.00064,0.00408,0.00378,0.00732,0.01071,0.01474,0.02112,0.02784,0.0341,0.04621,0.03322,0.0597,0.05816,0.06034,0.06212,0.06209,0.06115,0.05913,0.05313,0.05407,0.03035,0.04457,0.03434,0.02738,0.02297,0.0194,0.0174,0.01419,0.0217,0,0.00572,0.00669,0.00436,0.00424,0.00312,0.00309,0.00221,0.00157,0.00148,0.00157],
+  5:[0.00052,0.0033,0.00427,0.00725,0.00885,0.01255,0.01922,0.02401,0.03135,0.04378,0.03196,0.05782,0.05642,0.05821,0.06073,0.06276,0.05982,0.06149,0.05421,0.05648,0.03086,0.04727,0.03417,0.02847,0.02523,0.02104,0.01862,0.01698,0.02395,0,0.0054,0.0077,0.00567,0.00485,0.00376,0.00324,0.00236,0.00227,0.00146,0.0017],
+  6:[0.0008,0.00339,0.00447,0.00537,0.00818,0.01105,0.01429,0.02043,0.02456,0.0341,0.0261,0.04665,0.04687,0.04897,0.05341,0.05573,0.05708,0.05551,0.05449,0.05548,0.03332,0.05036,0.04045,0.03826,0.03212,0.02836,0.0258,0.02141,0.03533,0,0.00984,0.01398,0.01027,0.00716,0.00633,0.00534,0.00478,0.00413,0.00309,0.00275]
+};
+var SIM_B1_WIN_TABLE={
+  "top-top":0.730,"top-mid":0.692,"top-low":0.556,
+  "mid-top":0.560,"mid-mid":0.516,"mid-low":0.408,
+  "low-top":0.382,"low-mid":0.327,"low-low":0.253
+};
+var SIM_KIMARITE_DIST={
+  top2:{"まくり":0.350,"まくり差し":0.287,"差し":0.260,"抜き":0.097,"逃げ":0.010},
+  rank3:{"差し":0.350,"まくり":0.310,"まくり差し":0.230,"抜き":0.100,"逃げ":0.010}
+};
+function simRankBucket(r){return r<=2?"top":(r<=4?"mid":"low");}
+function simRankDesc(vals,b){
+  if(vals[b]==null)return null;
+  var better=0;for(var bb=1;bb<=6;bb++)if(bb!==b&&vals[bb]!=null&&vals[bb]>vals[b])better++;
+  return better+1;
+}
+function simRankAsc(vals,b){
+  if(vals[b]==null)return null;
+  var better=0;for(var bb=1;bb<=6;bb++)if(bb!==b&&vals[bb]!=null&&vals[bb]<vals[b])better++;
+  return better+1;
+}
+function simShuffle(arr){
+  var a=arr.slice();
+  for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
+  return a;
+}
+function simWeightedPick(distObj,excludeSet){
+  var keys=Object.keys(distObj).filter(function(c){return !excludeSet[c];});
+  var total=0;keys.forEach(function(c){total+=distObj[c];});
+  if(total<=0){
+    var rem=[1,2,3,4,5,6].filter(function(c){return !excludeSet[c];});
+    return rem[Math.floor(Math.random()*rem.length)];
+  }
+  var r=Math.random()*total;
+  for(var i=0;i<keys.length;i++){r-=distObj[keys[i]];if(r<=0)return Number(keys[i]);}
+  return Number(keys[keys.length-1]);
+}
+function simSampleEntryCourses(){
+  var order=simShuffle([1,2,3,4,5,6]);
+  var assigned={},result={};
+  order.forEach(function(b){
+    var c=simWeightedPick(ENTRY_TRANSITION_MATRIX[b],assigned);
+    result[b]=c;assigned[c]=true;
+  });
+  return result;
+}
+function simSampleST(course){
+  var hist=ST_HISTOGRAM[course];
+  var r=Math.random();
+  var cum=0;
+  for(var i=0;i<hist.length;i++){
+    cum+=hist[i];
+    if(r<=cum)return ST_HIST_MIN+i*ST_HIST_BIN_WIDTH+Math.random()*ST_HIST_BIN_WIDTH;
+  }
+  return ST_HIST_MIN+(hist.length-0.5)*ST_HIST_BIN_WIDTH;
+}
+function simulateRaceOnce(canVal){
+  var courseAssignment=simSampleEntryCourses();
+  var stSample={};
+  for(var b=1;b<=6;b++)stSample[b]=simSampleST(courseAssignment[b]);
+  var b1STRank=simRankAsc(stSample,1);
+  var b1AccelRank=simRankDesc(canVal,1);
+  var key=simRankBucket(b1STRank)+"-"+simRankBucket(b1AccelRank);
+  var b1WinProb=SIM_B1_WIN_TABLE[key];
+  if(Math.random()<b1WinProb)return{winner:1,kimarite:"逃げ"};
+  var outerBestRank=7,outerBestBoat=null;
+  for(var b=1;b<=6;b++){
+    var course=courseAssignment[b];
+    if(course<3)continue;
+    var r=simRankDesc(canVal,b);
+    if(r!=null&&r<outerBestRank){outerBestRank=r;outerBestBoat=b;}
+  }
+  var bucket=outerBestRank<=2?"top2":"rank3";
+  var dist=SIM_KIMARITE_DIST[bucket];
+  var dkeys=Object.keys(dist);
+  var dtotal=0;dkeys.forEach(function(k){dtotal+=dist[k];});
+  var rr=Math.random()*dtotal,kimarite=dkeys[dkeys.length-1];
+  for(var di=0;di<dkeys.length;di++){rr-=dist[dkeys[di]];if(rr<=0){kimarite=dkeys[di];break;}}
+  var winner;
+  if(kimarite==="まくり"||kimarite==="まくり差し"){
+    winner=outerBestBoat;
+  }else if(kimarite==="差し"){
+    winner=null;
+    for(var bb2=1;bb2<=6;bb2++)if(courseAssignment[bb2]===2){winner=bb2;break;}
+    if(winner==null)winner=2;
+  }else{
+    var cands=[1,2,3,4,5,6].filter(function(x){return x!==1;});
+    winner=cands[Math.floor(Math.random()*cands.length)];
+  }
+  return{winner:winner,kimarite:kimarite};
+}
+var RACE_SIM_CACHE={};
+// rdを受け取り、艇番×決まり手のクロス集計（%）を返す。accelスコアが計算できない場合はnull。
+// 同一レース・同一展示データに対しては結果をキャッシュし、再描画のたびに数値が揺れないようにする。
+function computeRaceSimulation(rd,trials){
+  var accel=computeAccelScores(rd);
+  if(!accel)return null;
+  var canVal={};
+  for(var cb=1;cb<=6;cb++)canVal[cb]=accel[cb].scoreChukan+accel[cb].scoreNobi;
+  var N=trials||3000;
+  var sigParts=[];
+  for(var sb=1;sb<=6;sb++)sigParts.push(rd.inputs[sb].tenji+"|"+rd.inputs[sb].chokusen);
+  var sig=sigParts.join(",")+"#"+N;
+  if(RACE_SIM_CACHE[sig])return RACE_SIM_CACHE[sig];
+  var winnerTally={1:0,2:0,3:0,4:0,5:0,6:0};
+  var crossTally={1:{},2:{},3:{},4:{},5:{},6:{}};
+  for(var t=0;t<N;t++){
+    var res=simulateRaceOnce(canVal);
+    winnerTally[res.winner]++;
+    crossTally[res.winner][res.kimarite]=(crossTally[res.winner][res.kimarite]||0)+1;
+  }
+  var byBoat=[1,2,3,4,5,6].map(function(b){
+    var breakdown=Object.keys(crossTally[b]).sort(function(x,y){return crossTally[b][y]-crossTally[b][x];}).map(function(k){
+      return{kimarite:k,pct:crossTally[b][k]/N*100};
+    });
+    return{b:b,winPct:winnerTally[b]/N*100,breakdown:breakdown};
+  });
+  var result={byBoat:byBoat,N:N};
+  RACE_SIM_CACHE[sig]=result;
+  return result;
+}
 // 1着候補の選び方を「中間速＋伸びスコアの上位2艇」に差し替えた版（ユーザー考案）。
 // レースが対象になるかどうかの判定（発動条件）自体は既存のAI1着%基準（getAi1chakuCandidates、
 // 候補ちょうど2艇＝参加検討）のまま変えていない。1着に実際に使う艇だけを差し替える。
@@ -4263,6 +4406,40 @@ function App() {
                     </div>
                   );
                 })()}
+              </div>
+            );
+          })()}
+        </div>
+
+        <div style={{marginBottom:24}}>
+          <div id="section-race-sim" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>レース展開シミュレーション（参考・決まり手ベース）</div>
+          {(function(){
+            var sim=computeRaceSimulation(rd,3000);
+            if(!sim){
+              return <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべての展示・直線を入力すると表示します</div>;
+            }
+            var sorted=sim.byBoat.slice().sort(function(a,c){return c.winPct-a.winPct;});
+            return (
+              <div>
+                <div style={{background:"#16273c",borderRadius:10,padding:"10px 12px",display:"grid",gap:10}}>
+                  {sorted.map(function(o){
+                    return (
+                      <div key={o.b}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <LB b={o.b}/>
+                          <div style={{flex:1,position:"relative",height:18,background:"#0e1b2c",borderRadius:5,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:o.winPct+"%",background:"#7db4e8",borderRadius:5}}/>
+                          </div>
+                          <span style={{width:52,fontSize:12,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{o.winPct.toFixed(1)}%</span>
+                        </div>
+                        <div style={{fontSize:10,color:"#9db5cc",marginLeft:30,marginTop:2}}>
+                          {o.breakdown.filter(function(k){return k.pct>=0.5;}).map(function(k){return k.kimarite+" "+k.pct.toFixed(1)+"%";}).join(" / ")}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:9,color:"#6b7a8c",marginTop:6}}>過去実測（進入コース・ST・決まり手の確率分布）に基づくモンテカルロシミュレーション（{sim.N}試行）。参考表示専用で買い目ロジックには使用していません。「抜き」「恵まれ」は精度が粗いため目安程度にご覧ください。</div>
               </div>
             );
           })()}
