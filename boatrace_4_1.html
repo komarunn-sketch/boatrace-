@@ -1141,6 +1141,28 @@ function simSampleST(course){
 // アウト艇（コース3以上）の中から「まくり／まくり差し」の実際の勝者を選ぶ。accelスコアを
 // 主軸にしつつ、選手個人の決まり手成績（rd.kimariCount、直近1年固定・実測）が使える場合は
 // まくり＋まくり差しの個人発生率で重みを追加する（データが無い/薄い艇は実質的にaccelのみで決まる）。
+// 「差し」の勝者選定用：艇番別の実測シェア（全期間n=33,620、コース2が過半だが3～6コースからの
+// 差しも計 35%ほど存在するため、コース2固定は単純化しすぎと判明。コース別基準重み×個人の
+// 差し実績（あれば）で重み付き抽選する。
+var SASHI_COURSE_WEIGHT={2:0.645,3:0.128,4:0.146,5:0.048,6:0.032};
+function simPickSashiWinner(courseAssignment,personalKimari){
+  var candidates=[];
+  for(var b=1;b<=6;b++)if(courseAssignment[b]>=2)candidates.push(b);
+  var weights=candidates.map(function(b){
+    var course=courseAssignment[b];
+    var courseW=SASHI_COURSE_WEIGHT[course]||0.01;
+    var rate=0;
+    if(personalKimari&&personalKimari.raceCount&&personalKimari.raceCount[b-1]){
+      var sc=(personalKimari.sashi&&personalKimari.sashi[b-1])||0;
+      rate=sc/personalKimari.raceCount[b-1];
+    }
+    return courseW*(1+rate*3);
+  });
+  var total=0;weights.forEach(function(w){total+=w;});
+  var r=Math.random()*total;
+  for(var i=0;i<candidates.length;i++){r-=weights[i];if(r<=0)return candidates[i];}
+  return candidates[candidates.length-1];
+}
 function simPickOuterWinner(courseAssignment,canVal,personalKimari){
   var candidates=[];
   for(var b=1;b<=6;b++)if(courseAssignment[b]>=3)candidates.push(b);
@@ -1184,9 +1206,7 @@ function simulateRaceOnce(canVal,personalKimari){
   if(kimarite==="まくり"||kimarite==="まくり差し"){
     winner=simPickOuterWinner(courseAssignment,canVal,personalKimari);
   }else if(kimarite==="差し"){
-    winner=null;
-    for(var bb2=1;bb2<=6;bb2++)if(courseAssignment[bb2]===2){winner=bb2;break;}
-    if(winner==null)winner=2;
+    winner=simPickSashiWinner(courseAssignment,personalKimari);
   }else{
     var cands=[1,2,3,4,5,6].filter(function(x){return x!==1;});
     winner=cands[Math.floor(Math.random()*cands.length)];
@@ -1398,7 +1418,7 @@ function computeRaceSimulation(rd,trials){
   // 選手個人の決まり手成績（直近1年固定・実測）。データが無いレースはnullのまま
   // （simPickOuterWinner側でaccelのみのフォールバックになる）。
   var personalKimari=(rd.kimariCount&&rd.racerRaceCount)?{
-    makuri:rd.kimariCount.makuri,makurizashi:rd.kimariCount.makurizashi,raceCount:rd.racerRaceCount
+    sashi:rd.kimariCount.sashi,makuri:rd.kimariCount.makuri,makurizashi:rd.kimariCount.makurizashi,raceCount:rd.racerRaceCount
   }:null;
   var N=trials||3000;
   var sigParts=[];
@@ -4651,12 +4671,34 @@ function App() {
                           </div>
                           <span style={{width:52,fontSize:12,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{o.winPct.toFixed(1)}%</span>
                         </div>
-                        <div style={{fontSize:10,color:"#9db5cc",marginLeft:30,marginTop:2}}>
-                          {o.breakdown.filter(function(k){return k.pct>=0.5;}).map(function(k){
-                            var vr=(venue&&VENUE_KIMARITE_RATES[venue]&&VENUE_KIMARITE_RATES[venue][o.b]&&VENUE_KIMARITE_RATES[venue][o.b][k.kimarite]!=null)?(VENUE_KIMARITE_RATES[venue][o.b][k.kimarite]*100).toFixed(1):null;
-                            return k.kimarite+" "+k.pct.toFixed(1)+"%"+(vr!=null?"（場平均"+vr+"%）":"");
-                          }).join(" / ")}
-                        </div>
+                        {(function(){
+                          var top=o.breakdown[0];
+                          if(!top||top.pct<0.5)return null;
+                          var vr=(venue&&VENUE_KIMARITE_RATES[venue]&&VENUE_KIMARITE_RATES[venue][o.b]&&VENUE_KIMARITE_RATES[venue][o.b][top.kimarite]!=null)?(VENUE_KIMARITE_RATES[venue][o.b][top.kimarite]*100):null;
+                          return (
+                            <div style={{marginLeft:30,marginTop:6}}>
+                              <div style={{fontSize:10,color:"#9db5cc",marginBottom:4}}>「{top.kimarite}」の確率</div>
+                              <div style={{display:"grid",gap:3}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                  <span style={{width:46,fontSize:9,color:"#6b7a8c",flexShrink:0}}>今レース</span>
+                                  <div style={{flex:1,position:"relative",height:12,background:"#0e1b2c",borderRadius:3,overflow:"hidden"}}>
+                                    <div style={{height:"100%",width:top.pct+"%",background:"#7db4e8",borderRadius:3}}/>
+                                  </div>
+                                  <span style={{width:32,fontSize:10,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{top.pct.toFixed(0)}%</span>
+                                </div>
+                                {vr!=null&&(
+                                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                  <span style={{width:46,fontSize:9,color:"#6b7a8c",flexShrink:0}}>場平均</span>
+                                  <div style={{flex:1,position:"relative",height:12,background:"#0e1b2c",borderRadius:3,overflow:"hidden"}}>
+                                    <div style={{height:"100%",width:vr+"%",background:"#4a5d70",borderRadius:3}}/>
+                                  </div>
+                                  <span style={{width:32,fontSize:10,color:"#9db5cc",textAlign:"right",flexShrink:0}}>{vr.toFixed(0)}%</span>
+                                </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
