@@ -1410,6 +1410,76 @@ var VENUE_KIMARITE_RATES = {
 var RACE_SIM_CACHE={};
 // rdを受け取り、艇番×決まり手のクロス集計（%）を返す。accelスコアが計算できない場合はnull。
 // 同一レース・同一展示データに対しては結果をキャッシュし、再描画のたびに数値が揺れないようにする。
+// ==================== 試験的：新モデル(Plackett-Luce)予測 ====================
+// 5人アドバイザー会議の提案でAI1着%・V2をゼロから再設計中。バックテスト（Python・
+// walkforward_harness.py、直近90日で最終学習、2026-08-08時点）で全期間ウォークフォワード
+// 回収率105.1%（1点買い）・107.3%（3～5点買い、大口payout依存なし）を確認済み。
+// 買い目ロジックには未使用・参考表示専用（5人会議の凍結方針の例外扱い、レース展開
+// シミュレーションと同じ位置づけ）。
+const PL_MODEL={
+  features:["win1_直近6ヶ月","ren2_直近6ヶ月","ren3raw_直近6ヶ月","motor_rate","motor_ren2","motor_ren3_v","tenji","chokusen","class_score","kimari_nige_rate","kimari_sashi_rate","kimari_makuri_rate","kimari_makurizashi_rate","f_hold_num","course_num"],
+  weights:[0.031204024377990875,0.03794854076325616,0.530458568708921,0.018437826795330767,0.06687369568498343,0.14798387332784846,-0.24246385226188694,-0.47643238109052816,0.2659457739610844,0.2167964202696977,0.03197735850366755,0.03935903980116352,0.05010010922698992,-0.030626261344366166,-0.10709224427816987],
+  means:[16.559175023513173,16.591978648817015,49.818930242216226,16.629319339966028,33.299393351128366,49.962264677341096,6.825774986638162,7.339158185434812,2.6400776322173702,8.810457737343718,1.966362293318832,2.5317298135699686,1.9440205838933393,0.08038573508005822,3.4966399805919455],
+  stds:[21.16606455595214,12.084239110302603,25.178766603588933,6.541309810954511,9.254622833806627,10.35585850735544,0.11227610439038173,0.6453936802875058,0.9185166161681689,21.339946284281385,4.6082299359958405,4.955967810646426,4.111619010964501,0.2718894420085063,1.7065570851410234],
+  trainedAt:"2026-08-08",trainPeriod:"2026-05-11～2026-08-08",trainN:13740,
+};
+const PL_CLASS_SCORE={A1:4,A2:3,B1:2,B2:1};
+function computePLFeatures(rd,b){
+  var rs=rd.racerStats;var kc=rd.kimariCount;
+  var rc=rd.racerRaceCount?rd.racerRaceCount[b-1]:null;
+  var denom=(rc&&rc>0)?rc:1;
+  return[
+    rs.win1&&rs.win1["直近6ヶ月"]?(rs.win1["直近6ヶ月"][b-1]||0):0,
+    rs.ren2&&rs.ren2["直近6ヶ月"]?(rs.ren2["直近6ヶ月"][b-1]||0):0,
+    rs.ren3raw&&rs.ren3raw["直近6ヶ月"]?(rs.ren3raw["直近6ヶ月"][b-1]||0):0,
+    rd.motors&&rd.motors[b]?(rd.motors[b].rate||0):0,
+    rd.motors&&rd.motors[b]?(rd.motors[b].ren2||0):0,
+    rd.motors&&rd.motors[b]?(rd.motors[b].ren3||0):0,
+    rd.inputs&&rd.inputs[b]?parseFloat(rd.inputs[b].tenji)||0:0,
+    rd.inputs&&rd.inputs[b]?parseFloat(rd.inputs[b].chokusen)||0:0,
+    rd.racerClass?(PL_CLASS_SCORE[rd.racerClass[b-1]]||0):0,
+    kc?(kc.nige[b-1]||0)/denom*100:0,
+    kc?(kc.sashi[b-1]||0)/denom*100:0,
+    kc?(kc.makuri[b-1]||0)/denom*100:0,
+    kc?(kc.makurizashi[b-1]||0)/denom*100:0,
+    rd.fHold?(rd.fHold[b]?1:0):0,
+    rd.courses?(rd.courses[b]||0):0,
+  ];
+}
+function computePLStrength(rd,b){
+  var feats=computePLFeatures(rd,b);
+  var z=0;
+  for(var i=0;i<feats.length;i++){
+    var std=PL_MODEL.stds[i]>1e-9?PL_MODEL.stds[i]:1;
+    var norm=(feats[i]-PL_MODEL.means[i])/std;
+    z+=norm*PL_MODEL.weights[i];
+  }
+  return Math.exp(z);
+}
+function computePLPrediction(rd){
+  if(!rd.racerStats||!rd.motors||!rd.inputs||!rd.racerClass||!rd.kimariCount||!rd.racerRaceCount||!rd.courses)return null;
+  var s={};
+  for(var b=1;b<=6;b++)s[b]=computePLStrength(rd,b);
+  var S1=0;
+  for(var b2=1;b2<=6;b2++)S1+=s[b2];
+  var combos=[];
+  var boats=[1,2,3,4,5,6];
+  for(var i=0;i<6;i++){
+    for(var j=0;j<6;j++){
+      if(j===i)continue;
+      for(var k=0;k<6;k++){
+        if(k===i||k===j)continue;
+        var b0=boats[i],b1=boats[j],b2c=boats[k];
+        var S2=S1-s[b0];
+        var S3=S2-s[b1];
+        var prob=(S2>0&&S3>0)?(s[b0]/S1)*(s[b1]/S2)*(s[b2c]/S3):0;
+        combos.push({combo:[b0,b1,b2c],prob:prob});
+      }
+    }
+  }
+  combos.sort(function(a,b){return b.prob-a.prob;});
+  return{combos:combos,strength:s};
+}
 function computeRaceSimulation(rd,trials){
   var accel=computeAccelScores(rd);
   if(!accel)return null;
@@ -4704,6 +4774,37 @@ function App() {
                   })}
                 </div>
                 <div style={{fontSize:9,color:"#6b7a8c",marginTop:6}}>過去実測（進入コース・ST・決まり手の確率分布）に基づくモンテカルロシミュレーション（{sim.N}試行）。参考表示専用で買い目ロジックには使用していません。「抜き」「恵まれ」は精度が粗いため目安程度にご覧ください。</div>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div style={{marginBottom:24}}>
+          <div id="section-pl-model" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>試験的：新モデル(Plackett-Luce)予測</div>
+          {(function(){
+            var pred=computePLPrediction(rd);
+            if(!pred){
+              return <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべてのデータが揃うと表示します</div>;
+            }
+            return (
+              <div style={{background:"#16273c",borderRadius:10,padding:"12px 14px"}}>
+                <div style={{fontSize:10,color:"#f9c513",marginBottom:8}}>⚠ 試験段階（バックテスト回収率105～107%を確認済み、5人会議凍結方針の例外として参考表示のみ・買い目ロジックには未使用）</div>
+                <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>上位5組み合わせ（3連単）</div>
+                <div>
+                  {pred.combos.slice(0,5).map(function(c,i){
+                    return (
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                        <span style={{width:20,fontSize:10,color:"#6b7a8c",flexShrink:0}}>{i+1}位</span>
+                        <span style={{width:70,fontSize:13,fontWeight:800,color:"#fff",flexShrink:0}}>{c.combo.join("-")}</span>
+                        <div style={{flex:1,position:"relative",height:12,background:"#0e1b2c",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:(c.prob*100/pred.combos[0].prob*100)+"%",background:"#7db4e8",borderRadius:3}}/>
+                        </div>
+                        <span style={{width:44,fontSize:11,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{(c.prob*100).toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:9,color:"#6b7a8c",marginTop:8}}>選手成績・展示・モーター・級別・決まり手率・F持ち・コースの15項目から学習したPlackett-Luceモデル（学習期間{PL_MODEL.trainPeriod}、n={PL_MODEL.trainN}）。バックテストでは上位3～5点均等買いが回収率107.3%・的中率25～36%で最も安定（1点買い105.1%）。まだ試験段階のため参考程度にご覧ください。</div>
               </div>
             );
           })()}
