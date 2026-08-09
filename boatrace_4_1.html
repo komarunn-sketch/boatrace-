@@ -2630,13 +2630,6 @@ function QuickNav(props){
       if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
     },60);
   }
-  function jumpToPLModel(){
-    props.setActiveTab("data");
-    setTimeout(function(){
-      var el=document.getElementById("section-pl-model");
-      if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
-    },60);
-  }
   return (
     <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999}}>
       <div style={{background:"#16273c",borderBottom:"1px solid #2c4762",padding:"4px",display:"flex",gap:3,boxSizing:"border-box"}}>
@@ -2652,8 +2645,8 @@ function QuickNav(props){
         <button key="yoso" onClick={function(){props.setActiveTab("yoso");}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:props.activeTab==="yoso"?"1px solid #5a87b8":"1px solid #2c4762",background:props.activeTab==="yoso"?"#2c4762":"#0e1b2c",color:props.activeTab==="yoso"?"#fff":"#a9cbea",fontSize:11,fontWeight:700,cursor:"pointer"}}>
           ③予想・買い目
         </button>
-        <button key="pl-model" onClick={jumpToPLModel} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:"1px solid #9a7a1f",background:"#3d2f0e",color:"#f9c513",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-          新モデルへ
+        <button key="pl-model" onClick={function(){props.setActiveTab("plmodel");}} style={{flex:"1 1 0",padding:"6px 2px",borderRadius:6,border:props.activeTab==="plmodel"?"1px solid #9a7a1f":"1px solid #6b5a1f",background:props.activeTab==="plmodel"?"#5a4517":"#3d2f0e",color:"#f9c513",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          ④新モデル
         </button>
       </div>
     </div>
@@ -4790,37 +4783,6 @@ function App() {
         </div>
 
         <div style={{marginBottom:24}}>
-          <div id="section-pl-model" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>試験的：新モデル(Plackett-Luce)予測</div>
-          {(function(){
-            var pred=computePLPrediction(rd);
-            if(!pred){
-              return <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべてのデータが揃うと表示します</div>;
-            }
-            return (
-              <div style={{background:"#16273c",borderRadius:10,padding:"12px 14px"}}>
-                <div style={{fontSize:10,color:"#f9c513",marginBottom:8}}>⚠ 試験段階（バックテスト回収率105～107%を確認済み、5人会議凍結方針の例外として参考表示のみ・買い目ロジックには未使用）</div>
-                <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>上位5組み合わせ（3連単）</div>
-                <div>
-                  {pred.combos.slice(0,5).map(function(c,i){
-                    return (
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                        <span style={{width:20,fontSize:10,color:"#6b7a8c",flexShrink:0}}>{i+1}位</span>
-                        <span style={{width:70,fontSize:13,fontWeight:800,color:"#fff",flexShrink:0}}>{c.combo.join("-")}</span>
-                        <div style={{flex:1,position:"relative",height:12,background:"#0e1b2c",borderRadius:3,overflow:"hidden"}}>
-                          <div style={{height:"100%",width:(c.prob*100/pred.combos[0].prob*100)+"%",background:"#7db4e8",borderRadius:3}}/>
-                        </div>
-                        <span style={{width:44,fontSize:11,fontWeight:800,color:"#fff",textAlign:"right",flexShrink:0}}>{(c.prob*100).toFixed(1)}%</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{fontSize:9,color:"#6b7a8c",marginTop:8}}>選手成績・展示・モーター・級別・決まり手率・F持ち・コースの15項目から学習したPlackett-Luceモデル（学習期間{PL_MODEL.trainPeriod}、n={PL_MODEL.trainN}）。バックテストでは上位3～5点均等買いが回収率107.3%・的中率25～36%で最も安定（1点買い105.1%）。まだ試験段階のため参考程度にご覧ください。</div>
-              </div>
-            );
-          })()}
-        </div>
-
-        <div style={{marginBottom:24}}>
           <div id="section-tenji" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>展示タイム一覧</div>
           {venue&&VENUE_TENJI_IMPORTANCE[venue]&&(function(){
             var info=VENUE_TENJI_IMPORTANCE[venue];
@@ -5198,6 +5160,78 @@ function App() {
         )}
 
         </>)}
+
+            {activeTab==="plmodel"&&(
+              <div id="section-plmodel" style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🧪 試験的：新モデル(Plackett-Luce)予測</div>
+                </div>
+                <div style={{fontSize:11,color:"#f9c513",background:"#3d2f0e",borderRadius:6,padding:"8px 10px",marginBottom:12}}>
+                  ⚠ 試験段階：バックテスト（正真正銘のアウトオブサンプル、2026-08-08時点）で全期間回収率105.1%（1点買い）・107.3%（3～5点買い）を確認済み。5人会議の凍結方針の例外として参考表示のみ・買い目ロジックには未使用です。
+                </div>
+                {(function(){
+                  var pred=computePLPrediction(rd);
+                  if(!pred){
+                    return <div style={{textAlign:"center",padding:"30px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべてのデータ（選手成績・展示・モーター・級別・決まり手・進入コース）が揃うと表示します</div>;
+                  }
+                  return (
+                    <div>
+                      <div style={{marginBottom:14}}>
+                        <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>艇別の強さスコア（相対値）</div>
+                        <div style={{display:"flex",gap:6}}>
+                          {[1,2,3,4,5,6].map(function(b){
+                            var maxS=Math.max.apply(null,Object.values(pred.strength));
+                            var pct=pred.strength[b]/maxS*100;
+                            return (
+                              <div key={b} style={{flex:1,textAlign:"center"}}>
+                                <div style={{fontSize:10,color:"#6b7a8c",marginBottom:2}}><LB b={b}/></div>
+                                <div style={{height:60,background:"#0e1b2c",borderRadius:4,position:"relative",overflow:"hidden",display:"flex",alignItems:"flex-end"}}>
+                                  <div style={{width:"100%",height:pct+"%",background:"#7db4e8"}}/>
+                                </div>
+                                <div style={{fontSize:10,color:"#9db5cc",marginTop:2}}>{pred.strength[b].toFixed(2)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>3連単 全120通りの確率（確率降順、上位3～5点が推奨買い目レンジ）</div>
+                      <div style={{maxHeight:520,overflowY:"auto",border:"1px solid #2c4762",borderRadius:6}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                          <thead>
+                            <tr style={{position:"sticky",top:0,background:"#0e1b2c",color:"#a9cbea",fontSize:10}}>
+                              <th style={{padding:"6px 8px",textAlign:"center"}}>順位</th>
+                              <th style={{padding:"6px 8px",textAlign:"center"}}>組み合わせ</th>
+                              <th style={{padding:"6px 8px",textAlign:"left"}}>確率</th>
+                              <th style={{padding:"6px 8px",textAlign:"right"}}>％</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pred.combos.map(function(c,i){
+                              var rank=i+1;
+                              var bg=rank<=3?"#20351f":(rank<=5?"#2a2f1a":"transparent");
+                              var maxProb=pred.combos[0].prob;
+                              return (
+                                <tr key={i} style={{background:bg,borderBottom:"1px solid #1d3149"}}>
+                                  <td style={{padding:"4px 8px",textAlign:"center",color:"#6b7a8c",fontSize:10}}>{rank}</td>
+                                  <td style={{padding:"4px 8px",textAlign:"center",fontWeight:800,color:"#fff"}}>{c.combo.join("-")}</td>
+                                  <td style={{padding:"4px 8px"}}>
+                                    <div style={{position:"relative",height:10,background:"#0e1b2c",borderRadius:3,overflow:"hidden",width:"100%"}}>
+                                      <div style={{height:"100%",width:(c.prob/maxProb*100)+"%",background:rank<=5?"#7db4e8":"#3d5570",borderRadius:3}}/>
+                                    </div>
+                                  </td>
+                                  <td style={{padding:"4px 8px",textAlign:"right",fontWeight:rank<=5?800:400,color:rank<=5?"#fff":"#9db5cc"}}>{(c.prob*100).toFixed(2)}%</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div style={{fontSize:9,color:"#6b7a8c",marginTop:8}}>選手成績（直近6ヶ月）・展示・モーター・級別・決まり手率・F持ち・進入コースの15項目から学習したPlackett-Luceモデル（学習期間{PL_MODEL.trainPeriod}、n={PL_MODEL.trainN}）。緑背景の上位3～5点がバックテストで最も安定した買い方（回収率107.3%・的中率25～36%）でした。まだ試験段階のため参考程度にご覧ください。</div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {activeTab==="yoso"&&yoso&&(
               <div id="section-yoso" style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
