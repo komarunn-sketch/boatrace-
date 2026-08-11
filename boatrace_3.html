@@ -4881,21 +4881,25 @@ function App() {
                 var over=b1r.aiP1>=B1_FIXED_AI1_THRESH;
                 return <span style={{fontSize:15,fontWeight:800,padding:"4px 12px",borderRadius:999,background:over?"#123a42":"#16273c",color:over?"#5dc9f9":"#6b7d94",border:over?"1px solid #2ea9c9":"1px solid #2c4762"}}>1号艇aiP1 {b1r.aiP1}%</span>;
               })()}
-              {(function(){
-                var c1=rd.course1Stats&&rd.course1Stats[1];
-                if(!c1)return null;
-                var n=c1.starts||0;
-                if(n<=0)return null;
-                var pct=function(x){return (x/n*100).toFixed(1);};
-                return <span style={{fontSize:10,color:"#9db5cc",padding:"4px 10px",borderRadius:8,background:"#16273c",border:"1px solid #2c4762"}}>
-                  1コース自前集計（n={n}）　
-                  逃げ{c1.nige||0}/{n}({pct(c1.nige||0)}%)　
-                  差され{c1.sasare||0}/{n}({pct(c1.sasare||0)}%)　
-                  捲られ{c1.makurare||0}/{n}({pct(c1.makurare||0)}%)　
-                  捲り差され{c1.makuraresashi||0}/{n}({pct(c1.makuraresashi||0)}%)
-                </span>;
-              })()}
             </div>
+            {(function(){
+              var c1=rd.course1Stats&&rd.course1Stats[1];
+              if(!c1)return null;
+              var n=c1.starts||0;
+              if(n<=0)return null;
+              var pct=function(x){return (x/n*100).toFixed(1);};
+              var itemS={fontSize:16,fontWeight:800,color:"#fff"};
+              var labelS={fontSize:12,fontWeight:700,color:"#a9cbea",marginRight:4};
+              return <div style={{marginBottom:12,padding:"10px 12px",borderRadius:10,background:"#16273c",border:"1px solid #2c4762"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#a9cbea",marginBottom:6}}>1コース自前集計（n={n}）</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"8px 20px"}}>
+                  <div><span style={labelS}>逃げ</span><span style={itemS}>{c1.nige||0}/{n}（{pct(c1.nige||0)}%）</span></div>
+                  <div><span style={labelS}>差され</span><span style={itemS}>{c1.sasare||0}/{n}（{pct(c1.sasare||0)}%）</span></div>
+                  <div><span style={labelS}>捲られ</span><span style={itemS}>{c1.makurare||0}/{n}（{pct(c1.makurare||0)}%）</span></div>
+                  <div><span style={labelS}>捲り差され</span><span style={itemS}>{c1.makuraresashi||0}/{n}（{pct(c1.makuraresashi||0)}%）</span></div>
+                </div>
+              </div>;
+            })()}
             {result.dup&&<div style={{fontSize:12,color:"#f9c513",background:"#2e2710",border:"1px solid #6b5a1d",borderRadius:8,padding:"8px 10px",marginBottom:12}}>⚠ 同じコースに複数の艇が入っています。</div>}
 
 
