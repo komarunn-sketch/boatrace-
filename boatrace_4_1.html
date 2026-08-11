@@ -2186,10 +2186,14 @@ function parseNewCSV(allRows){
   // F数・L数・今節F持ち(Bファイル)は、日によって列位置が異なる（実測F/Lがある日と無い日で
   // 後ろの列がズレる）ため、固定列番号ではなくヘッダー行から名前で位置を探す。
   var flColIdx={"F数":-1,"L数":-1,"今節F持ち(Bファイル)":-1,"今節F持ち(実測)":-1,"今節L持ち(実測)":-1};
+  // 1コース自前集計（course1_starts/nige/sasare/makurare/makuraresashi、add_course1_to_race_csv.jsが
+  // 末尾に追加する列、2026-08-11新規）もF/Lと同じようにヘッダー名で位置を探す。
+  var c1ColIdx={"course1_starts":-1,"course1_nige":-1,"course1_sasare":-1,"course1_makurare":-1,"course1_makuraresashi":-1};
   if(allRows[0]){
     for(var hi=0;hi<allRows[0].length;hi++){
       var hname=(allRows[0][hi]||"").trim();
       if(flColIdx.hasOwnProperty(hname))flColIdx[hname]=hi;
+      if(c1ColIdx.hasOwnProperty(hname))c1ColIdx[hname]=hi;
     }
   }
   var raceMap={};
@@ -2306,6 +2310,18 @@ function parseNewCSV(allRows){
         // （Bファイルは今節ベースの粗い代替信号のため、期の情報が無い場合の次善策として使う）。
         base.fHold[b]=fCnt!=null?fCnt>=1:(bflagForFallback===1);
         base.fHoldToday[b]=konsetsuF===1; // 参考情報：今節中に実際にFが発生したか（F持ち判定には使わない）
+      }
+      // 1コース自前集計（登録番号・艇番ごとの履歴ではなく、現在バインドされた登録番号の選手自体の1コース履歴）
+      var c1Starts=c1ColIdx["course1_starts"]>=0?pi(row[c1ColIdx["course1_starts"]]):null;
+      if(c1Starts!=null&&c1Starts>0){
+        if(!base.course1Stats)base.course1Stats={1:null,2:null,3:null,4:null,5:null,6:null};
+        base.course1Stats[b]={
+          starts:c1Starts,
+          nige:c1ColIdx["course1_nige"]>=0?(pi(row[c1ColIdx["course1_nige"]])||0):0,
+          sasare:c1ColIdx["course1_sasare"]>=0?(pi(row[c1ColIdx["course1_sasare"]])||0):0,
+          makurare:c1ColIdx["course1_makurare"]>=0?(pi(row[c1ColIdx["course1_makurare"]])||0):0,
+          makuraresashi:c1ColIdx["course1_makuraresashi"]>=0?(pi(row[c1ColIdx["course1_makuraresashi"]])||0):0,
+        };
       }
     }
     base.racerClass=racerClass;
@@ -4864,6 +4880,20 @@ function App() {
                 if(!b1r||b1r.aiP1==null)return null;
                 var over=b1r.aiP1>=B1_FIXED_AI1_THRESH;
                 return <span style={{fontSize:15,fontWeight:800,padding:"4px 12px",borderRadius:999,background:over?"#123a42":"#16273c",color:over?"#5dc9f9":"#6b7d94",border:over?"1px solid #2ea9c9":"1px solid #2c4762"}}>1号艇aiP1 {b1r.aiP1}%</span>;
+              })()}
+              {(function(){
+                var c1=rd.course1Stats&&rd.course1Stats[1];
+                if(!c1)return null;
+                var n=c1.starts||0;
+                if(n<=0)return null;
+                var pct=function(x){return (x/n*100).toFixed(1);};
+                return <span style={{fontSize:10,color:"#9db5cc",padding:"4px 10px",borderRadius:8,background:"#16273c",border:"1px solid #2c4762"}}>
+                  1コース自前集計（n={n}）　
+                  逃げ{c1.nige||0}/{n}({pct(c1.nige||0)}%)　
+                  差され{c1.sasare||0}/{n}({pct(c1.sasare||0)}%)　
+                  捲られ{c1.makurare||0}/{n}({pct(c1.makurare||0)}%)　
+                  捲り差され{c1.makuraresashi||0}/{n}({pct(c1.makuraresashi||0)}%)
+                </span>;
               })()}
             </div>
             {result.dup&&<div style={{fontSize:12,color:"#f9c513",background:"#2e2710",border:"1px solid #6b5a1d",borderRadius:8,padding:"8px 10px",marginBottom:12}}>⚠ 同じコースに複数の艇が入っています。</div>}
