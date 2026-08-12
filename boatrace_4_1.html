@@ -2208,8 +2208,9 @@ function parseNewCSV(allRows){
   // 末尾に追加する列、2026-08-11新規）もF/Lと同じようにヘッダー名で位置を探す。
   var c1ColIdx={"course1_starts":-1,"course1_nige":-1,"course1_sasare":-1,"course1_makurare":-1,"course1_makuraresashi":-1};
   // 選手×進入コース別の平均ST自前集計（waku_st_avg/waku_st_n、add_racer_course_st_to_race_csv.jsが
-  // 末尾に追加する列、2026-08-12新規）も同じくヘッダー名で位置を探す。
-  var wstColIdx={"waku_st_avg":-1,"waku_st_n":-1,"waku_st_rank_avg":-1,"waku_st_rank_n":-1};
+  // 末尾に追加する列、2026-08-12新規）も同じくヘッダー名で位置を探す。直近1年版（_1y接尾辞、
+  // 2026-08-12新規）も同時に読み込み、UI側で6ヶ月/1年を切り替えられるようにする。
+  var wstColIdx={"waku_st_avg":-1,"waku_st_n":-1,"waku_st_rank_avg":-1,"waku_st_rank_n":-1,"waku_st_avg_1y":-1,"waku_st_n_1y":-1,"waku_st_rank_avg_1y":-1,"waku_st_rank_n_1y":-1};
   if(allRows[0]){
     for(var hi=0;hi<allRows[0].length;hi++){
       var hname=(allRows[0][hi]||"").trim();
@@ -2354,9 +2355,18 @@ function parseNewCSV(allRows){
       // 新規蓄積が進むまではrankAvgがnullのままになる選手・コースの組み合わせも多い。
       var wstRankAvg=wstColIdx["waku_st_rank_avg"]>=0?pf(row[wstColIdx["waku_st_rank_avg"]]):null;
       var wstRankN=wstColIdx["waku_st_rank_n"]>=0?pi(row[wstColIdx["waku_st_rank_n"]]):null;
-      if(wstAvg!=null&&wstN!=null&&wstN>0){
+      var wstAvg1y=wstColIdx["waku_st_avg_1y"]>=0?pf(row[wstColIdx["waku_st_avg_1y"]]):null;
+      var wstN1y=wstColIdx["waku_st_n_1y"]>=0?pi(row[wstColIdx["waku_st_n_1y"]]):null;
+      var wstRankAvg1y=wstColIdx["waku_st_rank_avg_1y"]>=0?pf(row[wstColIdx["waku_st_rank_avg_1y"]]):null;
+      var wstRankN1y=wstColIdx["waku_st_rank_n_1y"]>=0?pi(row[wstColIdx["waku_st_rank_n_1y"]]):null;
+      if((wstAvg!=null&&wstN!=null&&wstN>0)||(wstAvg1y!=null&&wstN1y!=null&&wstN1y>0)){
         if(!base.wakuSt)base.wakuSt={1:null,2:null,3:null,4:null,5:null,6:null};
-        base.wakuSt[b]={avg:wstAvg,n:wstN,rankAvg:(wstRankAvg!=null&&wstRankN>0)?wstRankAvg:null,rankN:(wstRankN!=null&&wstRankN>0)?wstRankN:null};
+        base.wakuSt[b]={
+          avg6mo:(wstAvg!=null&&wstN>0)?wstAvg:null,n6mo:(wstN!=null&&wstN>0)?wstN:null,
+          rankAvg6mo:(wstRankAvg!=null&&wstRankN>0)?wstRankAvg:null,rankN6mo:(wstRankN!=null&&wstRankN>0)?wstRankN:null,
+          avg1y:(wstAvg1y!=null&&wstN1y>0)?wstAvg1y:null,n1y:(wstN1y!=null&&wstN1y>0)?wstN1y:null,
+          rankAvg1y:(wstRankAvg1y!=null&&wstRankN1y>0)?wstRankAvg1y:null,rankN1y:(wstRankN1y!=null&&wstRankN1y>0)?wstRankN1y:null,
+        };
       }
     }
     base.racerClass=racerClass;
@@ -2736,6 +2746,7 @@ function App() {
   const [racerCat,setRacerCat]=useState("直近1年");
   const [stPeriod,setStPeriod]=useState("今期");
   const [kimariPeriod,setKimariPeriod]=useState("直近6ヶ月");
+  const [wakuStPeriod,setWakuStPeriod]=useState("6ヶ月"); // 枠別平均ST・平均ST順位の表示期間切り替え（2026-08-12新規、スリット予測のみに影響）
   const [curRace,setCurRace]=useState(1);
   const [races,setRaces]=useState(loadRacesFromStorage);
   const [saveStatusMsg,setSaveStatusMsg]=useState("");
@@ -3172,7 +3183,7 @@ function App() {
     // 最優先で採用する。静的なRACER_COURSE_ST（build_racer_course_st.pyで199日分から一度だけ生成、
     // 以降更新が止まって化石化していたスナップショット）は、新集計にまだデータが無い選手・コースの
     // 組み合わせのフォールバックとしてのみ使う。
-    var hasWakuSt=!!(rd.wakuSt&&[1,2,3,4,5,6].some(function(b){return rd.wakuSt[b]!=null;}));
+    var hasWakuSt=!!(rd.wakuSt&&[1,2,3,4,5,6].some(function(b){return rd.wakuSt[b]!=null&&(rd.wakuSt[b].avg6mo!=null||rd.wakuSt[b].avg1y!=null);}));
     var hasStaleWakuSt=!!(rd.playerNums&&rd.courses&&[1,2,3,4,5,6].some(function(b){
       var reg=rd.playerNums[b-1];
       var course=rd.courses[b];
@@ -3189,14 +3200,20 @@ function App() {
         var liveEntry=(rd.wakuSt&&rd.wakuSt[b])?rd.wakuSt[b]:null;
         var reg=rd.playerNums?rd.playerNums[b-1]:null;
         var course=rd.courses[b];
-        var staleEntry=(!liveEntry&&reg&&RACER_COURSE_ST[reg])?RACER_COURSE_ST[reg][String(course)]:null;
-        if(liveEntry!=null){
+        // 表示期間トグル（wakuStPeriod、2026-08-12新規）に応じて、6ヶ月版/1年版のどちらを使うか選ぶ。
+        var use1y=wakuStPeriod==="1年";
+        var selAvg=liveEntry?(use1y?liveEntry.avg1y:liveEntry.avg6mo):null;
+        var selN=liveEntry?(use1y?liveEntry.n1y:liveEntry.n6mo):null;
+        var selRankAvg=liveEntry?(use1y?liveEntry.rankAvg1y:liveEntry.rankAvg6mo):null;
+        var selRankN=liveEntry?(use1y?liveEntry.rankN1y:liveEntry.rankN6mo):null;
+        var staleEntry=(selAvg==null&&reg&&RACER_COURSE_ST[reg])?RACER_COURSE_ST[reg][String(course)]:null;
+        if(selAvg!=null){
           // 選手×コース別（進入コース基準）平均STを最優先で採用（日次更新される自前集計）。
           // サンプル数の多寡に関わらず使用し、UI側でnを併記して信頼度を判断できるようにする。
-          st=liveEntry.avg;n=liveEntry.n;mark="枠別";
+          st=selAvg;n=selN;mark="枠別";
           // 平均ST順位（該当枠でSTの順番が平均何番になっているか、2026-08-12新規）。
           // 静的フォールバックにはレース単位のST順位情報が無いため、liveEntryの場合のみ値が入る。
-          rankAvg=liveEntry.rankAvg;rankN=liveEntry.rankN;
+          rankAvg=selRankAvg;rankN=selRankN;
         } else if(staleEntry!=null){
           // 新集計にまだデータが無い選手・コースの組み合わせのみ、古い静的スナップショットにフォールバック
           st=staleEntry[0];n=staleEntry[1];mark="枠別旧";
@@ -3211,7 +3228,7 @@ function App() {
       rows.push({boat:b,course:rd.courses[b],st:st,mark:mark,n:n,rankAvg:rankAvg,rankN:rankN});
     }
     return rows.sort(function(a,b){return a.course-b.course;});
-  },[rd.sts,rd.fHold,rd.fSts,rd.courses,rd.stScore,rd.playerNums,rd.wakuSt]);
+  },[rd.sts,rd.fHold,rd.fSts,rd.courses,rd.stScore,rd.playerNums,rd.wakuSt,wakuStPeriod]);
 
   const aiEval=useMemo(function(){
     if(!result)return null;
@@ -3655,8 +3672,8 @@ function App() {
           var inT=inInp?parseFloat(inInp.tenji):NaN;
           var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
           var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
-          var myRank=(rd.wakuSt&&rd.wakuSt[myB]&&rd.wakuSt[myB].rankAvg!=null)?rd.wakuSt[myB].rankAvg:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null);
-          var inRank=(rd.wakuSt&&rd.wakuSt[inB]&&rd.wakuSt[inB].rankAvg!=null)?rd.wakuSt[inB].rankAvg:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null);
+          var myRank=(rd.wakuSt&&rd.wakuSt[myB]&&rd.wakuSt[myB].rankAvg6mo!=null)?rd.wakuSt[myB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null);
+          var inRank=(rd.wakuSt&&rd.wakuSt[inB]&&rd.wakuSt[inB].rankAvg6mo!=null)?rd.wakuSt[inB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null);
           var tOk=!isNaN(myT)&&!isNaN(inT)&&(inT-myT)>=0.1;
           var sOk=(myRank!=null&&inRank!=null)?((inRank-myRank)>=0.5):(mySt==null||inSt==null||(inSt-mySt)>=0.5);
           if(tOk&&sOk)ssaBoats.push(r.boat);
@@ -4567,7 +4584,14 @@ function App() {
 
         {activeTab==="data"&&(<>
         <div id="section-slit" style={{marginBottom:24}}>
-          <div style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>スリット予測</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <div style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea"}}>スリット予測</div>
+            <div style={{display:"flex",gap:4}}>
+              {["6ヶ月","1年"].map(function(p){
+                return <button key={p} onClick={function(){setWakuStPeriod(p);}} style={{fontSize:10,padding:"3px 8px",borderRadius:6,border:"none",fontWeight:700,cursor:"pointer",background:wakuStPeriod===p?"#2c5b8a":"#1d3149",color:wakuStPeriod===p?"#fff":"#7d95ab"}}>{p}</button>;
+              })}
+            </div>
+          </div>
           {!slit?(
             <div style={{textAlign:"center",padding:"20px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべての平均STを選択するとスリット隊形を表示します</div>
           ):(
@@ -4631,9 +4655,9 @@ function App() {
                           </div>}
                         </div>
                         <span style={{width:34,fontSize:11,color:"#9db5cc",textAlign:"right",flexShrink:0}}>.{r.st.toFixed(2).split(".")[1]}</span>
-                        {r.n!=null&&<span style={{fontSize:8,color:"#5a7a9a",flexShrink:0,marginLeft:2,width:20}} title={"選手×"+r.course+"コースの実測平均ST（サンプル"+r.n+"件）"}>n{r.n}</span>}
+                        {r.n!=null&&<span style={{fontSize:8,color:"#5a7a9a",flexShrink:0,marginLeft:2,width:20}} title={"選手×"+r.course+"コースの実測平均ST（直近"+wakuStPeriod+"・サンプル"+r.n+"件）"}>n{r.n}</span>}
                         {slit.some(function(x){return x.rankAvg!=null;})&&(
-                          <span style={{width:38,fontSize:10,color:"#c084fc",textAlign:"right",flexShrink:0,fontWeight:700}} title={r.rankN!=null?"選手×"+r.course+"コースの実測ST順位平均（サンプル"+r.rankN+"件）":undefined}>
+                          <span style={{width:38,fontSize:10,color:"#c084fc",textAlign:"right",flexShrink:0,fontWeight:700}} title={r.rankN!=null?"選手×"+r.course+"コースの実測ST順位平均（直近"+wakuStPeriod+"・サンプル"+r.rankN+"件）":undefined}>
                             {r.rankAvg!=null?r.rankAvg.toFixed(2):"―"}
                           </span>
                         )}
@@ -5016,8 +5040,8 @@ function App() {
                             var inTenji=inInp?parseFloat(inInp.tenji):NaN;
                             var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
                             var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
-                            var myAvgRank=(rd.wakuSt&&rd.wakuSt[myB]&&rd.wakuSt[myB].rankAvg!=null)?rd.wakuSt[myB].rankAvg:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null);
-                            var inAvgRank=(rd.wakuSt&&rd.wakuSt[inB]&&rd.wakuSt[inB].rankAvg!=null)?rd.wakuSt[inB].rankAvg:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null);
+                            var myAvgRank=(rd.wakuSt&&rd.wakuSt[myB]&&rd.wakuSt[myB].rankAvg6mo!=null)?rd.wakuSt[myB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null);
+                            var inAvgRank=(rd.wakuSt&&rd.wakuSt[inB]&&rd.wakuSt[inB].rankAvg6mo!=null)?rd.wakuSt[inB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null);
                             var tenjOk=!isNaN(myTenji)&&!isNaN(inTenji)&&(inTenji-myTenji)>=0.1;
                             // 平均スタート順位が内側より良い（数字が小さい）
                             var stOk=(myAvgRank!=null&&inAvgRank!=null)?(myAvgRank<inAvgRank):
