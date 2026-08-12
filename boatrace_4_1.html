@@ -91,6 +91,13 @@ const SHOW_MOTOR_B1_AXIS = false;
 // 1号艇ペナルティ修正版：206日実測で回収率102.5%（採用中の対角線バランス型114.1%・
 // 旧ベース版110.9%のいずれよりも悪化）と不採用が確定したため、2026-07-31ユーザー要望で非表示化。
 const SHOW_B1_PENALTY_FIXED = false;
+// AI1着%基準フォーメーション・v2買い目：フォワードテスト累積n=2,254（2026-08-12時点）でも
+// 回収率がバックテスト比60〜70pt低いまま改善せず、原因（VENUE_TABLESのバケット参照が
+// 非線形に崩壊しており単純な統計補正では直せないと特定済み）も解消の見込みが薄いため、
+// 2026-08-12ユーザー判断で買い目の表示のみ停止（内部計算・フォワードテスト記録用の
+// データ収集は継続、新モデル＝Plackett-Luceへ移行中）。
+const SHOW_AI1CHAKU_FORMATION = false;
+const SHOW_V2_BET = false;
 // 2026-08-01ユーザー要望：枠番別の物理的な距離差（1号艇はコース取りで一周・回り足が
 // 不利になりやすい等）を補正するための基準値。展示タイム一覧に表示専用（買い目・スコア
 // 計算には一切使わない）。単位は秒、枠1〜6の順。
@@ -5500,7 +5507,7 @@ function App() {
                     </div>
                   )}
                   </>)}
-                  {v2bet&&(
+                  {SHOW_V2_BET&&v2bet&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #8e5ce0"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🧪 v2買い目（本線4点＋対抗2点・実験的機能）</div>
@@ -5599,11 +5606,12 @@ function App() {
                       )}
                     </div>
                   )}
-                  {!v2bet&&(
+                  {SHOW_V2_BET&&!v2bet&&(
                     <div style={{marginTop:10,fontSize:10,color:"#8b9bae"}}>🧪 v2買い目：選手データ（CSV取込等）が揃うと表示されます</div>
                   )}
                   {ai1chakuBalanced&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
+                      {SHOW_AI1CHAKU_FORMATION&&(<>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:4}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#c9a8ff"}}>🎯 AI1着%基準フォーメーション（対角線バランス型）</div>
                         {isSelectedRace?(
@@ -5717,6 +5725,7 @@ function App() {
                           <div style={{fontSize:9,color:"#6b7a8c",marginTop:4}}>橙枠＋NEW＝採用中（対角線バランス型）の買い目には無い組番（修正版が新たに拾っている分）</div>
                         </div>
                       )}
+                      </>)}
                       {ren3AxisNagashi&&(
                         <div style={{marginTop:10,paddingTop:10,borderTop:"1px dashed #3a3060"}}>
                           <div style={{fontSize:11,fontWeight:800,color:"#c084fc",marginBottom:4}}>🧭 3連対率軸2頭流し（AI1着%版・全会場対応・バックテスト済み）</div>
