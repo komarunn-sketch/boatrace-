@@ -2207,11 +2207,15 @@ function parseNewCSV(allRows){
   // 1コース自前集計（course1_starts/nige/sasare/makurare/makuraresashi、add_course1_to_race_csv.jsが
   // 末尾に追加する列、2026-08-11新規）もF/Lと同じようにヘッダー名で位置を探す。
   var c1ColIdx={"course1_starts":-1,"course1_nige":-1,"course1_sasare":-1,"course1_makurare":-1,"course1_makuraresashi":-1};
+  // 選手×進入コース別の平均ST自前集計（waku_st_avg/waku_st_n、add_racer_course_st_to_race_csv.jsが
+  // 末尾に追加する列、2026-08-12新規）も同じくヘッダー名で位置を探す。
+  var wstColIdx={"waku_st_avg":-1,"waku_st_n":-1};
   if(allRows[0]){
     for(var hi=0;hi<allRows[0].length;hi++){
       var hname=(allRows[0][hi]||"").trim();
       if(flColIdx.hasOwnProperty(hname))flColIdx[hname]=hi;
       if(c1ColIdx.hasOwnProperty(hname))c1ColIdx[hname]=hi;
+      if(wstColIdx.hasOwnProperty(hname))wstColIdx[hname]=hi;
     }
   }
   var raceMap={};
@@ -2340,6 +2344,14 @@ function parseNewCSV(allRows){
           makurare:c1ColIdx["course1_makurare"]>=0?(pi(row[c1ColIdx["course1_makurare"]])||0):0,
           makuraresashi:c1ColIdx["course1_makuraresashi"]>=0?(pi(row[c1ColIdx["course1_makuraresashi"]])||0):0,
         };
+      }
+      // 選手×進入コース別の平均ST自前集計（今日その艇が走る予定コース＝艇番での実測平均、
+      // add_racer_course_st_to_race_csv.jsが末尾に追加、2026-08-12新規）
+      var wstAvg=wstColIdx["waku_st_avg"]>=0?pf(row[wstColIdx["waku_st_avg"]]):null;
+      var wstN=wstColIdx["waku_st_n"]>=0?pi(row[wstColIdx["waku_st_n"]]):null;
+      if(wstAvg!=null&&wstN!=null&&wstN>0){
+        if(!base.wakuSt)base.wakuSt={1:null,2:null,3:null,4:null,5:null,6:null};
+        base.wakuSt[b]={avg:wstAvg,n:wstN};
       }
     }
     base.racerClass=racerClass;
@@ -3151,12 +3163,17 @@ function App() {
     var rows=[];
     var hasManual=Object.values(rd.sts).some(function(v){return v!=="";});
     var hasCsvSt=rd.stScore&&rd.stScore.st1y&&rd.stScore.st1y.some(function(v){return v!=null;});
-    var hasWakuSt=!!(rd.playerNums&&rd.courses&&[1,2,3,4,5,6].some(function(b){
+    // ②（2026-08-12新規）：選手×進入コース別の平均ST自前集計（waku_st_avg/waku_st_n、日次更新）を
+    // 最優先で採用する。静的なRACER_COURSE_ST（build_racer_course_st.pyで199日分から一度だけ生成、
+    // 以降更新が止まって化石化していたスナップショット）は、新集計にまだデータが無い選手・コースの
+    // 組み合わせのフォールバックとしてのみ使う。
+    var hasWakuSt=!!(rd.wakuSt&&[1,2,3,4,5,6].some(function(b){return rd.wakuSt[b]!=null;}));
+    var hasStaleWakuSt=!!(rd.playerNums&&rd.courses&&[1,2,3,4,5,6].some(function(b){
       var reg=rd.playerNums[b-1];
       var course=rd.courses[b];
       return reg&&RACER_COURSE_ST[reg]&&RACER_COURSE_ST[reg][String(course)]!=null;
     }));
-    if(!hasManual&&!hasCsvSt&&!hasWakuSt)return null;
+    if(!hasManual&&!hasCsvSt&&!hasWakuSt&&!hasStaleWakuSt)return null;
     for(var b=1;b<=6;b++){
       var st=null,mark=null,n=null;
       if(rd.sts[b]!==""){
@@ -3164,13 +3181,17 @@ function App() {
         st=parseFloat(rd.sts[b]);
         if(rd.fHold[b]){if(rd.fSts[b]!==""){st=parseFloat(rd.fSts[b]);mark="F";}else mark="F?";}
       } else {
+        var liveEntry=(rd.wakuSt&&rd.wakuSt[b])?rd.wakuSt[b]:null;
         var reg=rd.playerNums?rd.playerNums[b-1]:null;
         var course=rd.courses[b];
-        var wakuEntry=(reg&&RACER_COURSE_ST[reg])?RACER_COURSE_ST[reg][String(course)]:null;
-        if(wakuEntry!=null){
-          // 選手×コース別（進入コース基準）平均STを最優先で採用。
+        var staleEntry=(!liveEntry&&reg&&RACER_COURSE_ST[reg])?RACER_COURSE_ST[reg][String(course)]:null;
+        if(liveEntry!=null){
+          // 選手×コース別（進入コース基準）平均STを最優先で採用（日次更新される自前集計）。
           // サンプル数の多寡に関わらず使用し、UI側でnを併記して信頼度を判断できるようにする。
-          st=wakuEntry[0];n=wakuEntry[1];mark="枠別";
+          st=liveEntry.avg;n=liveEntry.n;mark="枠別";
+        } else if(staleEntry!=null){
+          // 新集計にまだデータが無い選手・コースの組み合わせのみ、古い静的スナップショットにフォールバック
+          st=staleEntry[0];n=staleEntry[1];mark="枠別旧";
         } else if(hasCsvSt&&rd.stScore.st1y[b-1]!=null){
           // 枠別データが無い選手はCSV平均STにフォールバック（当地3ヶ月→当地1年→全国1年）
           st=rd.stScore.st1y[b-1];
@@ -3182,7 +3203,7 @@ function App() {
       rows.push({boat:b,course:rd.courses[b],st:st,mark:mark,n:n});
     }
     return rows.sort(function(a,b){return a.course-b.course;});
-  },[rd.sts,rd.fHold,rd.fSts,rd.courses,rd.stScore,rd.playerNums]);
+  },[rd.sts,rd.fHold,rd.fSts,rd.courses,rd.stScore,rd.playerNums,rd.wakuSt]);
 
   const aiEval=useMemo(function(){
     if(!result)return null;
@@ -4589,7 +4610,7 @@ function App() {
                           <div style={{position:"absolute",left:(ST_ZONE*100)+"%",top:0,bottom:0,width:2,background:"#f9c513",opacity:0.7}}/>
                           <div style={{position:"absolute",top:"50%",left:"calc("+(pComp*100)+"% - 13px)",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:3}}>
                             <LB b={r.boat}/>
-                            {r.mark&&r.mark!=="平均"&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":(r.mark==="枠別"?"#2c5b8a":"#6b5a1d"),color:"#fff"}}>{r.mark}</span>}
+                            {r.mark&&r.mark!=="平均"&&<span style={{fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:4,background:r.mark==="F"?"#b3463f":(r.mark==="枠別"?"#2c5b8a":(r.mark==="枠別旧"?"#4a5568":"#6b5a1d")),color:"#fff"}} title={r.mark==="枠別旧"?"日次自前集計にまだデータが無いため、古い静的スナップショット（〜2026年3月頃まで）にフォールバック中":undefined}>{r.mark}</span>}
                             {rd.tilts[r.boat]!==""&&parseFloat(rd.tilts[r.boat])>=1.0&&<span>⚡</span>}
                           </div>
                           {p2!=null&&<div style={{position:"absolute",top:"50%",left:"calc("+(p2*100)+"% - 10px)",transform:"translateY(-50%)",opacity:0.55}} title={"伸び加味後の予測位置（等加速度モデル）"}>
