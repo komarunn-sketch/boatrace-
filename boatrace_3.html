@@ -1412,22 +1412,40 @@ var RACE_SIM_CACHE={};
 // 同一レース・同一展示データに対しては結果をキャッシュし、再描画のたびに数値が揺れないようにする。
 // ==================== 試験的：新モデル(Plackett-Luce)予測 ====================
 // 5人アドバイザー会議の提案でAI1着%・V2をゼロから再設計中。バックテスト（Python・
-// walkforward_harness.py、直近90日で最終学習、2026-08-08時点）で全期間ウォークフォワード
-// 回収率105.1%（1点買い）・107.3%（3～5点買い、大口payout依存なし）を確認済み。
+// walkforward_harness.py、直近90日で最終学習、2026-08-11時点）で全期間ウォークフォワード
+// 回収率109.5%（1点買い、②：1号艇の逃げ率を1コース限定シュリンケージ版に精緻化）を確認済み。
 // 買い目ロジックには未使用・参考表示専用（5人会議の凍結方針の例外扱い、レース展開
 // シミュレーションと同じ位置づけ）。
 const PL_MODEL={
-  features:["win1_直近6ヶ月","ren2_直近6ヶ月","ren3raw_直近6ヶ月","motor_rate","motor_ren2","motor_ren3_v","tenji","chokusen","class_score","kimari_nige_rate","kimari_sashi_rate","kimari_makuri_rate","kimari_makurizashi_rate","f_hold_num","course_num"],
-  weights:[0.031204024377990875,0.03794854076325616,0.530458568708921,0.018437826795330767,0.06687369568498343,0.14798387332784846,-0.24246385226188694,-0.47643238109052816,0.2659457739610844,0.2167964202696977,0.03197735850366755,0.03935903980116352,0.05010010922698992,-0.030626261344366166,-0.10709224427816987],
-  means:[16.559175023513173,16.591978648817015,49.818930242216226,16.629319339966028,33.299393351128366,49.962264677341096,6.825774986638162,7.339158185434812,2.6400776322173702,8.810457737343718,1.966362293318832,2.5317298135699686,1.9440205838933393,0.08038573508005822,3.4966399805919455],
-  stds:[21.16606455595214,12.084239110302603,25.178766603588933,6.541309810954511,9.254622833806627,10.35585850735544,0.11227610439038173,0.6453936802875058,0.9185166161681689,21.339946284281385,4.6082299359958405,4.955967810646426,4.111619010964501,0.2718894420085063,1.7065570851410234],
-  trainedAt:"2026-08-08",trainPeriod:"2026-05-11～2026-08-08",trainN:13740,
+  features:["win1_直近6ヶ月","ren2_直近6ヶ月","ren3raw_直近6ヶ月","motor_rate","motor_ren2","motor_ren3_v","tenji","chokusen","class_score","kimari_nige_rate_c1repl","kimari_sashi_rate","kimari_makuri_rate","kimari_makurizashi_rate","f_hold_num","course_num"],
+  weights:[0.5095480703579124,0.03752855301779347,0.5063872737813789,0.018294976629517134,0.06800179382114878,0.1380166391556562,-0.24731854064657455,-0.47214986440231,0.2623268579908902,-0.3007099733152626,-0.08965069062343384,-0.08532482864678426,-0.04504203119785192,-0.03041054152554299,-0.14505270919517912],
+  means:[16.57455683384777,16.5972061927361,49.83399782839435,16.66631767728176,33.36526828558964,50.0325156272714,6.826181094720497,7.3337923618835745,2.641154237534525,9.07028014923541,1.9682902263156425,2.536524242661365,1.9459625677859667,0.0857319377816543,3.496656490769007],
+  stds:[21.176202626510477,12.094590380676978,25.208190174189113,6.547079380918238,9.240517288501888,10.347838774191539,0.11117154793554616,0.6506590343528942,0.9199449817759161,20.895432282799252,4.614199831786143,4.959234985535848,4.116523514843462,0.2799678064096957,1.70656587145033],
+  trainedAt:"2026-08-11",trainPeriod:"2026-05-14～2026-08-11",trainN:13758,
 };
+// ②（2026-08-12採用）：1号艇のkimari_nige_rateを「1コース限定・シュリンケージ済み」の精緻化版に
+// 置き換える。rd.course1Stats[1]（登録番号紐付けの1コース実績、自前集計）の生カウントに、
+// グローバル平均（COURSE1_GLOBAL_NIGE_RATE、train_final_model.py実行時点の1コース選手の
+// 逃げ成功率）へのベイズ縮約をかける: shrunk = (nige + k*globalRate) / (starts + k) * 100
+// これによりサンプルが薄い選手ほどグローバル平均に近づき、極端な値によるノイズを抑える。
+// モデル再学習のたびにfinal_model.jsonのcourse1GlobalNigeRate/course1ShrinkKで更新すること。
+const COURSE1_SHRINK_K=10;
+const COURSE1_GLOBAL_NIGE_RATE=0.5260212240151185;
+function computeCourse1NigeRateC1Repl(rd,b,fallback){
+  if(b!==1)return fallback;
+  var c1=rd.course1Stats&&rd.course1Stats[1];
+  if(!c1)return fallback;
+  var starts=c1.starts||0;
+  var nige=c1.nige||0;
+  return(nige+COURSE1_SHRINK_K*COURSE1_GLOBAL_NIGE_RATE)/(starts+COURSE1_SHRINK_K)*100;
+}
 const PL_CLASS_SCORE={A1:4,A2:3,B1:2,B2:1};
 function computePLFeatures(rd,b){
   var rs=rd.racerStats;var kc=rd.kimariCount;
   var rc=rd.racerRaceCount?rd.racerRaceCount[b-1]:null;
   var denom=(rc&&rc>0)?rc:1;
+  var nigeRateFallback=kc?(kc.nige[b-1]||0)/denom*100:0;
+  var nigeRateC1=computeCourse1NigeRateC1Repl(rd,b,nigeRateFallback);
   return[
     rs.win1&&rs.win1["直近6ヶ月"]?(rs.win1["直近6ヶ月"][b-1]||0):0,
     rs.ren2&&rs.ren2["直近6ヶ月"]?(rs.ren2["直近6ヶ月"][b-1]||0):0,
@@ -1438,7 +1456,7 @@ function computePLFeatures(rd,b){
     rd.inputs&&rd.inputs[b]?parseFloat(rd.inputs[b].tenji)||0:0,
     rd.inputs&&rd.inputs[b]?parseFloat(rd.inputs[b].chokusen)||0:0,
     rd.racerClass?(PL_CLASS_SCORE[rd.racerClass[b-1]]||0):0,
-    kc?(kc.nige[b-1]||0)/denom*100:0,
+    nigeRateC1,
     kc?(kc.sashi[b-1]||0)/denom*100:0,
     kc?(kc.makuri[b-1]||0)/denom*100:0,
     kc?(kc.makurizashi[b-1]||0)/denom*100:0,
