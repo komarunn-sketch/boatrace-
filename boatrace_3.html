@@ -40,6 +40,8 @@ const PLACE_NO = {
   "尼崎":13,"鳴門":14,"丸亀":15,"児島":16,"宮島":17,"徳山":18,
   "下関":19,"若松":20,"芦屋":21,"福岡":22,"唐津":23,"大村":24,
 };
+const EXCLUDED_VENUES=["江戸川"];
+function isExcludedVenue(venue){return EXCLUDED_VENUES.indexOf(venue)>=0;}
 const VENUES = {
   "桐生":[50.2,11.8,13.6,13.7,8.6,2.4],"戸田":[44.5,16.2,16.1,14.1,6.7,2.7],"江戸川":[47.0,18.4,14.5,11.8,6.6,2.6],
   "平和島":[46.8,15.6,14.7,13.1,7.4,3.1],"多摩川":[53.0,14.0,13.3,10.7,7.1,2.3],"浜名湖":[52.6,13.3,15.5,10.6,7.0,1.6],
@@ -738,6 +740,7 @@ function hasV2Data(rd){
 }
 // tsxのrdから直接v2ロジックの結果を得るための入口関数
 function computeV2FromRd(rd,venue,racerCat){
+  if(isExcludedVenue(venue))return null;
   if(!hasV2Data(rd))return null;
   var boatsV2=buildBoatsForV2(rd);
   if(!boatsV2)return null;
@@ -882,6 +885,7 @@ function makeAi1chakuBetForAxisBalanced(rd,rowsByBoat,axis,maxN){
   return pairs.slice(0,maxN).map(function(p){return [axis,p[2],p[3]];});
 }
 function computeAi1chakuFormationBalanced(result,rd,venue,pointOverride){
+  if(isExcludedVenue(venue))return null;
   if(!result||!result.rows||result.rows.length<6)return null;
   var rowsByBoat={};
   for(var b=1;b<=6;b++){
@@ -1493,7 +1497,8 @@ function computePLStrength(rd,b){
   }
   return Math.exp(z);
 }
-function computePLPrediction(rd){
+function computePLPrediction(rd,venue){
+  if(isExcludedVenue(venue))return null;
   if(!rd.racerStats||!rd.motors||!rd.inputs||!rd.racerClass||!rd.kimariCount||!rd.racerRaceCount||!rd.courses)return null;
   var s={};
   for(var b=1;b<=6;b++)s[b]=computePLStrength(rd,b);
@@ -1593,6 +1598,7 @@ function computeRen3AxisNagashiFormationAccel(result,rd,venue){
   return {candidates:cands,perAxis:perAxis,bet:bet,gateCands:gateCands,accelScores:cands.map(function(b){return {b:b,score:+(accel[b].scoreChukan+accel[b].scoreNobi).toFixed(1)};})};
 }
 function computeRen3AxisNagashiFormation(result,rd,venue){
+  if(isExcludedVenue(venue))return null;
   if(!result||!result.rows||result.rows.length<6)return null;
   var rowsByBoat={};
   for(var b=1;b<=6;b++){
@@ -1632,6 +1638,7 @@ const B1_FIXED_AI1_PENDING_THRESH=50; // 展示データ取込前の「イン逃
 // 展示データの補正で1号艇のaiP1は平均+6pt前後・時には10pt以上動くため、正式な60%基準だと
 // 展示取込前はほとんど点線が表示されない（2026-07-25実測：確定21件中18件は展示前50%台以下だった）。
 function computeB1FixedRen3Axis(result,rd,venue){
+  if(isExcludedVenue(venue))return null;
   if(!result||!result.rows||result.rows.length<6)return null;
   if(!result.hasTime)return null; // 展示データが無いレースは対象外（バックテストで悪化を確認済み）
   var rowsByBoat={};
@@ -1705,6 +1712,7 @@ function compositePermutations(arr){
   return out;
 }
 function computeCompositeFormation(result,rd,venue){
+  if(isExcludedVenue(venue))return null;
   if(COMPOSITE_TOP8_VENUES.indexOf(venue)<0)return null;
   if(!result||!result.rows||result.rows.length<6)return null;
   var accel=computeAccelScores(rd);
@@ -1761,6 +1769,7 @@ function accelUpsetRankPts(rows,getVal){
   return pts;
 }
 function computeAccelUpsetFormation(result,rd,venue){
+  if(isExcludedVenue(venue))return null;
   if(!result||!result.rows||result.rows.length<6)return null;
   var accel=computeAccelScores(rd);
   if(!accel)return null;
@@ -5299,7 +5308,7 @@ function App() {
                   ⚠ 試験段階：バックテスト（正真正銘のアウトオブサンプル、2026-08-08時点）で全期間回収率105.1%（1点買い）・107.3%（3～5点買い）を確認済み。5人会議の凍結方針の例外として参考表示のみ・買い目ロジックには未使用です。
                 </div>
                 {(function(){
-                  var pred=computePLPrediction(rd);
+                  var pred=computePLPrediction(rd,venue);
                   if(!pred){
                     return <div style={{textAlign:"center",padding:"30px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:12}}>6艇すべてのデータ（選手成績・展示・モーター・級別・決まり手・進入コース）が揃うと表示します</div>;
                   }
