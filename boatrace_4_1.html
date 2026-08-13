@@ -1099,6 +1099,13 @@ var SIM_KIMARITE_DIST={
   top2:{"まくり":0.350,"まくり差し":0.287,"差し":0.260,"抜き":0.097,"逃げ":0.010},
   rank3:{"差し":0.350,"まくり":0.310,"まくり差し":0.230,"抜き":0.100,"逃げ":0.010}
 };
+var SIM_MAKURI_STYLE_BY_COURSE={
+  2:{"まくり":1.000,"まくり差し":0.000},
+  3:{"まくり":0.514,"まくり差し":0.486},
+  4:{"まくり":0.647,"まくり差し":0.353},
+  5:{"まくり":0.265,"まくり差し":0.735},
+  6:{"まくり":0.450,"まくり差し":0.550}
+};
 function simRankBucket(r){return r<=2?"top":(r<=4?"mid":"low");}
 function simRankDesc(vals,b){
   if(vals[b]==null)return null;
@@ -1212,6 +1219,11 @@ function simulateRaceOnce(canVal,personalKimari){
   var winner;
   if(kimarite==="まくり"||kimarite==="まくり差し"){
     winner=simPickOuterWinner(courseAssignment,canVal,personalKimari);
+    var winnerCourse=courseAssignment[winner];
+    var styleDist=SIM_MAKURI_STYLE_BY_COURSE[winnerCourse];
+    if(styleDist){
+      kimarite=Math.random()<styleDist["まくり"]?"まくり":"まくり差し";
+    }
   }else if(kimarite==="差し"){
     winner=simPickSashiWinner(courseAssignment,personalKimari);
   }else{
