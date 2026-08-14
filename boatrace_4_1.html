@@ -1931,13 +1931,16 @@ function synthesizeOdds(combos,oddsObj){
 // 信頼度スコア（Score A）＝1号艇の公式全国勝率−他5艇平均。
 // 【2026-08-14改修】的中率をさらに上げるため2段フィルター＋4点フォーメーションに変更：
 //   ①スコア2.0以上　②gap（他5艇の勝率2番手と3番手の差）1.0以上 → 1日2〜3レースに厳選
-//   買い目＝1-{c1,c2}-{c1,c2,c3}の4点（c1〜c3は他5艇の公式全国勝率上位3艇）、1点100円均等。
+//   買い目＝1-{c1,c2}-{c1,c2,c3}の4点（c1〜c3は他5艇の公式全国勝率上位3艇）。
 // 調整用(1/1〜6/30)／評価用(7/1〜8/13)の分割検証で的中率46.2%→45.1%とほぼ再現、ROI83〜88%
 // （score_a_precision_grid.js／score_a_formation_expand_check.js、精度分析ログ参照）。
-// 資金配分（オッズ反比例等）の最適化は後追い検証予定、それまで均等買い。
+// 資金配分（2026-08-14確定）：オッズ取得時は合計1000円をオッズ反比例で配分（払戻平準化、
+// トリガミ率17.8〜19.6%→ほぼ0%。ドリフト感度分析で±65%相当のオッズ変動まで均等比の優位維持を確認済み）。
+// オッズ未取得時は1点100円均等（合計400円）にフォールバック。できるだけ締切間際のオッズで配分を更新すること。
 const SCORE_A_THRESHOLD=2.0;
 const SCORE_A_GAP_MIN=1.0;
 const SCORE_A_STAKE_PER_POINT=100;
+const SCORE_A_TOTAL_STAKE_ODDS=1000;
 function computeScoreA(rd){
   if(!rd||!rd.officialWinRate)return null;
   var b1=rd.officialWinRate[0];
@@ -1957,6 +1960,37 @@ function allocateStakeByInverseOdds(oddsA,oddsB,total){
   if(stakeB<100){stakeB=100;stakeA=total-100;}
   return [stakeA,stakeB];
 }
+// 【2026-08-14確定】Score A用のオッズ反比例配分（N点対応・100円単位・各点最低100円）。
+// 1/oddsに比例配分＝どの点が当たっても払戻がほぼ同額になる「払戻平準化」。
+// ドリフト感度分析（score_a_stake_allocation_drift_check.js）で±65%相当のオッズ変動まで
+// 均等比の優位が崩れないことを確認済み。端数は理想配分との差が大きい点から100円ずつ調整。
+function allocateScoreAStakes(oddsList,total){
+  var n=oddsList.length,unit=100;
+  var weights=oddsList.map(function(o){return 1/o;});
+  var sumW=0;for(var i=0;i<n;i++)sumW+=weights[i];
+  var ideal=weights.map(function(w){return total*w/sumW;});
+  var stakes=ideal.map(function(v){return Math.max(unit,Math.floor(v/unit)*unit);});
+  var used=0;for(var j=0;j<n;j++)used+=stakes[j];
+  while(used>total){
+    var bi=-1,best=-Infinity;
+    for(var k=0;k<n;k++){
+      if(stakes[k]<=unit)continue;
+      var over=stakes[k]-ideal[k];
+      if(over>best){best=over;bi=k;}
+    }
+    if(bi<0)break;
+    stakes[bi]-=unit;used-=unit;
+  }
+  while(used<total){
+    var bi2=0,best2=-Infinity;
+    for(var m=0;m<n;m++){
+      var under=ideal[m]-stakes[m];
+      if(under>best2){best2=under;bi2=m;}
+    }
+    stakes[bi2]+=unit;used+=unit;
+  }
+  return stakes;
+}
 function computeScoreAFormation(rd,venue){
   if(!rd||!rd.officialWinRate)return null;
   var score=computeScoreA(rd);
@@ -1974,10 +2008,21 @@ function computeScoreAFormation(rd,venue){
   // 4点フォーメーション：1-{c1,c2}-{c1,c2,c3}
   var bet=[[1,c1,c2],[1,c1,c3],[1,c2,c1],[1,c2,c3]];
   var stakes=bet.map(function(){return SCORE_A_STAKE_PER_POINT;});
+  var allocation="equal";
+  var totalStake=SCORE_A_STAKE_PER_POINT*bet.length;
+  if(rd.odds3tan){
+    var oddsVals=bet.map(function(t){return rd.odds3tan[t[0]+"-"+t[1]+"-"+t[2]];});
+    var allOk=oddsVals.every(function(o){return o!=null&&!isNaN(o)&&o>0;});
+    if(allOk){
+      stakes=allocateScoreAStakes(oddsVals,SCORE_A_TOTAL_STAKE_ODDS);
+      allocation="inverse";
+      totalStake=SCORE_A_TOTAL_STAKE_ODDS;
+    }
+  }
   return {
     selected:true,score:score,gap:gap,candidates:[c1,c2],third:c3,bet:bet,
-    stakes:stakes,
-    totalStake:SCORE_A_STAKE_PER_POINT*bet.length,threshold:SCORE_A_THRESHOLD,gapMin:SCORE_A_GAP_MIN,
+    stakes:stakes,allocation:allocation,
+    totalStake:totalStake,threshold:SCORE_A_THRESHOLD,gapMin:SCORE_A_GAP_MIN,
   };
 }
 
@@ -5784,7 +5829,7 @@ function App() {
                         <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🎯 厳選レース該当</span>
                       </div>
                       <div style={{fontSize:10,color:"#e8c98a",marginBottom:6,lineHeight:1.5}}>
-                        信頼度スコア（1号艇の公式全国勝率−他5艇平均）={scoreAFormation.score.toFixed(2)}（閾値{scoreAFormation.threshold}以上）　gap（他5艇の勝率2番手と3番手の差）={scoreAFormation.gap.toFixed(2)}（閾値{scoreAFormation.gapMin}以上）。2段フィルター通過の厳選レース（1日2〜3件想定）。調整用1/1〜6/30／評価用7/1〜8/13の分割検証で的中率46.2%→45.1%とほぼ再現、ROI83〜88%（詳細は精度分析ログ参照）
+                        信頼度スコア（1号艇の公式全国勝率−他5艇平均）={scoreAFormation.score.toFixed(2)}（閾値{scoreAFormation.threshold}以上）　gap（他5艇の勝率2番手と3番手の差）={scoreAFormation.gap.toFixed(2)}（閾値{scoreAFormation.gapMin}以上）。2段フィルター通過の厳選レース（1日2〜3件想定）。調整用1/1〜6/30／評価用7/1〜8/13の分割検証で的中率46.2%→45.1%とほぼ再現、オッズ反比例配分でROI90%前後・トリガミほぼ0（詳細は精度分析ログ参照）
                       </div>
                       <div style={{fontSize:10,color:"#9db5cc",marginBottom:6}}>
                         2着候補（公式全国勝率上位2艇）：{scoreAFormation.candidates[0]}号艇・{scoreAFormation.candidates[1]}号艇　／　3着候補：{scoreAFormation.candidates[0]}・{scoreAFormation.candidates[1]}・{scoreAFormation.third}号艇（4点フォーメーション 1-{""+scoreAFormation.candidates[0]+scoreAFormation.candidates[1]}-{""+scoreAFormation.candidates[0]+scoreAFormation.candidates[1]+scoreAFormation.third}）
@@ -5804,7 +5849,9 @@ function App() {
                         })}
                       </div>
                       <div style={{fontSize:10,color:"#8fae9d"}}>
-                        1点{SCORE_A_STAKE_PER_POINT}円均等（合計{scoreAFormation.totalStake}円）。資金配分（オッズ反比例等）の最適化は後追い検証予定。
+                        {scoreAFormation.allocation==="inverse"
+                          ?"合計"+scoreAFormation.totalStake+"円をオッズ反比例で配分（どの点が当たっても払戻がほぼ同額）。オッズは変動するため、できるだけ締切間際に取り込み直して配分を更新するのを推奨。"
+                          :"オッズ未取得のため1点"+SCORE_A_STAKE_PER_POINT+"円均等（合計"+scoreAFormation.totalStake+"円）。オッズ取込で合計"+SCORE_A_TOTAL_STAKE_ODDS+"円のオッズ反比例配分に自動で切り替わります。"}
                       </div>
                     </div>
                   )}
