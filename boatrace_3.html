@@ -1685,6 +1685,29 @@ function computeB1FixedNirentan(rd,venue){
   return {axis:1,betCandidates:betCandidates,displayCandidates:displayCandidates,bet:bet};
 }
 
+// イン逃げ2連単モードの資金配分（ユーザー考案、精度分析ログ追記171で検証・採用）。
+// 合計1000円を2点に配分：オッズが低い方（的中しやすい方）＝「当たれば1000円ちょうど回収」できる
+// 最小限の金額（100円単位に丸め、100〜900円にクランプ）に抑え、残り全額をオッズが高い方（的中し
+// にくいが配当が乗る方）に投入する。全期間n=1174のバックテストで均等配分(500/500円)の回収率112.4%
+// に対し114.9%と上回ることを確認済み（逆パターン＝高い方を回収点にすると107.4%に悪化し不採用）。
+function computeNirentanStakeAllocation(oddsMap,betCandidates){
+  if(!betCandidates||betCandidates.length!==2)return null;
+  var odds=betCandidates.map(function(s){
+    var o=oddsMap&&oddsMap["1-"+s];
+    return (o!=null&&!isNaN(o))?o:null;
+  });
+  if(odds[0]==null||odds[1]==null)return null;
+  var lowIdx=odds[0]<=odds[1]?0:1;
+  var highIdx=lowIdx===0?1:0;
+  var stakeLow=Math.round((1000/odds[lowIdx])/100)*100;
+  stakeLow=Math.max(100,Math.min(900,stakeLow));
+  var stakeHigh=1000-stakeLow;
+  var out={};
+  out[betCandidates[lowIdx]]={odds:odds[lowIdx],stake:stakeLow,role:"回収点",payoutIfHit:Math.round(stakeLow*odds[lowIdx])};
+  out[betCandidates[highIdx]]={odds:odds[highIdx],stake:stakeHigh,role:"利益点",payoutIfHit:Math.round(stakeHigh*odds[highIdx])};
+  return out;
+}
+
 const COMPOSITE_TOP8_VENUES=["津","蒲郡","福岡","三国","丸亀","多摩川","下関","常滑"];
 const COMPOSITE_GAP_THRESHOLD=6;
 function compositeRankPts(rows,getVal){
@@ -1902,6 +1925,107 @@ function synthesizeOdds(combos,oddsObj){
   if(sumInv<=0)return null;
   return 1/sumInv;
 }
+
+// 【追加、2026-08-14】的中率特化モデル（方向転換：7/13不調の複雑なロジック群とは完全に独立、
+// racerCatのチューニング済み期間を経由しない新モデル）。
+// 信頼度スコア（Score A）＝1号艇の公式全国勝率−他5艇平均。
+// 【2026-08-14改修】的中率をさらに上げるため2段フィルター＋4点フォーメーションに変更：
+//   ①スコア2.0以上　②gap（他5艇の勝率2番手と3番手の差）1.0以上 → 1日2〜3レースに厳選
+//   買い目＝1-{c1,c2}-{c1,c2,c3}の4点（c1〜c3は他5艇の公式全国勝率上位3艇）。
+// 調整用(1/1〜6/30)／評価用(7/1〜8/13)の分割検証で的中率46.2%→45.1%とほぼ再現、ROI83〜88%
+// （score_a_precision_grid.js／score_a_formation_expand_check.js、精度分析ログ参照）。
+// 資金配分（2026-08-14確定）：オッズ取得時は合計1000円をオッズ反比例で配分（払戻平準化、
+// トリガミ率17.8〜19.6%→ほぼ0%。ドリフト感度分析で±65%相当のオッズ変動まで均等比の優位維持を確認済み）。
+// オッズ未取得時は1点100円均等（合計400円）にフォールバック。できるだけ締切間際のオッズで配分を更新すること。
+const SCORE_A_THRESHOLD=2.0;
+const SCORE_A_GAP_MIN=1.0;
+const SCORE_A_STAKE_PER_POINT=100;
+const SCORE_A_TOTAL_STAKE_ODDS=1000;
+function computeScoreA(rd){
+  if(!rd||!rd.officialWinRate)return null;
+  var b1=rd.officialWinRate[0];
+  if(b1==null)return null;
+  var others=[];
+  for(var i=1;i<6;i++){if(rd.officialWinRate[i]!=null)others.push(rd.officialWinRate[i]);}
+  if(others.length<3)return null;
+  var sum=0;for(var j=0;j<others.length;j++)sum+=others[j];
+  var avg=sum/others.length;
+  return b1-avg;
+}
+function allocateStakeByInverseOdds(oddsA,oddsB,total){
+  var wA=1/oddsA,wB=1/oddsB;
+  var stakeA=Math.round((total*wA/(wA+wB))/100)*100;
+  var stakeB=total-stakeA;
+  if(stakeA<100){stakeA=100;stakeB=total-100;}
+  if(stakeB<100){stakeB=100;stakeA=total-100;}
+  return [stakeA,stakeB];
+}
+// 【2026-08-14確定】Score A用のオッズ反比例配分（N点対応・100円単位・各点最低100円）。
+// 1/oddsに比例配分＝どの点が当たっても払戻がほぼ同額になる「払戻平準化」。
+// ドリフト感度分析（score_a_stake_allocation_drift_check.js）で±65%相当のオッズ変動まで
+// 均等比の優位が崩れないことを確認済み。端数は理想配分との差が大きい点から100円ずつ調整。
+function allocateScoreAStakes(oddsList,total){
+  var n=oddsList.length,unit=100;
+  var weights=oddsList.map(function(o){return 1/o;});
+  var sumW=0;for(var i=0;i<n;i++)sumW+=weights[i];
+  var ideal=weights.map(function(w){return total*w/sumW;});
+  var stakes=ideal.map(function(v){return Math.max(unit,Math.floor(v/unit)*unit);});
+  var used=0;for(var j=0;j<n;j++)used+=stakes[j];
+  while(used>total){
+    var bi=-1,best=-Infinity;
+    for(var k=0;k<n;k++){
+      if(stakes[k]<=unit)continue;
+      var over=stakes[k]-ideal[k];
+      if(over>best){best=over;bi=k;}
+    }
+    if(bi<0)break;
+    stakes[bi]-=unit;used-=unit;
+  }
+  while(used<total){
+    var bi2=0,best2=-Infinity;
+    for(var m=0;m<n;m++){
+      var under=ideal[m]-stakes[m];
+      if(under>best2){best2=under;bi2=m;}
+    }
+    stakes[bi2]+=unit;used+=unit;
+  }
+  return stakes;
+}
+function computeScoreAFormation(rd,venue){
+  if(!rd||!rd.officialWinRate)return null;
+  var score=computeScoreA(rd);
+  if(score==null)return {selected:false,score:score,gap:null};
+  var rest=[];
+  for(var b=2;b<=6;b++){
+    var v=rd.officialWinRate[b-1];
+    if(v!=null)rest.push({b:b,v:v});
+  }
+  if(rest.length<3)return {selected:false,score:score,gap:null};
+  rest.sort(function(x,y){return y.v-x.v;});
+  var gap=rest[1].v-rest[2].v;
+  if(score<SCORE_A_THRESHOLD||gap<SCORE_A_GAP_MIN)return {selected:false,score:score,gap:gap};
+  var c1=rest[0].b,c2=rest[1].b,c3=rest[2].b;
+  // 4点フォーメーション：1-{c1,c2}-{c1,c2,c3}
+  var bet=[[1,c1,c2],[1,c1,c3],[1,c2,c1],[1,c2,c3]];
+  var stakes=bet.map(function(){return SCORE_A_STAKE_PER_POINT;});
+  var allocation="equal";
+  var totalStake=SCORE_A_STAKE_PER_POINT*bet.length;
+  if(rd.odds3tan){
+    var oddsVals=bet.map(function(t){return rd.odds3tan[t[0]+"-"+t[1]+"-"+t[2]];});
+    var allOk=oddsVals.every(function(o){return o!=null&&!isNaN(o)&&o>0;});
+    if(allOk){
+      stakes=allocateScoreAStakes(oddsVals,SCORE_A_TOTAL_STAKE_ODDS);
+      allocation="inverse";
+      totalStake=SCORE_A_TOTAL_STAKE_ODDS;
+    }
+  }
+  return {
+    selected:true,score:score,gap:gap,candidates:[c1,c2],third:c3,bet:bet,
+    stakes:stakes,allocation:allocation,
+    totalStake:totalStake,threshold:SCORE_A_THRESHOLD,gapMin:SCORE_A_GAP_MIN,
+  };
+}
+
 // 買い目リストをフォーメーション表記（例：1-23-2345）に圧縮する。
 // 軸（1着）ごとにグループ化し、その軸の(2着,3着)組の中から「2着候補×3着候補（2着≠3着）」の
 // 矩形になっている部分を貪欲に探して圧縮表記にする。矩形に入らない点は単独の組番として残す。
@@ -2270,6 +2394,10 @@ function parseNewCSV(allRows){
     base.shimekiri=rd.shimekiri;
     base.pMsg="✓ CSVから読み込みました";
     var racerClass=[null,null,null,null,null,null];
+    // 【追加、2026-08-14】公式期別勝率（CSV列7・9、番組表の公式値、racerCatの期間選択に依存しない。
+    // 的中率特化モデル（computeScoreAFormation）の信頼度スコアの土台）
+    var officialWinRate=[null,null,null,null,null,null];
+    var officialLocalWinRate=[null,null,null,null,null,null];
     var playerNums=[null,null,null,null,null,null];
     var playerAreas=[null,null,null,null,null,null];
     var playerNames=[null,null,null,null,null,null];
@@ -2334,6 +2462,8 @@ function parseNewCSV(allRows){
       kc_makurizashi[idx]=pi(row[87]);
       kc_nuki[idx]=pi(row[89]);
       raceCount[idx]=pi(row[67]);
+      officialWinRate[idx]=pf(row[7]);
+      officialLocalWinRate[idx]=pf(row[9]);
       if(!base.tokuten)base.tokuten={};
       base.tokuten[b]={rate:pf(row[149]),score:pf(row[150]),minus:pf(row[151]),nodes:pi(row[152])};
       base.motors[b]={ren2:pf(row[142]),ren3:pf(row[143]),rank:pi(row[139]),rate:pf(row[141])};
@@ -2402,6 +2532,8 @@ function parseNewCSV(allRows){
     base.playerNames=playerNames;
     base.playerAreas=playerAreas;
     base.racerRaceCount=raceCount;
+    base.officialWinRate=officialWinRate;
+    base.officialLocalWinRate=officialLocalWinRate;
     base.kimariCount={nige:kc_nige,sashi:kc_sashi,makuri:kc_makuri,makurizashi:kc_makurizashi,nuki:kc_nuki};
     base.racerStats={win1:{},ren2:{},ren3:{},ren3raw:{}};
     for(var ci=0;ci<catNames.length;ci++){
@@ -2787,6 +2919,7 @@ function App() {
   const [openBaseRate,setOpenBaseRate]=useState(false);
   const [openMotorB1,setOpenMotorB1]=useState(false);
   const [openSenbatsu,setOpenSenbatsu]=useState(false);
+  const [openScoreASenbatsu,setOpenScoreASenbatsu]=useState(true);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
@@ -4163,6 +4296,34 @@ function App() {
     return out;
   },[races]);
 
+  // 【追加、2026-08-14】的中率特化モデル（Score A）：現在表示中のレースの判定結果
+  const scoreAFormation=useMemo(function(){
+    return computeScoreAFormation(rd,venue);
+  },[rd,venue]);
+
+  // 【追加、2026-08-14】的中率特化モデルの厳選レース一覧（全venue横断、締切時間順）。
+  // 既存の紫／水色の厳選レースとは判定基準が完全に独立（公式全国勝率ベース、閾値2.0以上）。
+  const scoreASenbatsuList=useMemo(function(){
+    var out=[];
+    Object.keys(races).forEach(function(key){
+      var raceEntry=races[key];
+      if(!raceEntry||!raceEntry.officialWinRate)return;
+      var sp=key.split("_");
+      var vname=sp.slice(0,-1).join("_");
+      var rnum=parseInt(sp[sp.length-1]);
+      var form=computeScoreAFormation(raceEntry,vname);
+      if(!form||!form.selected)return;
+      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
+        score:form.score,gap:form.gap,candidates:form.candidates,third:form.third});
+    });
+    out.sort(function(a,b){
+      var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
+      var tb=b.shimekiri?parseInt(b.shimekiri.split(":")[0])*60+parseInt(b.shimekiri.split(":")[1]):9999;
+      return ta-tb||(a.rnum-b.rnum);
+    });
+    return out;
+  },[races]);
+
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
   const axisPickRowsByBoat=useMemo(function(){
@@ -4347,6 +4508,32 @@ function App() {
           </div>
         )}
 
+        {scoreASenbatsuList.length>0&&(
+          <div style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openScoreASenbatsu?5:0}}>
+              <div style={{fontSize:10,color:"#f9c513",fontWeight:700}}>🎯 的中率特化モデル　厳選レースあり（スコア{SCORE_A_THRESHOLD}以上＋gap{SCORE_A_GAP_MIN}以上・4点買い）</div>
+              <button onClick={function(){setOpenScoreASenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#f9c513",border:"1px solid #7a5c00",fontWeight:700}}>{openScoreASenbatsu?"▲ 閉じる":"▼ 開く"}</button>
+            </div>
+            {openScoreASenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+              {scoreASenbatsuList.map(function(item){
+                var isActive=venue===item.vname&&curRace===item.rnum;
+                return (
+                  <button key={"scoreA_"+item.vname+"_"+item.rnum}
+                    onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                    style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                      background:isActive?"#2c4762":"#0e1b2c",
+                      color:"#f9c513",
+                      border:isActive?"2px solid #f9c513":"1px solid #7a5c00",textAlign:"left"}}>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　スコア{item.score.toFixed(2)}　gap{item.gap.toFixed(2)}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div style={{fontSize:9,color:"#f9c513"}}>1-{""+item.candidates[0]+item.candidates[1]}-{""+item.candidates[0]+item.candidates[1]+item.third}</div>
+                  </button>
+                );
+              })}
+            </div>}
+          </div>
+        )}
+
         {SHOW_MOTOR_B1_AXIS&&(function(){
           var items=[];
           Object.keys(races).forEach(function(key){
@@ -4460,8 +4647,13 @@ function App() {
               // n=301、前半443.0%・後半175.1%と両期間で黒字）を、金色の枠で目立たせる。
               var isFlip=rec&&rec.tenjiFlip;
               if(isFlip&&!isActive){borderColor="#f9c513";borderW="2px solid";}
+              // 【2026-08-14追加】的中率特化モデル（Score A）の厳選レースを一目でわかるように🎯バッジ＋金枠で表示
+              var saForm=computeScoreAFormation(r,venue);
+              var isScoreA=saForm&&saForm.selected;
+              if(isScoreA&&!isActive&&!isFlip){borderColor="#f9c513";borderW="2px solid";}
               return (
-                <button key={n} data-race={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:isFlip?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
+                <button key={n} data-race={n} onClick={function(){setCurRace(n);}} style={{minWidth:58,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,border:borderW+" "+borderColor,background:bg,color:textColor,position:"relative",boxShadow:(isFlip||isScoreA)?"0 0 6px rgba(249,197,19,0.6)":"none"}}>
+                  {isScoreA&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>🎯的中率</div>}
                   {isFlip&&<div style={{fontSize:10,fontWeight:800,lineHeight:1,color:"#f9c513"}}>⚡変化</div>}
                   {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}</div>}
                   {rec&&rec.compOdds!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,marginTop:1,color:rec.compOdds>=5?"#5dd39e":"#ff8a80"}}>合成{rec.compOdds.toFixed(1)}倍</div>}
@@ -5630,6 +5822,39 @@ function App() {
                   {SHOW_V2_BET&&!v2bet&&(
                     <div style={{marginTop:10,fontSize:10,color:"#8b9bae"}}>🧪 v2買い目：選手データ（CSV取込等）が揃うと表示されます</div>
                   )}
+                  {scoreAFormation&&scoreAFormation.selected&&(
+                    <div style={{marginTop:10,background:"#241c05",borderRadius:8,padding:"10px 12px",border:"1px solid #7a5c00"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                        <div style={{fontSize:11,fontWeight:800,color:"#f9c513"}}>🎯 的中率特化モデル（Score A、方向転換新規）2026-08-14、既存ロジックとは完全に独立）</div>
+                        <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🎯 厳選レース該当</span>
+                      </div>
+                      <div style={{fontSize:10,color:"#e8c98a",marginBottom:6,lineHeight:1.5}}>
+                        信頼度スコア（1号艇の公式全国勝率−他5艇平均）={scoreAFormation.score.toFixed(2)}（閾値{scoreAFormation.threshold}以上）　gap（他5艇の勝率2番手と3番手の差）={scoreAFormation.gap.toFixed(2)}（閾値{scoreAFormation.gapMin}以上）。2段フィルター通過の厳選レース（1日2〜3件想定）。調整用1/1〜6/30／評価用7/1〜8/13の分割検証で的中率46.2%→45.1%とほぼ再現、オッズ反比例配分でROI90%前後・トリガミほぼ0（詳細は精度分析ログ参照）
+                      </div>
+                      <div style={{fontSize:10,color:"#9db5cc",marginBottom:6}}>
+                        2着候補（公式全国勝率上位2艇）：{scoreAFormation.candidates[0]}号艇・{scoreAFormation.candidates[1]}号艇　／　3着候補：{scoreAFormation.candidates[0]}・{scoreAFormation.candidates[1]}・{scoreAFormation.third}号艇（4点フォーメーション 1-{""+scoreAFormation.candidates[0]+scoreAFormation.candidates[1]}-{""+scoreAFormation.candidates[0]+scoreAFormation.candidates[1]+scoreAFormation.third}）
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
+                        {scoreAFormation.bet.map(function(t,ti){
+                          var key=t[0]+"-"+t[1]+"-"+t[2];
+                          var o=rd.odds3tan&&rd.odds3tan[key];
+                          var stake=scoreAFormation.stakes?scoreAFormation.stakes[ti]:null;
+                          return (
+                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:"#f9c513",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                              {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{o}倍</span>}
+                              {stake!=null&&<span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{stake}円</span>}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div style={{fontSize:10,color:"#8fae9d"}}>
+                        {scoreAFormation.allocation==="inverse"
+                          ?"合計"+scoreAFormation.totalStake+"円をオッズ反比例で配分（どの点が当たっても払戻がほぼ同額）。オッズは変動するため、できるだけ締切間際に取り込み直して配分を更新するのを推奨。"
+                          :"オッズ未取得のため1点"+SCORE_A_STAKE_PER_POINT+"円均等（合計"+scoreAFormation.totalStake+"円）。オッズ取込で合計"+SCORE_A_TOTAL_STAKE_ODDS+"円のオッズ反比例配分に自動で切り替わります。"}
+                      </div>
+                    </div>
+                  )}
                   {ai1chakuBalanced&&(
                     <div style={{marginTop:10,background:"#16273c",borderRadius:8,padding:"10px 12px",border:"1px solid #4a3a70"}}>
                       {SHOW_AI1CHAKU_FORMATION&&(<>
@@ -5802,17 +6027,31 @@ function App() {
                             1着1号艇固定・2着＝aiP2上位2艇（買い目本線、38日規模で的中率53.7%・回収率108.2%）
                           </div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
-                            {b1FixedNirentan.betCandidates.map(function(s,si){
-                              var key="1-"+s;
-                              var o=rd.odds2tan&&rd.odds2tan[key];
-                              return (
-                                <span key={si} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
-                                  <span style={{fontSize:13,fontWeight:700,color:"#5dc9f9",letterSpacing:"0.03em"}}>1-{s}</span>
-                                  {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
-                                </span>
-                              );
-                            })}
+                            {(function(){
+                              var alloc=computeNirentanStakeAllocation(rd.odds2tan,b1FixedNirentan.betCandidates);
+                              return b1FixedNirentan.betCandidates.map(function(s,si){
+                                var key="1-"+s;
+                                var o=rd.odds2tan&&rd.odds2tan[key];
+                                var a=alloc&&alloc[s];
+                                return (
+                                  <span key={si} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                                    <span style={{fontSize:13,fontWeight:700,color:"#5dc9f9",letterSpacing:"0.03em"}}>1-{s}</span>
+                                    {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#f9c513"}}>{o}倍</span>}
+                                    {a&&<span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>掛け金{a.stake}円</span>}
+                                    {a&&<span style={{fontSize:10,color:"#9db5cc"}}>配当{a.payoutIfHit}円</span>}
+                                  </span>
+                                );
+                              });
+                            })()}
                           </div>
+                          {(function(){
+                            var alloc=computeNirentanStakeAllocation(rd.odds2tan,b1FixedNirentan.betCandidates);
+                            return alloc?(
+                              <div style={{fontSize:9,color:"#6b7a8c",marginBottom:4}}>
+                                資金配分：オッズが低い方＝回収点（当たれば1000円ちょうど回収）、高い方＝利益点（残り全額）。n=1174バックテストで均等配分112.4%に対し114.9%（精度分析ログ追記171）
+                              </div>
+                            ):null;
+                          })()}
                           {b1FixedNirentan.displayCandidates.length>b1FixedNirentan.betCandidates.length&&(
                             <div style={{fontSize:10,color:"#6b7a8c"}}>
                               参考（3艇目まで含めると的中率66.5%まで伸びるが回収率92.8%とやや悪化、精度分析ログ追記165参照）：
