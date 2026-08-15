@@ -1523,12 +1523,15 @@ function computePLPrediction(rd,venue){
   return{combos:combos,strength:s};
 }
 // 【追加、2026-08-15】PL精度特化モード（信頼度フィルター）：PLの1位候補の確率と、2位候補の確率差(gap)が
-// 一定以上のレースだけを厳選する。pl_precision_grid.jsでの検証（調整用/評価用/純不調期の3期間で
-// 的中率19〜20%不動・ROI103〜111%を確認済み）1点買いに基づくgap≥PL_PRECISION_GAP_MINで確定。
+// 一定以上のレースだけを厳選する。選定基準はgap≥PL_PRECISION_GAP_MINのみ（1位確率の下限は
+// 0.05〜0.12のどこに置いても結果が変わらず、prob_min単独路線は評価期間で崩壊＝過学習と判明）。
 // Score Aとの重複率は純不調期でScore A側11.2%・PL側6.7%と低く、独立した選定と確認済み（pl_scorea_overlap_check.js）。
-// 【買い目、2026-08-15変更】ユーザー方針により1点買いから3点/5点買いに変更。選定基準（gap≥PL_PRECISION_GAP_MIN）は
-// 1点買いでの検証値のまま流用（選定自体はPLで1位候補の確信度で行うため）。点数拡大後のROIは未検証。
-// combos3=上位3点（合計300円想定）、combos5=上位5点（合計500円想定）、各100円均等。
+// 【買い目、2026-08-15確定】combos3=上位3点・各100円均等（合計300円）。欠場オッズバグ修正後の
+// 3期間検証（pl_precision_grid_points.js）：調整n=683 的中45.5% ROI115.4%／評価n=170 42.9% 110.2%／
+// 純不調期n=107 42.1% 116.3%と、3期間すべて110%超で確定。
+// 5点買いは同一レースで調整105.4%→評価85.6%→純不調期86.4%と不合格（4・5点目は低配当の当たりばかり
+// 拾い構造的に不採算）のため、combos5は参考表示のみで運用対象外。
+// 資金配分（オッズ反比例・PL確率比例・期待値ベース）はいずれも3期間一貫して均等を超えられず、均等で確定。
 const PL_PRECISION_GAP_MIN=0.05;
 // 【追加、2026-08-15】合成オッズ（=1/Σ(1/各点オッズ)）の推奨ライン。この値以上なら厳選レースの中でも特に好条件。
 // 3期間検証済み（pl_precision_synth_odds_filter.js）：合成2.0以上のレースだけに絞ると
@@ -1569,6 +1572,23 @@ function computePLSynthOdds(rd,combos){
   }
   return sumInv>0?1/sumInv:null;
 }
+// 【重要バグ修正、2026-08-15】展示タイムが「一部の艇だけ空」のレースはPLの予想が壊れる。
+// computePLFeaturesは欠損値を0で埋めるため、展示だけ空の艇は標準化で平均から何十σも外れ、
+// exp(z)で強さが爆発して最強扱いになる（実データで強さ他艇最大の数十万〜1000万倍、
+// その艇が強さ1位と判定されたのは98.8%）。欠場艇は展示を走らないので必ずこの形になる。
+// 全艇が空（展示取込前）なら全艇同じ値なので相対順位に影響せず無害。危険なのは一部だけ空の場合。
+// 戻り値：展示が空の艇番の配列（全艇空・展示データ自体無しの場合は空配列＝異常なし扱い）。
+function computePartialTenjiBoats(rd){
+  if(!rd||!rd.inputs)return [];
+  var missing=[],present=0;
+  for(var b=1;b<=6;b++){
+    var iv=rd.inputs[b];
+    var t=iv?parseFloat(iv.tenji):NaN;
+    if(isFinite(t)&&t>0)present++;else missing.push(b);
+  }
+  if(present===0)return [];
+  return missing;
+}
 function computePLPrecisionPick(rd,venue){
   var pred=computePLPrediction(rd,venue);
   if(!pred||pred.combos.length<5)return {selected:false};
@@ -1577,6 +1597,10 @@ function computePLPrecisionPick(rd,venue){
   // 欠場艇を除いた実態とずれた確率を出してしまう。オッズ未取得時は判定不能なので通す。
   var kesshou=computeKesshouBoats(rd);
   if(kesshou&&kesshou.length)return {selected:false,kesshouBoats:kesshou};
+  // 【重要、2026-08-15】展示が一部の艇だけ空のレースも選定しない。上のcomputePartialTenjiBoatsの通り
+  // 強さが爆発して予想が壊れるため。これはオッズ未取得の段階でも効く唯一の欠場検知でもある。
+  var badTenji=computePartialTenjiBoats(rd);
+  if(badTenji&&badTenji.length)return {selected:false,partialTenjiBoats:badTenji};
   var top1=pred.combos[0],top2=pred.combos[1];
   var gap=top1.prob-top2.prob;
   var combos3=pred.combos.slice(0,3).map(function(c){return c.combo;});
@@ -1592,6 +1616,27 @@ function computePLPrecisionPick(rd,venue){
   else{for(var tb=1;tb<=6;tb++){var iv=rd.inputs[tb];var tv=iv?parseFloat(iv.tenji):NaN;if(isNaN(tv)){hasTenji=false;break;}}}
   return {selected:true,gap:gap,gapMin:PL_PRECISION_GAP_MIN,prob1:top1.prob,prob2:top2.prob,combo:top1.combo,combos3:combos3,combos5:combos5,
     synthOdds3:synthOdds3,synthOk:synthOk,synthMin:PL_PRECISION_SYNTH_ODDS_RECOMMEND,hasTenji:hasTenji};
+}
+// 【追加、2026-08-15】PL得意会場モード（福岡・津）。大サンプル検証（gap下限0＝全レース）で
+// 福岡は23会場1位115.0%(n=1000)・津は2位113.1%(n=966)、合算114.1% vs それ以外101.6%。
+// 評価期間（全体88.1%の不調期）でも合算109.6%、純不調期でも118.3%を維持。
+// 的中率も福岡29.4%・津29.1% vs 全体25.0%（zは約3.0/2.8）と差がある。
+// この2会場はgapフィルタをかけず全レース買ってもROIが立つため、別枠として提示する。
+// ※フォワードテスト段階（pl_venue_focus_forward_test.jsでnを蓄積中）。PL精度特化モードとは独立で、
+// 両方に選ばれるレースもある（重複したら二重に買わないこと）。
+const PL_VENUE_FOCUS_VENUES=["福岡","津"];
+function computePLVenueFocusPick(rd,venue){
+  if(PL_VENUE_FOCUS_VENUES.indexOf(venue)<0)return {selected:false};
+  var pred=computePLPrediction(rd,venue);
+  if(!pred||pred.combos.length<3)return {selected:false};
+  var kesshouV=computeKesshouBoats(rd);
+  if(kesshouV&&kesshouV.length)return {selected:false,kesshouBoats:kesshouV};
+  var badTenjiV=computePartialTenjiBoats(rd);
+  if(badTenjiV&&badTenjiV.length)return {selected:false,partialTenjiBoats:badTenjiV};
+  var vc3=pred.combos.slice(0,3).map(function(c){return c.combo;});
+  var vgap=pred.combos[0].prob-pred.combos[1].prob;
+  var vsynth=computePLSynthOdds(rd,vc3);
+  return {selected:true,venue:venue,gap:vgap,prob1:pred.combos[0].prob,combos3:vc3,synthOdds3:vsynth};
 }
 function computeRaceSimulation(rd,trials){
   var accel=computeAccelScores(rd);
@@ -2068,6 +2113,11 @@ function computeScoreAFormation(rd,venue){
   // 出走表の公式全国勝率だけでは欠場を知りようがなく、実際には買えない買い目を出してしまうため。
   var kesshouA=computeKesshouBoats(rd);
   if(kesshouA&&kesshouA.length)return {selected:false,kesshouBoats:kesshouA};
+  // 【重要、2026-08-15】展示が一部の艇だけ空のレースも選定しない。Score Aは展示タイムを使わないので
+  // PLのような強さの爆発は起きないが、欠場した艇を軸や相手に選んでしまう問題は残る。
+  // 展示が1艇だけ空なのはその艇が走っていない印で、オッズ取得前に欠場を知れる唯一の手がかり。
+  var badTenjiA=computePartialTenjiBoats(rd);
+  if(badTenjiA&&badTenjiA.length)return {selected:false,partialTenjiBoats:badTenjiA};
   var score=computeScoreA(rd);
   if(score==null)return {selected:false,score:score,gap:null};
   var rest=[];
@@ -5636,6 +5686,42 @@ function App() {
                 <div style={{fontSize:11,color:"#f9c513",background:"#3d2f0e",borderRadius:6,padding:"8px 10px",marginBottom:12}}>
                   ⚠ 試験段階：バックテスト（正真正銘のアウトオブサンプル、2026-08-08時点）で全期間回収率105.1%（1点買い）・107.3%（3～5点買い）を確認済み。5人会議の凍結方針の例外として参考表示のみ・買い目ロジックには未使用です。
                 </div>
+                {(function(){
+                  var vfPick=computePLVenueFocusPick(rd,venue);
+                  if(!vfPick||!vfPick.selected)return null;
+                  var vfDupPick=computePLPrecisionPick(rd,venue);
+                  var vfDup=!!(vfDupPick&&vfDupPick.selected);
+                  return (
+                    <div style={{marginBottom:12,background:"#132b20",borderRadius:8,padding:"10px 12px",border:"2px solid #2e6b52"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                        <div style={{fontSize:12,fontWeight:800,color:"#5dd39e"}}>🏆 PL得意会場モード（{venue}・gapフィルタなし・上位3点各100円）</div>
+                        <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:6,background:"#241c05",color:"#e8c98a",border:"1px solid #7a5c00"}}>フォワードテスト段階</span>
+                        {vfDup&&(
+                          <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:6,background:"#0a2733",color:"#7ad9ff",border:"1px solid #1f5a75"}}>⚠ PL精度特化モードと重複（二重に買わないこと）</span>
+                        )}
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8,alignItems:"center"}}>
+                        {vfPick.combos3.map(function(t,ti){
+                          var vk=t[0]+"-"+t[1]+"-"+t[2];
+                          var vo=rd.odds3tan&&rd.odds3tan[vk];
+                          return (
+                            <span key={"vf_"+ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:"#5dd39e",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                              {vo!=null&&!isNaN(vo)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{vo}倍</span>}
+                              <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>100円</span>
+                            </span>
+                          );
+                        })}
+                        {vfPick.synthOdds3!=null&&(
+                          <span style={{fontSize:10,fontWeight:700,color:"#a8d8e8"}}>合成オッズ{vfPick.synthOdds3.toFixed(2)}倍</span>
+                        )}
+                      </div>
+                      <div style={{fontSize:10,color:"#8fae9d",lineHeight:1.5}}>
+                        福岡・津はgapフィルタをかけず全レース買ってもROIが立つ会場。大サンプル検証で福岡は23会場中1位115.0%（n=1000）・津は2位113.1%（n=966）、合算114.1%に対しそれ以外は101.6%。全体が88.1%まで落ちた不調期でも合算109.6%を維持し、月別も調整期間6ヶ月中5ヶ月が100%超。ただし直近2026-08は92.3%と割れており、まだフォワードテストでnを蓄積中の段階です。この枠はgapを見ません（参考値：gap={vfPick.gap.toFixed(3)}・PL1位候補確率={(vfPick.prob1*100).toFixed(1)}%）。
+                      </div>
+                    </div>
+                  );
+                })()}
                 {(function(){
                   var pred=computePLPrediction(rd,venue);
                   if(!pred){
