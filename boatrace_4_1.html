@@ -1617,27 +1617,16 @@ function computePLPrecisionPick(rd,venue){
   return {selected:true,gap:gap,gapMin:PL_PRECISION_GAP_MIN,prob1:top1.prob,prob2:top2.prob,combo:top1.combo,combos3:combos3,combos5:combos5,
     synthOdds3:synthOdds3,synthOk:synthOk,synthMin:PL_PRECISION_SYNTH_ODDS_RECOMMEND,hasTenji:hasTenji};
 }
-// 【追加、2026-08-15】PL得意会場モード（福岡・津）。大サンプル検証（gap下限0＝全レース）で
-// 福岡は23会場1位115.0%(n=1000)・津は2位113.1%(n=966)、合算114.1% vs それ以外101.6%。
-// 評価期間（全体88.1%の不調期）でも合算109.6%、純不調期でも118.3%を維持。
-// 的中率も福岡29.4%・津29.1% vs 全体25.0%（zは約3.0/2.8）と差がある。
-// この2会場はgapフィルタをかけず全レース買ってもROIが立つため、別枠として提示する。
-// ※フォワードテスト段階（pl_venue_focus_forward_test.jsでnを蓄積中）。PL精度特化モードとは独立で、
-// 両方に選ばれるレースもある（重複したら二重に買わないこと）。
-const PL_VENUE_FOCUS_VENUES=["福岡","津"];
-function computePLVenueFocusPick(rd,venue){
-  if(PL_VENUE_FOCUS_VENUES.indexOf(venue)<0)return {selected:false};
-  var pred=computePLPrediction(rd,venue);
-  if(!pred||pred.combos.length<3)return {selected:false};
-  var kesshouV=computeKesshouBoats(rd);
-  if(kesshouV&&kesshouV.length)return {selected:false,kesshouBoats:kesshouV};
-  var badTenjiV=computePartialTenjiBoats(rd);
-  if(badTenjiV&&badTenjiV.length)return {selected:false,partialTenjiBoats:badTenjiV};
-  var vc3=pred.combos.slice(0,3).map(function(c){return c.combo;});
-  var vgap=pred.combos[0].prob-pred.combos[1].prob;
-  var vsynth=computePLSynthOdds(rd,vc3);
-  return {selected:true,venue:venue,gap:vgap,prob1:pred.combos[0].prob,combos3:vc3,synthOdds3:vsynth};
-}
+// 【削除、2026-08-15】PL得意会場モード（福岡・津）は同日中に検定で否定され削除した。
+// 一見すると良い数字が出ていた（gap下限0の大サンプルで福岡23会場1位115.0%(n=1000)・津2位113.1%(n=966)、
+// 合算114.1% vs それ以外101.6%、評価期間も109.6% vs 86.2%）が、これは多重比較の産物だった。
+// 並べ替え検定（backtest\pl_venue_edge_permutation_test.js、調整期間・試行2000回）：
+//   ・会場別の差の検定で福岡単独p=0.0550・津単独p=0.0895と、そもそも有意でない
+//   ・帰無分布の「23会場中の最高ROI」は中央値116.9%で、福岡の115.0%はそれ未満（p=0.6870）
+//   ・「2会場の組合せ全253通り中の最高ROI」は中央値115.2%で、合算114.1%はそれ未満（p=0.6555）
+// つまり会場差がゼロでも、23会場並べれば115%前後の会場は普通に出る。
+// 今後同じ会場別表を見て「福岡が良さそう」と再発見したときは、必ず上記の検定（最大値の帰無分布）にかけること。
+// 日次集計用の backtest\pl_venue_focus_forward_test.js もこの削除に伴い使用停止（ファイルは記録として残存）。
 function computeRaceSimulation(rd,trials){
   var accel=computeAccelScores(rd);
   if(!accel)return null;
@@ -5686,42 +5675,6 @@ function App() {
                 <div style={{fontSize:11,color:"#f9c513",background:"#3d2f0e",borderRadius:6,padding:"8px 10px",marginBottom:12}}>
                   ⚠ 試験段階：バックテスト（正真正銘のアウトオブサンプル、2026-08-08時点）で全期間回収率105.1%（1点買い）・107.3%（3～5点買い）を確認済み。5人会議の凍結方針の例外として参考表示のみ・買い目ロジックには未使用です。
                 </div>
-                {(function(){
-                  var vfPick=computePLVenueFocusPick(rd,venue);
-                  if(!vfPick||!vfPick.selected)return null;
-                  var vfDupPick=computePLPrecisionPick(rd,venue);
-                  var vfDup=!!(vfDupPick&&vfDupPick.selected);
-                  return (
-                    <div style={{marginBottom:12,background:"#132b20",borderRadius:8,padding:"10px 12px",border:"2px solid #2e6b52"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
-                        <div style={{fontSize:12,fontWeight:800,color:"#5dd39e"}}>🏆 PL得意会場モード（{venue}・gapフィルタなし・上位3点各100円）</div>
-                        <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:6,background:"#241c05",color:"#e8c98a",border:"1px solid #7a5c00"}}>フォワードテスト段階</span>
-                        {vfDup&&(
-                          <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:6,background:"#0a2733",color:"#7ad9ff",border:"1px solid #1f5a75"}}>⚠ PL精度特化モードと重複（二重に買わないこと）</span>
-                        )}
-                      </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8,alignItems:"center"}}>
-                        {vfPick.combos3.map(function(t,ti){
-                          var vk=t[0]+"-"+t[1]+"-"+t[2];
-                          var vo=rd.odds3tan&&rd.odds3tan[vk];
-                          return (
-                            <span key={"vf_"+ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#0e1b2c",borderRadius:6,padding:"5px 10px"}}>
-                              <span style={{fontSize:13,fontWeight:700,color:"#5dd39e",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
-                              {vo!=null&&!isNaN(vo)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{vo}倍</span>}
-                              <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>100円</span>
-                            </span>
-                          );
-                        })}
-                        {vfPick.synthOdds3!=null&&(
-                          <span style={{fontSize:10,fontWeight:700,color:"#a8d8e8"}}>合成オッズ{vfPick.synthOdds3.toFixed(2)}倍</span>
-                        )}
-                      </div>
-                      <div style={{fontSize:10,color:"#8fae9d",lineHeight:1.5}}>
-                        福岡・津はgapフィルタをかけず全レース買ってもROIが立つ会場。大サンプル検証で福岡は23会場中1位115.0%（n=1000）・津は2位113.1%（n=966）、合算114.1%に対しそれ以外は101.6%。全体が88.1%まで落ちた不調期でも合算109.6%を維持し、月別も調整期間6ヶ月中5ヶ月が100%超。ただし直近2026-08は92.3%と割れており、まだフォワードテストでnを蓄積中の段階です。この枠はgapを見ません（参考値：gap={vfPick.gap.toFixed(3)}・PL1位候補確率={(vfPick.prob1*100).toFixed(1)}%）。
-                      </div>
-                    </div>
-                  );
-                })()}
                 {(function(){
                   var pred=computePLPrediction(rd,venue);
                   if(!pred){
