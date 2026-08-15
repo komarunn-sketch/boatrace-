@@ -1536,6 +1536,29 @@ const PL_PRECISION_GAP_MIN=0.05;
 // 的中率は45.5→41.0%とわずかに下がるだけで、切り捨てているのは「当たっても大して儲けないレース」。
 // ただし非表示にはせず色分けに留める（ユーザー方針）。オッズ未取得時はnull（判定不能）。
 const PL_PRECISION_SYNTH_ODDS_RECOMMEND=2.0;
+// 【重要バグ修正、2026-08-15】全レースCSV（出走表）には載っているが当日欠場になった選手を
+// 1着予想にしてしまう問題への対応（ユーザー報告）。出走表だけでは欠場を知りようがないが、
+// オッズデータには確実に現れる：欠場艇を含む組合せはすべて値が文字列「欠場」になる
+//（3連単120通りのうち、その艇を含む60通りが全部欠場）。これを使って欠場艇を特定する。
+// 戻り値：欠場艇番の配列（オッズ未取得時はnull＝判定不能）。
+function computeKesshouBoats(rd){
+  if(!rd||!rd.odds3tan)return null;
+  var keys=Object.keys(rd.odds3tan);
+  if(keys.length<60)return null;
+  var out=[];
+  for(var b=1;b<=6;b++){
+    var total=0,bad=0;
+    for(var i=0;i<keys.length;i++){
+      var parts=keys[i].split("-");
+      if(parts.indexOf(String(b))<0)continue;
+      total++;
+      var v=rd.odds3tan[keys[i]];
+      if(v==null||isNaN(v)||!(v>0))bad++;
+    }
+    if(total>0&&bad===total)out.push(b);
+  }
+  return out;
+}
 function computePLSynthOdds(rd,combos){
   if(!rd||!rd.odds3tan||!combos||!combos.length)return null;
   var sumInv=0;
@@ -1549,6 +1572,11 @@ function computePLSynthOdds(rd,combos){
 function computePLPrecisionPick(rd,venue){
   var pred=computePLPrediction(rd,venue);
   if(!pred||pred.combos.length<5)return {selected:false};
+  // 【重要、2026-08-15】欠場艇がいるレースは選定しない。出走表ベースのPL予想は欠場を知らず、
+  // 欠場艇を弱い相手として扱わないため、欠場艇を含む買い目（実際には購入不可）や
+  // 欠場艇を除いた実態とずれた確率を出してしまう。オッズ未取得時は判定不能なので通す。
+  var kesshou=computeKesshouBoats(rd);
+  if(kesshou&&kesshou.length)return {selected:false,kesshouBoats:kesshou};
   var top1=pred.combos[0],top2=pred.combos[1];
   var gap=top1.prob-top2.prob;
   var combos3=pred.combos.slice(0,3).map(function(c){return c.combo;});
@@ -1556,8 +1584,14 @@ function computePLPrecisionPick(rd,venue){
   if(gap<PL_PRECISION_GAP_MIN)return {selected:false,gap:gap,prob1:top1.prob};
   var synthOdds3=computePLSynthOdds(rd,combos3);
   var synthOk=synthOdds3==null?null:(synthOdds3>=PL_PRECISION_SYNTH_ODDS_RECOMMEND);
+  // 【追加、2026-08-15】展示データの有無。PLモデルは展示タイム・直線タイム・進入コースを特徴量に使うため、
+  // 展示取込の前後でgapが変わり選定の顔ぶれが入れ替わる（8/13実データ：展示前8件→展示後9件、2件が消え3件が新規）。
+  // これはバグでなく仕様だが「さっき出ていたのに消えた」と見えるため、展示前は「暫定」と明示する（ユーザー方針）。
+  var hasTenji=true;
+  if(!rd.inputs)hasTenji=false;
+  else{for(var tb=1;tb<=6;tb++){var iv=rd.inputs[tb];var tv=iv?parseFloat(iv.tenji):NaN;if(isNaN(tv)){hasTenji=false;break;}}}
   return {selected:true,gap:gap,gapMin:PL_PRECISION_GAP_MIN,prob1:top1.prob,prob2:top2.prob,combo:top1.combo,combos3:combos3,combos5:combos5,
-    synthOdds3:synthOdds3,synthOk:synthOk,synthMin:PL_PRECISION_SYNTH_ODDS_RECOMMEND};
+    synthOdds3:synthOdds3,synthOk:synthOk,synthMin:PL_PRECISION_SYNTH_ODDS_RECOMMEND,hasTenji:hasTenji};
 }
 function computeRaceSimulation(rd,trials){
   var accel=computeAccelScores(rd);
@@ -2030,6 +2064,10 @@ function allocateScoreAStakes(oddsList,total){
 }
 function computeScoreAFormation(rd,venue){
   if(!rd||!rd.officialWinRate)return null;
+  // 【重要、2026-08-15】欠場艇がいるレースは選定しない（PL精度特化モードと同じ理由）。
+  // 出走表の公式全国勝率だけでは欠場を知りようがなく、実際には買えない買い目を出してしまうため。
+  var kesshouA=computeKesshouBoats(rd);
+  if(kesshouA&&kesshouA.length)return {selected:false,kesshouBoats:kesshouA};
   var score=computeScoreA(rd);
   if(score==null)return {selected:false,score:score,gap:null};
   var rest=[];
@@ -4381,7 +4419,7 @@ function App() {
       if(!pick||!pick.selected)return;
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
         gap:pick.gap,prob1:pick.prob1,combo:pick.combo,combos3:pick.combos3,combos5:pick.combos5,
-        synthOdds3:pick.synthOdds3,synthOk:pick.synthOk});
+        synthOdds3:pick.synthOdds3,synthOk:pick.synthOk,hasTenji:pick.hasTenji});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -4620,11 +4658,11 @@ function App() {
                       background:isActive?"#2c4762":(good?"#0d2a20":"#0e1b2c"),
                       color:mainC,
                       border:isActive?("2px solid "+mainC):(good?("2px solid "+mainC):("1px solid "+borderC)),textAlign:"left"}}>
-                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%</div>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%{!item.hasTenji&&<span style={{color:"#e8c98a"}}>　暫定</span>}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                     <div style={{fontSize:9,color:mainC}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
                     <div style={{fontSize:9,color:good?"#5dd39e":"#8b9bae"}}>
-                      {item.synthOdds3==null?"合成オッズ未判定（オッズ未取得）":("合成"+item.synthOdds3.toFixed(2)+"倍"+(good?"　◆好条件":""))}
+                      {!item.hasTenji?"展示前の暫定（取込で変わる場合あり）":(item.synthOdds3==null?"合成オッズ未判定（オッズ未取得）":("合成"+item.synthOdds3.toFixed(2)+"倍"+(good?"　◆好条件":"")))}
                     </div>
                   </button>
                 );
@@ -5959,8 +5997,12 @@ function App() {
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
                         <div style={{fontSize:11,fontWeight:800,color:"#7ad9ff"}}>🧪 PL精度特化モード（信頼度フィルター、2026-08-15、Score Aとは完全に独立）</div>
                         <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🎯 厳選レース該当</span>
+                        {!plPrecisionPick.hasTenji&&(
+                          <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#241c05",color:"#e8c98a",border:"1px solid #7a5c00"}}>⚠ 展示前の暫定判定</span>
+                        )}
                       </div>
                       <div style={{fontSize:10,color:"#a8d8e8",marginBottom:6,lineHeight:1.5}}>
+                        {!plPrecisionPick.hasTenji&&<span style={{color:"#e8c98a",fontWeight:700}}>展示データ未取込のため暫定判定です。PLモデルは展示タイム・直線タイム・進入コースも使うため、展示取込後にgapが変わり、このレースが対象外になる（または別のレースが新たに入る）場合があります。</span>}
                         PL1位候補確率={(plPrecisionPick.prob1*100).toFixed(1)}%　gap（1位・2位の確率差）={plPrecisionPick.gap.toFixed(3)}（閾値{plPrecisionPick.gapMin}以上）。調整用(1/1〜6/30)・評価用(7/1〜8/13)・純不調期(7/13〜8/13)の3期間で検証済み、3点買いでROI110～116%・的中42～45%。1日4レース前後。Score Aとの重複率は低く（純不調期でScore A側11.2%・PL側6.7%）、独立した選定（詳細は精度分析ログ参照）
                       </div>
                       <div style={{fontSize:10,color:"#7ad9ff",marginBottom:4,fontWeight:700}}>● 推奨：3点フォーメーション（合計300円、各100円均等）
