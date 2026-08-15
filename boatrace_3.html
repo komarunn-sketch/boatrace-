@@ -1530,6 +1530,22 @@ function computePLPrediction(rd,venue){
 // 1点買いでの検証値のまま流用（選定自体はPLで1位候補の確信度で行うため）。点数拡大後のROIは未検証。
 // combos3=上位3点（合計300円想定）、combos5=上位5点（合計500円想定）、各100円均等。
 const PL_PRECISION_GAP_MIN=0.05;
+// 【追加、2026-08-15】合成オッズ（=1/Σ(1/各点オッズ)）の推奨ライン。この値以上なら厳選レースの中でも特に好条件。
+// 3期間検証済み（pl_precision_synth_odds_filter.js）：合成2.0以上のレースだけに絞ると
+// 調整118.0%・評価120.6%・純不調期131.3%と、フィルターなし（115.4/110.2/116.3%）を上回る。
+// 的中率は45.5→41.0%とわずかに下がるだけで、切り捨てているのは「当たっても大して儲けないレース」。
+// ただし非表示にはせず色分けに留める（ユーザー方針）。オッズ未取得時はnull（判定不能）。
+const PL_PRECISION_SYNTH_ODDS_RECOMMEND=2.0;
+function computePLSynthOdds(rd,combos){
+  if(!rd||!rd.odds3tan||!combos||!combos.length)return null;
+  var sumInv=0;
+  for(var i=0;i<combos.length;i++){
+    var o=rd.odds3tan[combos[i][0]+"-"+combos[i][1]+"-"+combos[i][2]];
+    if(o==null||isNaN(o)||!(o>0))return null;
+    sumInv+=1/o;
+  }
+  return sumInv>0?1/sumInv:null;
+}
 function computePLPrecisionPick(rd,venue){
   var pred=computePLPrediction(rd,venue);
   if(!pred||pred.combos.length<5)return {selected:false};
@@ -1538,7 +1554,10 @@ function computePLPrecisionPick(rd,venue){
   var combos3=pred.combos.slice(0,3).map(function(c){return c.combo;});
   var combos5=pred.combos.slice(0,5).map(function(c){return c.combo;});
   if(gap<PL_PRECISION_GAP_MIN)return {selected:false,gap:gap,prob1:top1.prob};
-  return {selected:true,gap:gap,gapMin:PL_PRECISION_GAP_MIN,prob1:top1.prob,prob2:top2.prob,combo:top1.combo,combos3:combos3,combos5:combos5};
+  var synthOdds3=computePLSynthOdds(rd,combos3);
+  var synthOk=synthOdds3==null?null:(synthOdds3>=PL_PRECISION_SYNTH_ODDS_RECOMMEND);
+  return {selected:true,gap:gap,gapMin:PL_PRECISION_GAP_MIN,prob1:top1.prob,prob2:top2.prob,combo:top1.combo,combos3:combos3,combos5:combos5,
+    synthOdds3:synthOdds3,synthOk:synthOk,synthMin:PL_PRECISION_SYNTH_ODDS_RECOMMEND};
 }
 function computeRaceSimulation(rd,trials){
   var accel=computeAccelScores(rd);
@@ -4361,7 +4380,8 @@ function App() {
       var pick=computePLPrecisionPick(raceEntry,vname);
       if(!pick||!pick.selected)return;
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
-        gap:pick.gap,prob1:pick.prob1,combo:pick.combo,combos3:pick.combos3,combos5:pick.combos5});
+        gap:pick.gap,prob1:pick.prob1,combo:pick.combo,combos3:pick.combos3,combos5:pick.combos5,
+        synthOdds3:pick.synthOdds3,synthOk:pick.synthOk});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -4590,16 +4610,22 @@ function App() {
             {openPlPrecisionSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
               {plPrecisionSenbatsuList.map(function(item){
                 var isActive=venue===item.vname&&curRace===item.rnum;
+                var good=item.synthOk===true;
+                var mainC=good?"#5dd39e":"#7ad9ff";
+                var borderC=good?"#2e6b52":"#1f5a75";
                 return (
                   <button key={"plPrec_"+item.vname+"_"+item.rnum}
                     onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
-                      background:isActive?"#2c4762":"#0e1b2c",
-                      color:"#7ad9ff",
-                      border:isActive?"2px solid #7ad9ff":"1px solid #1f5a75",textAlign:"left"}}>
+                      background:isActive?"#2c4762":(good?"#0d2a20":"#0e1b2c"),
+                      color:mainC,
+                      border:isActive?("2px solid "+mainC):(good?("2px solid "+mainC):("1px solid "+borderC)),textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
-                    <div style={{fontSize:9,color:"#7ad9ff"}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
+                    <div style={{fontSize:9,color:mainC}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
+                    <div style={{fontSize:9,color:good?"#5dd39e":"#8b9bae"}}>
+                      {item.synthOdds3==null?"合成オッズ未判定（オッズ未取得）":("合成"+item.synthOdds3.toFixed(2)+"倍"+(good?"　◆好条件":""))}
+                    </div>
                   </button>
                 );
               })}
@@ -5937,7 +5963,19 @@ function App() {
                       <div style={{fontSize:10,color:"#a8d8e8",marginBottom:6,lineHeight:1.5}}>
                         PL1位候補確率={(plPrecisionPick.prob1*100).toFixed(1)}%　gap（1位・2位の確率差）={plPrecisionPick.gap.toFixed(3)}（閾値{plPrecisionPick.gapMin}以上）。調整用(1/1〜6/30)・評価用(7/1〜8/13)・純不調期(7/13〜8/13)の3期間で検証済み、3点買いでROI110～116%・的中42～45%。1日4レース前後。Score Aとの重複率は低く（純不調期でScore A側11.2%・PL側6.7%）、独立した選定（詳細は精度分析ログ参照）
                       </div>
-                      <div style={{fontSize:10,color:"#7ad9ff",marginBottom:4,fontWeight:700}}>● 推奨：3点フォーメーション（合計300円、各100円均等）</div>
+                      <div style={{fontSize:10,color:"#7ad9ff",marginBottom:4,fontWeight:700}}>● 推奨：3点フォーメーション（合計300円、各100円均等）
+                        {plPrecisionPick.synthOdds3!=null&&(
+                          <span style={{marginLeft:8,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:5,
+                            background:plPrecisionPick.synthOk?"#0d2a20":"#241c05",
+                            color:plPrecisionPick.synthOk?"#5dd39e":"#e8c98a",
+                            border:"1px solid "+(plPrecisionPick.synthOk?"#2e6b52":"#7a5c00")}}>
+                            合成オッズ{plPrecisionPick.synthOdds3.toFixed(2)}倍{plPrecisionPick.synthOk?"　◆好条件（"+plPrecisionPick.synthMin+"倍以上）":"　△"+plPrecisionPick.synthMin+"倍未満"}
+                          </span>
+                        )}
+                        {plPrecisionPick.synthOdds3==null&&(
+                          <span style={{marginLeft:8,fontSize:10,fontWeight:400,color:"#8b9bae"}}>合成オッズ未判定（オッズ取込後に表示）</span>
+                        )}
+                      </div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
                         {plPrecisionPick.combos3.map(function(t,ti){
                           var key=t[0]+"-"+t[1]+"-"+t[2];
@@ -5965,7 +6003,7 @@ function App() {
                           );
                         })}
                       </div>
-                      <div style={{fontSize:10,color:"#8fae9d"}}>3点を推奨（調整/評価/純不調期の3期間でROI115.4/110.2/116.3%・的中42～45%）。5点は的中率50～57%と高いがROI105.4/85.6/86.4%と評価・不調期に100%割れで参考表示。理由は4・5点目が拾うのが低配当の当たりばかりで、増えた的中1件あたり払戻約1,100円と追加投資200円×レース数に見合わないため。</div>
+                      <div style={{fontSize:10,color:"#8fae9d"}}>3点を推奨（調整/評価/純不調期の3期間でROI115.4/110.2/116.3%・的中42～45%）。5点は的中率50～57%と高いがROI105.4/85.6/86.4%と評価・不調期に100%割れで参考表示。合成オッズ{plPrecisionPick.synthMin}倍以上（緑表示）に絞るとROI118.0/120.6/131.3%とさらに上がるが、1日4.3→3.4レースに減る（非表示にはせず判断は手元で）。</div>
                     </div>
                   )}
                   {ai1chakuBalanced&&(
