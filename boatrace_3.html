@@ -1637,6 +1637,33 @@ function computePartialTenjiBoats(rd){
   if(present===0)return [];
   return missing;
 }
+// 【実験、2026-08-17】展示を入れるとPLの強さが変わり、選定されるレース集合そのものが動く。
+// 実測（`pl_precision_tenji_effect.js`、n=888・3点買い）では
+//   両方で選定（n=598）        全期間116.3% / 調整110.9 / 評価138.7 / 純不調138.2
+//   展示で増えた（n=219）      全期間 99.2% / 調整120.9 / 評価 67.5 / 純不調 72.1
+//   展示で消えた（n=71）       全期間122.4% / 調整105.9 / 評価150.5 / 純不調168.3
+// となり、展示で増えたレースだけが評価期間で67.5%と大きく悪い。
+// 内訳を分解すると主犯は直線（展示タイムだけなら調整117.5/評価58.8、直線だけなら調整 68.1/評価54.6）。
+// この関数は選定を変えず、展示を抜いた状態でも選定されるかを返すだけ。
+// 判断材料として表示・記録するためのもので、買うかどうかは利用者が決める。
+function stripTenjiFromRd(rd){
+  if(!rd||!rd.inputs)return rd;
+  var inputs={};
+  for(var k in rd.inputs){
+    var src=rd.inputs[k]||{};
+    var dst={};
+    for(var f in src)dst[f]=src[f];
+    dst.tenji="";dst.chokusen="";
+    inputs[k]=dst;
+  }
+  var copy={};
+  for(var p in rd)copy[p]=rd[p];
+  copy.inputs=inputs;
+  return copy;
+}
+function computePLPickNoTenji(rd,venue){
+  return computePLPrecisionPick(stripTenjiFromRd(rd),venue);
+}
 function computePLPrecisionPick(rd,venue){
   var pred=computePLPrediction(rd,venue);
   if(!pred||pred.combos.length<5)return {selected:false};
@@ -2255,6 +2282,57 @@ function compressFormation(combos){
 // 実運用上の優先度は低いままだが、係数自体はより正確なものに更新。
 const FHOLD_WIN_MULT = {1:0.956, 2:1.030, 3:0.907, 4:0.887, 5:1.177, 6:0.805}; // 2026-07-27：進入変更バグ修正後のパイプラインで207日規模に再推定。コース2・5は比率>1（F持ちの方が有利）と逆転しているので要注意
 
+// 【実験、2026-08-17】インが飛びそうなレースで1号艇を3着の軸に置く隊形。
+//   選定     … 1号艇のAI1着% < B1_AXIS_AI1_THRESH
+//   1着候補2艇 … 非1号艇5艇を「コース別決まり手」（進入2コースなら差し＋まくり、3コース以上なら
+//                まくり＋まくり差しの回数）の降順に並べた上位2艇
+//   自由枠   … 非1号艇から1着に入った艇を除いた4艇をAI1着%降順に並べた上位K艇
+//   買い目   … X-Y-1（X∈1着候補2艇、Y∈自由枠K艇）の2K点・各100円
+// ⚠️バックテストの事前基準（調整期間で選び評価期間で100%超）を満たしていない後知恵の候補。
+//   運用するものではなく実験表示。根拠と注意点は精度分析ログの追記197を参照。
+// ⚠️決まり手は kimariCount1y（列105-113）を優先する。バックテストが使ったのがこちらで、
+//   既存の kimariCount（列81-89）とは別物なので、揃えないと再現しない。
+const B1_AXIS_AI1_THRESH=30;
+// K=1（2点）がバックテストでは最良だったが、的中頻度を優先してK=3（6点）で表示する（ユーザー選択、2026-08-17）。
+// AI<30・3着軸のバックテスト（枠なり版）：K=1 調整125.7/評価116.2/純不調107.5%・的中4.6%
+//                                    K=3 調整112.9/評価 95.1/純不調 97.9%・的中9.5%
+const B1_AXIS_K=3;
+const B1_AXIS_STAKE_PER_POINT=100;
+function computeB1AxisFormation(rd,venue,resultIn){
+  if(isExcludedVenue(venue))return null;
+  if(!rd||!rd.racerStats||!rd.kimariCount||!rd.courses)return null;
+  var res=resultIn||computeResultForRd(venue,rd,"直近6ヶ月");
+  if(!res||!res.rows)return null;
+  var aiP1={};
+  for(var i=0;i<res.rows.length;i++){var rw=res.rows[i];if(rw.aiP1!=null)aiP1[rw.boat]=rw.aiP1;}
+  if(aiP1[1]==null)return null;
+  var others=[2,3,4,5,6];
+  for(var oi=0;oi<others.length;oi++)if(aiP1[others[oi]]==null)return null;
+  var kSrc=rd.kimariCount1y||rd.kimariCount;
+  var used1y=!!rd.kimariCount1y;
+  var kv={};
+  for(var b=2;b<=6;b++){
+    var c=rd.courses[b];
+    var sashi=(kSrc.sashi&&kSrc.sashi[b-1]!=null)?kSrc.sashi[b-1]:0;
+    var makuri=(kSrc.makuri&&kSrc.makuri[b-1]!=null)?kSrc.makuri[b-1]:0;
+    var mz=(kSrc.makurizashi&&kSrc.makurizashi[b-1]!=null)?kSrc.makurizashi[b-1]:0;
+    kv[b]=(c===2)?(sashi+makuri):(c>=3?(makuri+mz):0);
+  }
+  var byKimari=others.slice().sort(function(x,y){return (kv[y]-kv[x])||(aiP1[y]-aiP1[x]);});
+  var pair=[byKimari[0],byKimari[1]];
+  var bet=[];
+  for(var pidx=0;pidx<pair.length;pidx++){
+    var X=pair[pidx];
+    var free=others.filter(function(v){return v!==X;}).sort(function(x,y){return aiP1[y]-aiP1[x];}).slice(0,B1_AXIS_K);
+    for(var fi=0;fi<free.length;fi++)bet.push([X,free[fi],1]);
+  }
+  var stakes=bet.map(function(){return B1_AXIS_STAKE_PER_POINT;});
+  return {
+    selected:aiP1[1]<B1_AXIS_AI1_THRESH,b1AiP1:aiP1[1],threshold:B1_AXIS_AI1_THRESH,
+    k:B1_AXIS_K,pair:pair,kimariValue:kv,bet:bet,stakes:stakes,
+    totalStake:bet.length*B1_AXIS_STAKE_PER_POINT,used1y:used1y
+  };
+}
 function computeResultForRd(venue,rd,racerCat){
     if(!venue)return null;
     var vw=VW[venue]||{tenji:1,isshu:1,mawari:1,chokusen:1};
@@ -2574,6 +2652,14 @@ function parseNewCSV(allRows){
     var kc_makuri=[null,null,null,null,null,null];
     var kc_makurizashi=[null,null,null,null,null,null];
     var kc_nuki=[null,null,null,null,null,null];
+    // 【追加、2026-08-17】列105-113の決まり手回数。export_training_dataset.js の buildKimari1yLookup が
+    // 読んでいるのと同じ列で、バックテスト（b1_axis_23_formation_scan.js）が使ったのはこちら。
+    // 既存の kc_* は列81-89でこれとは別物なので、揃えないと本体とバックテストが再現しない。
+    var kc1y_nige=[null,null,null,null,null,null];
+    var kc1y_sashi=[null,null,null,null,null,null];
+    var kc1y_makuri=[null,null,null,null,null,null];
+    var kc1y_makurizashi=[null,null,null,null,null,null];
+    var kc1y_nuki=[null,null,null,null,null,null];
     var raceCount=[null,null,null,null,null,null];
     // 期間別データ格納用
     var PERIOD_COLS={
@@ -2624,6 +2710,11 @@ function parseNewCSV(allRows){
       kc_makuri[idx]=pi(row[85]);
       kc_makurizashi[idx]=pi(row[87]);
       kc_nuki[idx]=pi(row[89]);
+      kc1y_nige[idx]=pi(row[105]);
+      kc1y_sashi[idx]=pi(row[107]);
+      kc1y_makuri[idx]=pi(row[109]);
+      kc1y_makurizashi[idx]=pi(row[111]);
+      kc1y_nuki[idx]=pi(row[113]);
       raceCount[idx]=pi(row[67]);
       officialWinRate[idx]=pf(row[7]);
       officialLocalWinRate[idx]=pf(row[9]);
@@ -2698,6 +2789,10 @@ function parseNewCSV(allRows){
     base.officialWinRate=officialWinRate;
     base.officialLocalWinRate=officialLocalWinRate;
     base.kimariCount={nige:kc_nige,sashi:kc_sashi,makuri:kc_makuri,makurizashi:kc_makurizashi,nuki:kc_nuki};
+    // 列105-113版。1艇でも値が取れた場合のみセットする（古い形式のCSVでは列が無いのでnullのまま）
+    var has1y=false;
+    for(var h1=0;h1<6;h1++){if(kc1y_sashi[h1]!=null||kc1y_makuri[h1]!=null||kc1y_makurizashi[h1]!=null){has1y=true;break;}}
+    base.kimariCount1y=has1y?{nige:kc1y_nige,sashi:kc1y_sashi,makuri:kc1y_makuri,makurizashi:kc1y_makurizashi,nuki:kc1y_nuki}:null;
     base.racerStats={win1:{},ren2:{},ren3:{},ren3raw:{}};
     for(var ci=0;ci<catNames.length;ci++){
       var cat=catNames[ci];
@@ -4466,6 +4561,11 @@ function App() {
     return computeScoreAFormation(rd,venue);
   },[rd,venue]);
 
+  // 【実験、2026-08-17】1号艇3着軸フォーメーション（未採用・記録用の表示）
+  const b1AxisFormation=useMemo(function(){
+    return computeB1AxisFormation(rd,venue,result);
+  },[rd,venue,result]);
+
   // 【追加、2026-08-14】的中率特化モデルの厳選レース一覧（全venue横断、締切時間順）。
   // 既存の紫／水色の厳選レースとは判定基準が完全に独立（公式全国勝率ベース、閾値2.0以上）。
   const scoreASenbatsuList=useMemo(function(){
@@ -4492,6 +4592,11 @@ function App() {
   // 【追加、2026-08-15】PL精度特化モード：現在表示中のレースの判定結果
   const plPrecisionPick=useMemo(function(){
     return computePLPrecisionPick(rd,venue);
+  },[rd,venue]);
+
+  // 【実験、2026-08-17】展示を抜いた状態でも選定されるか（選定は変えず印を出すだけ）
+  const plPickNoTenji=useMemo(function(){
+    return computePLPickNoTenji(rd,venue);
   },[rd,venue]);
 
   // 【追加、2026-08-15】PL精度特化モードの厳選レース一覧（全venue横断、締切時間順）。
@@ -6081,6 +6186,37 @@ function App() {
                       </div>
                     </div>
                   )}
+                  {b1AxisFormation&&b1AxisFormation.selected&&(
+                    <div style={{marginTop:10,background:"#2a1030",borderRadius:8,padding:"10px 12px",border:"1px solid #6b3a7a"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                        <div style={{fontSize:11,fontWeight:800,color:"#d9a7ff"}}>🧪 1号艇3着軸フォーメーション（実験・未採用、2026-08-17）</div>
+                        <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠ 検証中・買わない前提</span>
+                      </div>
+                      <div style={{fontSize:10,color:"#c9a7d9",marginBottom:6,lineHeight:1.5}}>
+                        1号艇のAI1着%={b1AxisFormation.b1AiP1.toFixed(1)}%（閾値{b1AxisFormation.threshold}未満で該当）。1着候補は「コース別決まり手」上位2艇＝{b1AxisFormation.pair[0]}号艇・{b1AxisFormation.pair[1]}号艇。自由枠はAI1着%上位{b1AxisFormation.k}艇（{b1AxisFormation.bet.length}点・合計{b1AxisFormation.totalStake}円）。
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
+                        {b1AxisFormation.bet.map(function(t,ti){
+                          var key=t[0]+"-"+t[1]+"-"+t[2];
+                          var o=rd.odds3tan&&rd.odds3tan[key];
+                          return (
+                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#180d20",borderRadius:6,padding:"5px 10px"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:"#d9a7ff",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                              {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{o}倍</span>}
+                              <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{B1_AXIS_STAKE_PER_POINT}円</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div style={{fontSize:10,color:"#b08fae",lineHeight:1.5}}>
+                        ⚠ これはバックテストの事前基準（調整期間だけを見て選び、評価期間で100%超）を満たしていない後知恵の候補です。しかも表示中のK=3（6点）はバックテストでK=1（2点）に劣り、AI1着%30未満の3着軸で調整112.9／評価95.1／純不調期97.9%（枠なり版）と評価期間で100%を割っています（K=1は125.7／116.2／107.5%）。点数を増やすと的中率は4.6%→9.5%と上がりますが回収率は下がる関係です。
+                      </div>
+                      <div style={{fontSize:10,color:"#ff9c9c",lineHeight:1.5,fontWeight:700}}>
+                        最新のフォワード成績は「フォワードテスト記録_2026-08.md」の「🆕 1号艇3着軸フォーメーション」を参照。ROIのSEが大きく、まだ100%とも控除率ライン75%とも区別できません。表示は記録と体感の確認用で、買う前提のものではありません。
+                        {!b1AxisFormation.used1y&&"　※列105-113の決まり手回数が取れていないため既存の決まり手回数（列81-89）で代用しています。バックテストとは条件が異なるので数字は当てになりません。"}
+                      </div>
+                    </div>
+                  )}
                   {plPrecisionPick&&plPrecisionPick.selected&&(
                     <div style={{marginTop:10,background:"#0a2733",borderRadius:8,padding:"10px 12px",border:"1px solid #1f5a75"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
@@ -6088,6 +6224,12 @@ function App() {
                         <span style={{fontSize:13,fontWeight:900,padding:"5px 12px",borderRadius:8,background:"#132b20",color:"#5dd39e",border:"2px solid #2e6b52"}}>🎯 厳選レース該当</span>
                         {!plPrecisionPick.hasTenji&&(
                           <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#241c05",color:"#e8c98a",border:"1px solid #7a5c00"}}>⚠ 展示前の暫定判定</span>
+                        )}
+                        {plPrecisionPick.hasTenji&&plPickNoTenji&&!plPickNoTenji.selected&&(
+                          <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠ 展示で新たに入ったレース</span>
+                        )}
+                        {plPrecisionPick.hasTenji&&plPickNoTenji&&plPickNoTenji.selected&&(
+                          <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#132b20",color:"#5dd39e",border:"1px solid #2e6b52"}}>◆ 展示なしでも選定</span>
                         )}
                       </div>
                       <div style={{fontSize:10,color:"#a8d8e8",marginBottom:6,lineHeight:1.5}}>
