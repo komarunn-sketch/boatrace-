@@ -6199,14 +6199,20 @@ function App() {
                         {b1AxisFormation.bet.map(function(t,ti){
                           var key=t[0]+"-"+t[1]+"-"+t[2];
                           var o=rd.odds3tan&&rd.odds3tan[key];
+                          // betは「X1の自由枠K艇 → X2の自由枠K艇」の順なので、各Xの先頭がK=1相当
+                          var isK1=(ti%b1AxisFormation.k===0);
                           return (
-                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#180d20",borderRadius:6,padding:"5px 10px"}}>
-                              <span style={{fontSize:13,fontWeight:700,color:"#d9a7ff",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
+                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:isK1?"#2a2410":"#180d20",borderRadius:6,padding:"5px 10px",border:isK1?"1px solid #7a6a1e":"1px solid transparent"}}>
+                              <span style={{fontSize:13,fontWeight:isK1?800:700,color:isK1?"#ffd97a":"#d9a7ff",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
                               {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{o}倍</span>}
                               <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{B1_AXIS_STAKE_PER_POINT}円</span>
                             </span>
                           );
                         })}
+                      </div>
+                      <div style={{fontSize:10,color:"#b08fae",marginBottom:6,lineHeight:1.5}}>
+                        <span style={{color:"#ffd97a",fontWeight:800}}>金色の2点</span>がK=1相当（各1着候補の自由枠1番手）。金色だけ買えば2点{2*B1_AXIS_STAKE_PER_POINT}円。
+                        <span style={{color:"#ff9c9c",fontWeight:700}}>バックテストもフォワードもK=1のほうが回収率が高い</span>（フォワード217レースでK=1 178.5% vs K=3 98.9%、確定データでもK=1 125.7/116.2/107.5% vs K=3 112.9/95.1/97.9%）。ただし的中回数はK=3のほうが多い。
                       </div>
                       <div style={{fontSize:10,color:"#b08fae",lineHeight:1.5}}>
                         ⚠ これはバックテストの事前基準（調整期間だけを見て選び、評価期間で100%超）を満たしていない後知恵の候補です。しかも表示中のK=3（6点）はバックテストでK=1（2点）に劣り、AI1着%30未満の3着軸で調整112.9／評価95.1／純不調期97.9%（枠なり版）と評価期間で100%を割っています（K=1は125.7／116.2／107.5%）。点数を増やすと的中率は4.6%→9.5%と上がりますが回収率は下がる関係です。
