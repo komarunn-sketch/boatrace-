@@ -4620,9 +4620,15 @@ function App() {
       var rnum=parseInt(sp[sp.length-1]);
       var pick=computePLPrecisionPick(raceEntry,vname);
       if(!pick||!pick.selected)return;
+      // 【追加、2026-08-19】展示を抜いても選定されるか。展示未取込のレースは区分しようがないのでnull。
+      var noTenjiSel=null;
+      if(pick.hasTenji){
+        var pNo=computePLPickNoTenji(raceEntry,vname);
+        noTenjiSel=!!(pNo&&pNo.selected);
+      }
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
         gap:pick.gap,prob1:pick.prob1,combo:pick.combo,combos3:pick.combos3,combos5:pick.combos5,
-        synthOdds3:pick.synthOdds3,synthOk:pick.synthOk,hasTenji:pick.hasTenji});
+        synthOdds3:pick.synthOdds3,synthOk:pick.synthOk,hasTenji:pick.hasTenji,noTenjiSel:noTenjiSel});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -4907,14 +4913,19 @@ function App() {
                 var good=item.synthOk===true;
                 var mainC=good?"#5dd39e":"#7ad9ff";
                 var borderC=good?"#2e6b52":"#1f5a75";
+                // 【追加、2026-08-19】展示を入れて新たに入ったレースは薄くする。
+                // 色は合成オッズの好条件ですでに使っているので、ここは濃淡とタグで区別する。
+                // 根拠（評価期間7/1-8/13、n=98 vs 92）：的中率51.0% vs 30.4%、ROI138.7% vs 67.5%。
+                // 的中率の差20.6ptは約3σで配当の裾に影響されないが、ROI差は少数の高配当日も含む。
+                var newByTenji=(item.noTenjiSel===false);
                 return (
                   <button key={"plPrec_"+item.vname+"_"+item.rnum}
                     onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
                       background:isActive?"#2c4762":(good?"#0d2a20":"#0e1b2c"),
-                      color:mainC,
+                      color:mainC,opacity:newByTenji?0.5:1,
                       border:isActive?("2px solid "+mainC):(good?("2px solid "+mainC):("1px solid "+borderC)),textAlign:"left"}}>
-                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%{!item.hasTenji&&<span style={{color:"#e8c98a"}}>　暫定</span>}</div>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%{!item.hasTenji&&<span style={{color:"#e8c98a"}}>　暫定</span>}{item.noTenjiSel===true&&<span style={{color:"#5dd39e",fontWeight:800}}>　◆残り</span>}{newByTenji&&<span style={{color:"#ff9c9c",fontWeight:800}}>　⚠展示で新規</span>}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                     <div style={{fontSize:9,color:mainC}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
                     <div style={{fontSize:9,color:good?"#5dd39e":"#8b9bae"}}>
@@ -4923,6 +4934,12 @@ function App() {
                   </button>
                 );
               })}
+            </div>}
+            {openPlPrecisionSenbatsu&&<div style={{fontSize:9,color:"#8b9bae",marginTop:4,lineHeight:1.5}}>
+              <span style={{color:"#5dd39e",fontWeight:800}}>◆残り</span>＝展示を抜いても選定されるレース。<span style={{color:"#ff9c9c",fontWeight:800}}>⚠展示で新規</span>＝展示を入れて初めて入ってきたレース（薄く表示）。
+              評価期間（7/1〜8/13）の実測は <span style={{color:"#5dd39e",fontWeight:700}}>◆残り n=98・的中51.0%・ROI138.7%</span> vs <span style={{color:"#ff9c9c",fontWeight:700}}>⚠新規 n=92・的中30.4%・ROI67.5%</span>。
+              的中率の差20.6ptは約3σで配当の裾に影響されない。日別の勝ち負けは18勝9敗4分（勝率67%・p≈0.087）で<span style={{color:"#ff9c9c",fontWeight:700}}>有意水準5%には届いていない</span>。
+              ⚠なぜそうなるかの説明はまだついていない（直線でも展示タイムでもなく、7/13の環境変化とも無関係）。<span style={{color:"#e8c98a",fontWeight:700}}>運用は変えておらず、印を出して記録している段階</span>。
             </div>}
           </div>
         )}
