@@ -3186,6 +3186,8 @@ function App() {
   const [openSenbatsu,setOpenSenbatsu]=useState(false);
   const [openScoreASenbatsu,setOpenScoreASenbatsu]=useState(true);
   const [openPlPrecisionSenbatsu,setOpenPlPrecisionSenbatsu]=useState(true);
+  // 【追加、2026-08-18】🧪1号艇3着軸（実験・未採用）の一覧の開閉。件数が多いので既定は閉じておく
+  const [openB1AxisSenbatsu,setOpenB1AxisSenbatsu]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
@@ -4630,6 +4632,30 @@ function App() {
     return out;
   },[races]);
 
+  // 【追加、2026-08-18】🧪1号艇3着軸フォーメーションの対象レース一覧（全venue横断・締切時間順）。
+  // Score A・PL精度とは判定基準が独立（1号艇のAI1着%が閾値未満かどうか）。
+  // ⚠実験・未採用なので他の一覧とは色を分け、既定で閉じてある（1日40件前後出るため）。
+  const b1AxisSenbatsuList=useMemo(function(){
+    var out=[];
+    Object.keys(races).forEach(function(key){
+      var raceEntry=races[key];
+      if(!raceEntry||!raceEntry.racerStats)return;
+      var sp=key.split("_");
+      var vname=sp.slice(0,-1).join("_");
+      var rnum=parseInt(sp[sp.length-1]);
+      var fm=computeB1AxisFormation(raceEntry,vname);
+      if(!fm||!fm.selected)return;
+      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
+        ai:fm.b1AiP1,pair:fm.pair,bet:fm.bet,betP2:fm.betP2,used1y:fm.used1y});
+    });
+    out.sort(function(a,b){
+      var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
+      var tb=b.shimekiri?parseInt(b.shimekiri.split(":")[0])*60+parseInt(b.shimekiri.split(":")[1]):9999;
+      return ta-tb||(a.rnum-b.rnum);
+    });
+    return out;
+  },[races]);
+
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
   const axisPickRowsByBoat=useMemo(function(){
@@ -4810,6 +4836,35 @@ function App() {
                   </button>
                 );
               })}
+            </div>}
+          </div>
+        )}
+
+        {b1AxisSenbatsuList.length>0&&(
+          <div style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openB1AxisSenbatsu?5:0}}>
+              <div style={{fontSize:10,color:"#d9a7ff",fontWeight:700}}>🧪 1号艇3着軸（実験・未採用）対象レース {b1AxisSenbatsuList.length}件　金色＝3着軸2点／水色＝2着軸2点</div>
+              <button onClick={function(){setOpenB1AxisSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1a0f22",color:"#d9a7ff",border:"1px solid #6b3a7a",fontWeight:700}}>{openB1AxisSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
+            </div>
+            {openB1AxisSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+              {b1AxisSenbatsuList.map(function(item){
+                var isActive=venue===item.vname&&curRace===item.rnum;
+                return (
+                  <button key={"b1axis_"+item.vname+"_"+item.rnum}
+                    onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                    style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                      background:isActive?"#3a2450":"#1a0f22",color:"#d9a7ff",
+                      border:isActive?"2px solid #d9a7ff":"1px solid #6b3a7a",textAlign:"left"}}>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　AI1着%{item.ai.toFixed(1)}　着{item.pair[0]}/{item.pair[1]}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div style={{fontSize:9,color:"#ffd97a",fontWeight:800}}>{item.bet.map(function(c){return c.join("-");}).join("　")}</div>
+                    <div style={{fontSize:9,color:"#7fd8e8",fontWeight:800}}>{(item.betP2||[]).map(function(c){return c.join("-");}).join("　")}</div>
+                  </button>
+                );
+              })}
+            </div>}
+            {openB1AxisSenbatsu&&<div style={{fontSize:9,color:"#b08fae",marginTop:4,lineHeight:1.5}}>
+              ⚠ 実験・未採用。確定データの3期間（調整/評価/純不調期）は 3着軸 122.8/114.7/105.5%・2着軸 103.5/111.6/89.5%。4点全部なら113.2/113.1/97.5%で、<span style={{color:"#ff9c9c",fontWeight:700}}>3期間とも100%超は3着軸だけ</span>。的中率は3着軸4.6%・2着軸6.3%・4点合成11.0%。
             </div>}
           </div>
         )}
