@@ -4849,7 +4849,7 @@ function App() {
         {b1AxisSenbatsuList.length>0&&(
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openB1AxisSenbatsu?5:0}}>
-              <div style={{fontSize:10,color:"#d9a7ff",fontWeight:700}}>🧪 1号艇3着軸（実験・未採用）対象レース {b1AxisSenbatsuList.length}件　金色＝3着軸2点／水色＝2着軸2点</div>
+              <div style={{fontSize:10,color:"#d9a7ff",fontWeight:700}}>🧪 1号艇が飛びそうなレース（1着候補2艇のみ） {b1AxisSenbatsuList.length}件　⚠買い目としては不採用</div>
               <button onClick={function(){setOpenB1AxisSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1a0f22",color:"#d9a7ff",border:"1px solid #6b3a7a",fontWeight:700}}>{openB1AxisSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
             </div>
             {openB1AxisSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
@@ -4861,16 +4861,15 @@ function App() {
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
                       background:isActive?"#3a2450":"#1a0f22",color:"#d9a7ff",
                       border:isActive?"2px solid #d9a7ff":"1px solid #6b3a7a",textAlign:"left"}}>
-                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　AI1着%{item.ai.toFixed(1)}　着{item.pair[0]}/{item.pair[1]}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
+                    <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇AI1着%{item.ai.toFixed(1)}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
-                    <div style={{fontSize:9,color:"#ffd97a",fontWeight:800}}>{item.bet.map(function(c){return c.join("-");}).join("　")}</div>
-                    <div style={{fontSize:9,color:"#7fd8e8",fontWeight:800}}>{(item.betP2||[]).map(function(c){return c.join("-");}).join("　")}</div>
+                    <div style={{fontSize:11,color:"#ffd97a",fontWeight:800}}>1着候補 {item.pair[0]}・{item.pair[1]}号艇</div>
                   </button>
                 );
               })}
             </div>}
             {openB1AxisSenbatsu&&<div style={{fontSize:9,color:"#b08fae",marginTop:4,lineHeight:1.5}}>
-              ⚠ 実験・未採用。確定データの3期間（調整/評価/純不調期）は 3着軸 122.8/114.7/105.5%・2着軸 103.5/111.6/89.5%。4点全部なら113.2/113.1/97.5%で、<span style={{color:"#ff9c9c",fontWeight:700}}>3期間とも100%超は3着軸だけ</span>。的中率は3着軸4.6%・2着軸6.3%・4点合成11.0%。
+              ⚠ 買い目としては不採用（2026-08-20決定）。ここに出しているのは「1号艇のAI1着%が30未満」のレースと、その1着候補2艇（コース別決まり手の上位2艇）だけ。<span style={{color:"#ffd97a",fontWeight:700}}>この2艇に本物の1着が入る率は74.0%</span>（1号艇が勝たなかったレースに限ると 1番手48.6%・2番手26.0%。ランダムなら20%）。3連単の陣形は4通り検証したが改善が出ず、フォワードもn=287・ROI135.0%で控除率ラインとも100%とも区別できないため、買い目の表示はやめた。
             </div>}
           </div>
         )}
@@ -6268,50 +6267,30 @@ function App() {
                   {b1AxisFormation&&b1AxisFormation.selected&&(
                     <div style={{marginTop:10,background:"#2a1030",borderRadius:8,padding:"10px 12px",border:"1px solid #6b3a7a"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
-                        <div style={{fontSize:11,fontWeight:800,color:"#d9a7ff"}}>🧪 1号艇3着軸フォーメーション（実験・未採用、2026-08-17）</div>
-                        <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠ 検証中・買わない前提</span>
+                        <div style={{fontSize:11,fontWeight:800,color:"#d9a7ff"}}>🧪 1号艇が飛びそうなレースの1着候補（2026-08-20〜）</div>
+                        <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠ 買い目は不採用・1着候補のみ</span>
                       </div>
                       <div style={{fontSize:10,color:"#c9a7d9",marginBottom:6,lineHeight:1.5}}>
-                        1号艇のAI1着%={b1AxisFormation.b1AiP1.toFixed(1)}%（閾値{b1AxisFormation.threshold}未満で該当）。1着候補は「コース別決まり手」上位2艇＝{b1AxisFormation.pair[0]}号艇・{b1AxisFormation.pair[1]}号艇。自由枠はAI1着%上位{b1AxisFormation.k}艇。
+                        1号艇のAI1着%={b1AxisFormation.b1AiP1.toFixed(1)}%（閾値{b1AxisFormation.threshold}未満で該当）。1着候補は「コース別決まり手」の上位2艇。
                       </div>
-                      <div style={{fontSize:10,color:"#ffd97a",fontWeight:700,marginBottom:4}}>3着軸（1号艇を3着に固定）</div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-                        {b1AxisFormation.bet.map(function(t,ti){
-                          var key=t[0]+"-"+t[1]+"-"+t[2];
-                          var o=rd.odds3tan&&rd.odds3tan[key];
+                        {b1AxisFormation.pair.map(function(b,bi){
                           return (
-                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#2a2410",borderRadius:6,padding:"5px 10px",border:"1px solid #7a6a1e"}}>
-                              <span style={{fontSize:13,fontWeight:800,color:"#ffd97a",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
-                              {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{o}倍</span>}
-                              <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{B1_AXIS_STAKE_PER_POINT}円</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <div style={{fontSize:10,color:"#7fd8e8",fontWeight:700,marginBottom:4}}>2着軸（1号艇を2着に固定・参考）</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
-                        {(b1AxisFormation.betP2||[]).map(function(t,ti){
-                          var key=t[0]+"-"+t[1]+"-"+t[2];
-                          var o=rd.odds3tan&&rd.odds3tan[key];
-                          return (
-                            <span key={ti} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#10242a",borderRadius:6,padding:"5px 10px",border:"1px solid #2e6273"}}>
-                              <span style={{fontSize:13,fontWeight:800,color:"#7fd8e8",letterSpacing:"0.03em"}}>{t[0]}-{t[1]}-{t[2]}</span>
-                              {o!=null&&!isNaN(o)&&<span style={{fontSize:10,fontWeight:700,color:"#e8b98a"}}>{o}倍</span>}
-                              <span style={{fontSize:10,fontWeight:700,color:"#5dd39e"}}>{B1_AXIS_STAKE_PER_POINT}円</span>
+                            <span key={bi} style={{display:"inline-flex",alignItems:"center",gap:8,background:"#2a2410",borderRadius:6,padding:"6px 12px",border:"1px solid #7a6a1e"}}>
+                              <span style={{fontSize:10,fontWeight:700,color:"#b08fae"}}>{bi===0?"1番手":"2番手"}</span>
+                              <span style={{fontSize:15,fontWeight:800,color:"#ffd97a",letterSpacing:"0.03em"}}>{b}号艇</span>
                             </span>
                           );
                         })}
                       </div>
                       <div style={{fontSize:10,color:"#b08fae",marginBottom:6,lineHeight:1.5}}>
-                        <span style={{color:"#ffd97a",fontWeight:800}}>金色＝3着軸2点</span>（{b1AxisFormation.totalStake}円）、<span style={{color:"#7fd8e8",fontWeight:800}}>水色＝2着軸2点</span>（{b1AxisFormation.totalStakeP2}円）。4点全部なら{b1AxisFormation.totalStake+b1AxisFormation.totalStakeP2}円。
-                        確定データの3期間（調整/評価/純不調期）は <span style={{color:"#ffd97a",fontWeight:700}}>3着軸 122.8/114.7/105.5%</span>・<span style={{color:"#7fd8e8",fontWeight:700}}>2着軸 103.5/111.6/89.5%</span>・4点合成 113.2/113.1/97.5%。
-                        <span style={{color:"#ff9c9c",fontWeight:700}}>3期間とも100%を超えるのは3着軸だけ</span>。ただし的中率は3着軸4.6%・2着軸6.3%・4点合成11.0%で、合成なら当たる日が2.4倍になる。
+                        この2艇に本物の1着が入る率はバックテストで<span style={{color:"#ffd97a",fontWeight:800}}>74.0%</span>。1号艇が勝たなかったレースに限ると <span style={{color:"#ffd97a",fontWeight:700}}>1番手48.6%・2番手26.0%</span>（非1号艇5艇からのランダムなら20%）。
                       </div>
                       <div style={{fontSize:10,color:"#b08fae",lineHeight:1.5}}>
-                        ⚠ これはバックテストの事前基準（調整期間だけを見て選び、評価期間で100%超）を満たしていない後知恵の候補です。3着軸K=1は3期間とも100%を超えますが、それは3期間の表を見渡してから拾った方式なので、事前に選べたわけではありません。
+                        ⚠ 3連単の買い目は出していません（2026-08-20決定）。陣形は4通り検証しましたが、1号艇を券面から外す・1着候補を片側だけにする・紐の順序を変える・紐を広げる、のいずれでも改善が出ませんでした。フォワードもn=287・ROI135.0%（的中4.2%・坊主2/7）で、控除率ライン75%とも100%とも区別できていません。
                       </div>
                       <div style={{fontSize:10,color:"#ff9c9c",lineHeight:1.5,fontWeight:700}}>
-                        最新のフォワード成績は「フォワードテスト記録_2026-08.md」の「🆕 1号艇3着軸フォーメーション」を参照。ROIのSEが大きく、まだ100%とも控除率ライン75%とも区別できません。表示は記録と体感の確認用で、買う前提のものではありません。
+                        ここは1着を読む材料として見るための表示です。買い目として使う場合は自己判断で。
                         {!b1AxisFormation.used1y&&"　※列105-113の決まり手回数が取れていないため既存の決まり手回数（列81-89）で代用しています。バックテストとは条件が異なるので数字は当てになりません。"}
                       </div>
                     </div>
