@@ -42,6 +42,54 @@ const PLACE_NO = {
 };
 const EXCLUDED_VENUES=["江戸川"];
 function isExcludedVenue(venue){return EXCLUDED_VENUES.indexOf(venue)>=0;}
+
+// 【追加、2026-08-22】AI帯×会場の1号艇着順分布（6/1〜8/13、AI<30、全24会場、n=1662）
+// b1_ai_band_finish_venue.js の実行結果を定数化。手動参考として画面に表示する
+// 各会場に total（全体AI<30）と 3帯（A=0-9.9%、B=10-19.9%、C=20-30%）
+// 各配列は [n, 1着率%, 3連対率%, 着外率%]
+const B1_AI_BAND_VENUE_TABLE = {
+  "江戸川": { total: [183, 30.6, 67.8, 32.2], A: [43, 16.3, 60.5, 39.5], B: [60, 28.3, 60.0, 40.0], C: [80, 40.0, 77.5, 22.5] },
+  "津": { total: [139, 22.3, 59.0, 41.0], A: [38, 10.5, 34.2, 65.8], B: [37, 10.8, 51.4, 48.6], C: [64, 35.9, 78.1, 21.9] },
+  "多摩川": { total: [137, 27.7, 63.5, 36.5], A: [36, 25.0, 44.4, 55.6], B: [34, 20.6, 55.9, 44.1], C: [67, 32.8, 77.6, 22.4] },
+  "三国": { total: [136, 20.6, 55.9, 44.1], A: [32, 12.5, 40.6, 59.4], B: [38, 18.4, 52.6, 47.4], C: [66, 25.8, 65.2, 34.8] },
+  "唐津": { total: [132, 25.8, 65.9, 34.1], A: [22, 22.7, 54.5, 45.5], B: [32, 15.6, 68.8, 31.3], C: [78, 30.8, 67.9, 32.1] },
+  "常滑": { total: [130, 29.2, 62.3, 37.7], A: [35, 20.0, 48.6, 51.4], B: [32, 37.5, 59.4, 40.6], C: [63, 30.2, 71.4, 28.6] },
+  "平和島": { total: [128, 17.2, 57.8, 42.2], A: [34, 14.7, 50.0, 50.0], B: [37, 16.2, 64.9, 35.1], C: [57, 19.3, 57.9, 42.1] },
+  "桐生": { total: [114, 19.3, 52.6, 47.4], A: [30, 16.7, 43.3, 56.7], B: [35, 17.1, 51.4, 48.6], C: [49, 22.4, 59.2, 40.8] },
+  "児島": { total: [113, 31.0, 69.0, 31.0], A: [24, 37.5, 70.8, 29.2], B: [22, 31.8, 72.7, 27.3], C: [67, 28.4, 67.2, 32.8] },
+  "尼崎": { total: [111, 31.5, 64.0, 36.0], A: [24, 12.5, 50.0, 50.0], B: [23, 17.4, 52.2, 47.8], C: [64, 43.8, 73.4, 26.6] },
+  "浜名湖": { total: [107, 25.2, 54.2, 45.8], A: [25, 8.0, 32.0, 68.0], B: [19, 15.8, 57.9, 42.1], C: [63, 34.9, 61.9, 38.1] },
+  "びわこ": { total: [106, 23.6, 57.5, 42.5], A: [23, 13.0, 56.5, 43.5], B: [26, 15.4, 50.0, 50.0], C: [57, 31.6, 61.4, 38.6] },
+  "下関": { total: [105, 31.4, 71.4, 28.6], A: [36, 25.0, 63.9, 36.1], B: [27, 33.3, 74.1, 25.9], C: [42, 35.7, 76.2, 23.8] },
+  "住之江": { total: [104, 29.8, 71.2, 28.8], A: [29, 24.1, 69.0, 31.0], B: [24, 37.5, 62.5, 37.5], C: [51, 29.4, 76.5, 23.5] },
+  "大村": { total: [102, 22.5, 65.7, 34.3], A: [21, 9.5, 38.1, 61.9], B: [28, 17.9, 60.7, 39.3], C: [53, 30.2, 79.2, 20.8] },
+  "宮島": { total: [95, 29.5, 62.1, 37.9], A: [28, 17.9, 46.4, 53.6], B: [28, 28.6, 67.9, 32.1], C: [39, 38.5, 69.2, 30.8] },
+  "丸亀": { total: [95, 30.5, 66.3, 33.7], A: [27, 25.9, 59.3, 40.7], B: [24, 25.0, 54.2, 45.8], C: [44, 36.4, 77.3, 22.7] },
+  "徳山": { total: [92, 29.3, 69.6, 30.4], A: [16, 31.3, 68.8, 31.3], B: [29, 17.2, 69.0, 31.0], C: [47, 36.2, 70.2, 29.8] },
+  "若松": { total: [88, 29.5, 71.6, 28.4], A: [18, 0.0, 55.6, 44.4], B: [26, 30.8, 65.4, 34.6], C: [44, 40.9, 81.8, 18.2] },
+  "福岡": { total: [83, 20.5, 60.2, 39.8], A: [24, 8.3, 58.3, 41.7], B: [21, 9.5, 38.1, 61.9], C: [38, 34.2, 73.7, 26.3] },
+  "蒲郡": { total: [82, 23.2, 62.2, 37.8], A: [17, 5.9, 35.3, 64.7], B: [17, 29.4, 76.5, 23.5], C: [48, 27.1, 66.7, 33.3] },
+  "鳴門": { total: [71, 25.4, 63.4, 36.6], A: [22, 40.9, 68.2, 31.8], B: [13, 15.4, 53.8, 46.2], C: [36, 19.4, 63.9, 36.1] },
+  "戸田": { total: [68, 13.2, 45.6, 51.3], A: [25, 12.0, 48.0, 53.8], B: [12, 16.7, 25.0, 75.0], C: [31, 12.9, 51.6, 48.4] },
+  "芦屋": { total: [54, 25.9, 51.9, 48.1], A: [12, 16.7, 33.3, 66.7], B: [12, 25.0, 41.7, 58.3], C: [30, 30.0, 63.3, 36.7] },
+};
+// A=[0, 10), B=[10, 20), C=[20, 30]
+function b1AiBandKey(aiP1){ if(aiP1<10) return "A"; if(aiP1<20) return "B"; return "C"; }
+// 色付けヘルパー：着外率（高いほど緑系、V1向き）・1着率（高いほど赤系、V1不利）
+function b1BandCellBgOut(rate){
+  if(rate==null)return "transparent";
+  if(rate>=60)return "rgba(93,211,158,0.35)";
+  if(rate>=50)return "rgba(93,211,158,0.22)";
+  if(rate>=40)return "rgba(93,211,158,0.10)";
+  return "transparent";
+}
+function b1BandCellBgFirst(rate){
+  if(rate==null)return "transparent";
+  if(rate>=40)return "rgba(255,120,120,0.35)";
+  if(rate>=35)return "rgba(255,120,120,0.22)";
+  if(rate>=30)return "rgba(255,120,120,0.10)";
+  return "transparent";
+}
 const VENUES = {
   "桐生":[50.2,11.8,13.6,13.7,8.6,2.4],"戸田":[44.5,16.2,16.1,14.1,6.7,2.7],"江戸川":[47.0,18.4,14.5,11.8,6.6,2.6],
   "平和島":[46.8,15.6,14.7,13.1,7.4,3.1],"多摩川":[53.0,14.0,13.3,10.7,7.1,2.3],"浜名湖":[52.6,13.3,15.5,10.6,7.0,1.6],
@@ -3188,6 +3236,8 @@ function App() {
   const [openPlPrecisionSenbatsu,setOpenPlPrecisionSenbatsu]=useState(true);
   // 【追加、2026-08-18】🧪1号艇3着軸（実験・未採用）の一覧の開閉。件数が多いので既定は閉じておく
   const [openB1AxisSenbatsu,setOpenB1AxisSenbatsu]=useState(false);
+  // 【追加、2026-08-22】📊 AI帯×会場の全体表の開閉
+  const [openB1AiBandTable,setOpenB1AiBandTable]=useState(false);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
@@ -4942,6 +4992,70 @@ function App() {
             </div>}
           </div>
         )}
+
+        {/* 【追加、2026-08-22】📊 AI帯×会場の1号艇全体表（手動参考用） */}
+        <div style={{marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openB1AiBandTable?5:0}}>
+            <div style={{fontSize:10,color:"#8faece",fontWeight:700}}>📊 AI1着%×会場の1号艇傾向（6/1〜8/13・{"AI<30"}、全24会場n=1662）</div>
+            <button onClick={function(){setOpenB1AiBandTable(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#8faece",border:"1px solid #3a5a7a",fontWeight:700}}>{openB1AiBandTable?"▲ 閉じる":"▼ 開く"}</button>
+          </div>
+          {openB1AiBandTable&&(function(){
+            var venuesSorted=Object.keys(B1_AI_BAND_VENUE_TABLE).sort(function(a,b){
+              return (B1_AI_BAND_VENUE_TABLE[b].A[3]||0) - (B1_AI_BAND_VENUE_TABLE[a].A[3]||0);
+            });
+            var thStyle={padding:"3px 5px",fontSize:9,fontWeight:700,color:"#8faece",borderBottom:"1px solid #3a5a7a",whiteSpace:"nowrap"};
+            var tdStyle={padding:"2px 4px",fontSize:9,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",textAlign:"right"};
+            var venueStyle={padding:"2px 5px",fontSize:10,fontWeight:700,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",whiteSpace:"nowrap",textAlign:"left"};
+            var blockBorder="2px solid #3a5a7a";
+            return (
+              <div style={{overflowX:"auto"}}>
+                <table style={{borderCollapse:"collapse",fontSize:9,minWidth:"100%"}}>
+                  <thead>
+                    <tr>
+                      <th rowSpan={2} style={Object.assign({},thStyle,{textAlign:"left",position:"sticky",left:0,background:"#0a1420"})}>会場</th>
+                      <th colSpan={4} style={Object.assign({},thStyle,{textAlign:"center",borderLeft:blockBorder})}>{"全体(AI<30)"}</th>
+                      <th colSpan={4} style={Object.assign({},thStyle,{textAlign:"center",borderLeft:blockBorder,background:"rgba(93,211,158,0.05)"})}>A: 0〜9.9%</th>
+                      <th colSpan={4} style={Object.assign({},thStyle,{textAlign:"center",borderLeft:blockBorder})}>B: 10〜19.9%</th>
+                      <th colSpan={4} style={Object.assign({},thStyle,{textAlign:"center",borderLeft:blockBorder,background:"rgba(255,120,120,0.05)"})}>C: 20〜30%</th>
+                    </tr>
+                    <tr>
+                      <th style={Object.assign({},thStyle,{borderLeft:blockBorder})}>n</th><th style={thStyle}>1着</th><th style={thStyle}>3連対</th><th style={thStyle}>着外</th>
+                      <th style={Object.assign({},thStyle,{borderLeft:blockBorder})}>n</th><th style={thStyle}>1着</th><th style={thStyle}>3連対</th><th style={thStyle}>着外</th>
+                      <th style={Object.assign({},thStyle,{borderLeft:blockBorder})}>n</th><th style={thStyle}>1着</th><th style={thStyle}>3連対</th><th style={thStyle}>着外</th>
+                      <th style={Object.assign({},thStyle,{borderLeft:blockBorder})}>n</th><th style={thStyle}>1着</th><th style={thStyle}>3連対</th><th style={thStyle}>着外</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {venuesSorted.map(function(vname){
+                      var d=B1_AI_BAND_VENUE_TABLE[vname];
+                      var isActive=vname===venue;
+                      var vs=Object.assign({},venueStyle,{background:isActive?"#1a3050":"#0a1420",position:"sticky",left:0});
+                      var mkCell=function(block,idx,bgFn){
+                        var v=block[idx];
+                        var bg=bgFn?bgFn(v):"transparent";
+                        return <td style={Object.assign({},tdStyle,{background:bg})}>{v==null?"-":v.toFixed(1)+"%"}</td>;
+                      };
+                      var mkN=function(block){ return <td style={Object.assign({},tdStyle,{borderLeft:blockBorder,color:"#8faece"})}>{block[0]}</td>; };
+                      return (
+                        <tr key={vname}>
+                          <td style={vs}>{vname}</td>
+                          {mkN(d.total)}{mkCell(d.total,1,b1BandCellBgFirst)}{mkCell(d.total,2)}{mkCell(d.total,3,b1BandCellBgOut)}
+                          {mkN(d.A)}{mkCell(d.A,1,b1BandCellBgFirst)}{mkCell(d.A,2)}{mkCell(d.A,3,b1BandCellBgOut)}
+                          {mkN(d.B)}{mkCell(d.B,1,b1BandCellBgFirst)}{mkCell(d.B,2)}{mkCell(d.B,3,b1BandCellBgOut)}
+                          {mkN(d.C)}{mkCell(d.C,1,b1BandCellBgFirst)}{mkCell(d.C,2)}{mkCell(d.C,3,b1BandCellBgOut)}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{fontSize:9,color:"#8faece",marginTop:4,lineHeight:1.5}}>
+                  会場は「A帯（0〜9.9%）の着外率降順」（1号艇が飛びやすい会場が上に）。緑系セル＝着外率高（V1の的中母数向き）、赤系セル＝1着率高（V1は的中しない）。
+                  データは 2026-06-01〜08-13 の実測、{"AI1着%<30"} のレースだけ。セルのnが少ない場合（nが15未満の目安）はSEが±10pt以上で値は当てにならない。
+                </div>
+              </div>
+            );
+          })()}
+        </div>
 
         {SHOW_MOTOR_B1_AXIS&&(function(){
           var items=[];
