@@ -5000,9 +5000,7 @@ function App() {
             <button onClick={function(){setOpenB1AiBandTable(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0e1b2c",color:"#8faece",border:"1px solid #3a5a7a",fontWeight:700}}>{openB1AiBandTable?"▲ 閉じる":"▼ 開く"}</button>
           </div>
           {openB1AiBandTable&&(function(){
-            var venuesSorted=Object.keys(B1_AI_BAND_VENUE_TABLE).sort(function(a,b){
-              return (B1_AI_BAND_VENUE_TABLE[b].A[3]||0) - (B1_AI_BAND_VENUE_TABLE[a].A[3]||0);
-            });
+            var venuesSorted=["桐生","江戸川","戸田","平和島","多摩川","浜名湖","蒲郡","常滑","津","三国","びわこ","住之江","尼崎","鳴門","丸亀","児島","宮島","徳山","下関","若松","芦屋","福岡","唐津","大村"];
             var thStyle={padding:"3px 5px",fontSize:9,fontWeight:700,color:"#8faece",borderBottom:"1px solid #3a5a7a",whiteSpace:"nowrap"};
             var tdStyle={padding:"2px 4px",fontSize:9,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",textAlign:"right"};
             var venueStyle={padding:"2px 5px",fontSize:10,fontWeight:700,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",whiteSpace:"nowrap",textAlign:"left"};
@@ -5049,7 +5047,7 @@ function App() {
                   </tbody>
                 </table>
                 <div style={{fontSize:9,color:"#8faece",marginTop:4,lineHeight:1.5}}>
-                  会場は「A帯（0〜9.9%）の着外率降順」（1号艇が飛びやすい会場が上に）。緑系セル＝着外率高（V1の的中母数向き）、赤系セル＝1着率高（V1は的中しない）。
+                  会場は東から西の地域順で表示。緑系セル＝着外率高（V1の的中母数向き）、赤系セル＝1着率高（V1は的中しない）。
                   データは 2026-06-01〜08-13 の実測、{"AI1着%<30"} のレースだけ。セルのnが少ない場合（nが15未満の目安）はSEが±10pt以上で値は当てにならない。
                 </div>
               </div>
