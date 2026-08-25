@@ -120,6 +120,217 @@ function raceTypeBadgeStyle(t){
   if(t==="一般")return{bg:"#3a3a4a",fg:"#c9c9d0",border:"#5a5a6a"};
   return null;
 }
+
+// 【追加、2026-08-25】年間グレードスケジュール（boatrace.jp公式より2026年8月時点で取得）
+// 形式: [開始MM-DD, 終了MM-DD, 会場, グレード, 開催名]
+// グレード: SG（SG/PG1）/ G12（G1/G2）/ G3 / V（ヴィーナス）/ R（ルーキー）/ M（マスターズ）
+// 年度別。年始に更新するときはこのオブジェクトに年キーを追加（例: "2027": [...]）
+const RACE_GRADE_SCHEDULE = {
+  "2026": [
+    // === SG/PG1 (14件) ===
+    ["01-22","01-25","尼崎","SG","BBCトーナメント"],
+    ["02-24","03-01","鳴門","SG","スピードクイーンメモリアル"],
+    ["03-24","03-29","蒲郡","SG","ボートレースクラシック"],
+    ["04-21","04-26","宮島","SG","マスターズチャンピオン"],
+    ["05-26","05-31","浜名湖","SG","ボートレースオールスター"],
+    ["06-23","06-28","鳴門","SG","グランドチャンピオン"],
+    ["07-28","08-02","びわこ","SG","オーシャンカップ"],
+    ["08-06","08-11","徳山","SG","レディースチャンピオン"],
+    ["08-25","08-30","桐生","SG","ボートレースメモリアル"],
+    ["09-22","09-27","若松","SG","ヤングダービー"],
+    ["10-27","11-01","尼崎","SG","ボートレースダービー"],
+    ["11-24","11-29","常滑","SG","チャレンジカップ"],
+    ["12-15","12-20","大村","SG","グランプリ"],
+    ["12-26","12-31","住之江","SG","クイーンズクライマックス"],
+    // === G1/G2 (44件) ===
+    ["01-12","01-17","芦屋","G12","全日本王座決定戦"],
+    ["01-16","01-21","びわこ","G12","秩父宮妃記念杯"],
+    ["01-29","02-03","下関","G12","中国地区選手権"],
+    ["01-30","02-04","唐津","G12","九州地区選手権"],
+    ["01-31","02-05","鳴門","G12","四国地区選手権"],
+    ["02-04","02-09","住之江","G12","近畿地区選手権"],
+    ["02-05","02-10","常滑","G12","東海地区選手権"],
+    ["02-06","02-11","多摩川","G12","関東地区選手権"],
+    ["02-15","02-20","若松","G12","全日本覇者決定戦"],
+    ["02-18","02-24","江戸川","G12","江戸川大賞"],
+    ["03-02","03-07","児島","G12","児島キングカップ"],
+    ["03-08","03-13","大村","G12","海の王者決定戦"],
+    ["03-14","03-19","尼崎","G12","尼崎センプルカップ"],
+    ["03-17","03-22","唐津","G12","モーターボート大賞"],
+    ["04-02","04-07","津","G12","ダイヤモンドカップ"],
+    ["04-03","04-08","住之江","G12","太閣賞"],
+    ["04-11","04-16","福岡","G12","福岡チャンピオンカップ"],
+    ["04-12","04-17","桐生","G12","赤城雷神杯"],
+    ["05-05","05-10","丸亀","G12","レディースオールスター"],
+    ["05-11","05-16","江戸川","G12","モーターボート大賞"],
+    ["05-15","05-20","芦屋","G12","全日本王座決定戦"],
+    ["05-20","05-25","びわこ","G12","秩父宮妃記念杯"],
+    ["06-04","06-09","宮島","G12","宮島チャンピオンカップ"],
+    ["06-08","06-13","尼崎","G12","尼崎センプルカップ"],
+    ["06-13","06-18","常滑","G12","トコタンキング決定戦"],
+    ["06-17","06-22","大村","G12","モーターボート誕生祭"],
+    ["06-30","07-05","児島","G12","モーターボート大賞"],
+    ["07-07","07-12","戸田","G12","全国ボートレース甲子園"],
+    ["07-13","07-18","蒲郡","G12","モーターボート大賞"],
+    ["09-03","09-08","津","G12","ツッキー王座決定戦"],
+    ["09-07","09-12","大村","G12","海の王者決定戦"],
+    ["09-12","09-17","徳山","G12","ダイヤモンドカップ"],
+    ["09-16","09-21","多摩川","G12","ウェイキーカップ"],
+    ["09-28","10-03","児島","G12","児島キングカップ"],
+    ["10-04","10-09","三国","G12","北陸艇王決戦"],
+    ["10-13","10-18","平和島","G12","トーキョー・ベイ・カップ"],
+    ["10-18","10-23","唐津","G12","全日本王者決定戦"],
+    ["11-05","11-10","住之江","G12","高松宮記念"],
+    ["11-06","11-11","鳴門","G12","大渦大賞"],
+    ["11-14","11-19","びわこ","G12","びわこ大賞"],
+    ["11-15","11-20","丸亀","G12","京極賞"],
+    ["11-24","11-29","常滑","G12","レディースチャレンジカップ"],
+    ["12-03","12-08","徳山","G12","徳山クラウン争奪戦"],
+    ["12-06","12-11","蒲郡","G12","オールジャパン竹島特別"],
+    // === G3 (51件) ===
+    ["01-04","01-09","唐津","G3","オールレディース"],
+    ["01-14","01-19","蒲郡","G3","企業杯"],
+    ["01-17","01-23","丸亀","G3","オールレディース"],
+    ["01-23","01-28","江戸川","G3","オールレディース"],
+    ["02-12","02-17","平和島","G3","オールレディース"],
+    ["02-25","03-02","下関","G3","企業杯"],
+    ["03-10","03-15","徳山","G3","オールレディース"],
+    ["03-10","03-15","若松","G3","企業杯"],
+    ["03-20","03-25","浜名湖","G3","企業杯"],
+    ["03-24","03-29","三国","G3","オールレディース"],
+    ["03-26","03-31","芦屋","G3","企業杯"],
+    ["04-08","04-13","唐津","G3","オールレディース"],
+    ["04-14","04-19","戸田","G3","企業杯"],
+    ["04-22","04-27","若松","G3","オールレディース"],
+    ["04-29","05-04","鳴門","G3","オールレディース"],
+    ["05-09","05-14","津","G3","企業杯"],
+    ["05-18","05-23","徳山","G3","オールレディース"],
+    ["05-26","05-31","丸亀","G3","企業杯"],
+    ["05-30","06-04","多摩川","G3","オールレディース"],
+    ["06-12","06-17","福岡","G3","オールレディース"],
+    ["06-16","06-21","徳山","G3","企業杯"],
+    ["06-25","06-30","桐生","G3","企業杯"],
+    ["07-07","07-12","若松","G3","企業杯"],
+    ["07-13","07-18","尼崎","G3","オールレディース"],
+    ["07-17","07-22","児島","G3","企業杯"],
+    ["07-18","07-23","津","G3","イースタンヤング"],
+    ["07-19","07-24","下関","G3","オールレディース"],
+    ["07-19","07-24","福岡","G3","ウエスタンヤング"],
+    ["07-23","07-28","江戸川","G3","企業杯"],
+    ["07-31","08-05","桐生","G3","オールレディース"],
+    ["08-03","08-08","平和島","G3","企業杯"],
+    ["08-12","08-17","大村","G3","オールレディース"],
+    ["08-22","08-27","常滑","G3","企業杯"],
+    ["08-28","09-02","多摩川","G3","企業杯"],
+    ["08-30","09-04","浜名湖","G3","オールレディース"],
+    ["09-18","09-23","宮島","G3","オールレディース"],
+    ["09-22","09-27","びわこ","G3","企業杯"],
+    ["09-24","09-29","芦屋","G3","オールレディース"],
+    ["09-29","10-04","蒲郡","G3","企業杯"],
+    ["10-07","10-12","江戸川","G3","オールレディース"],
+    ["10-19","10-24","住之江","G3","オールレディース"],
+    ["10-21","10-26","浜名湖","G3","企業杯"],
+    ["10-31","11-05","津","G3","オールレディース"],
+    ["11-11","11-16","大村","G3","企業杯"],
+    ["11-18","11-23","戸田","G3","オールレディース"],
+    ["11-21","11-26","三国","G3","企業杯"],
+    ["11-27","12-02","尼崎","G3","企業杯"],
+    ["12-01","12-06","びわこ","G3","オールレディース"],
+    ["12-13","12-18","福岡","G3","企業杯"],
+    ["12-20","12-25","唐津","G3","企業杯"],
+    // === ヴィーナス (25件) ===
+    ["01-10","01-15","多摩川","V","ヴィーナスシリーズ第19戦"],
+    ["01-30","02-04","浜名湖","V","ヴィーナスシリーズ第20戦"],
+    ["02-06","02-11","児島","V","ヴィーナスシリーズ第21戦"],
+    ["02-18","02-23","福岡","V","ヴィーナスシリーズ第22戦"],
+    ["03-03","03-08","びわこ","V","ヴィーナスシリーズ第23戦"],
+    ["03-17","03-22","宮島","V","ヴィーナスシリーズ第24戦"],
+    ["04-01","04-06","福岡","V","ヴィーナスシリーズ第1戦"],
+    ["04-15","04-20","津","V","ヴィーナスシリーズ第2戦"],
+    ["05-12","05-17","蒲郡","V","ヴィーナスシリーズ第3戦"],
+    ["05-24","05-29","大村","V","ヴィーナスシリーズ第4戦"],
+    ["06-06","06-11","丸亀","V","ヴィーナスシリーズ第5戦"],
+    ["06-18","06-23","戸田","V","ヴィーナスシリーズ第6戦"],
+    ["06-24","06-29","住之江","V","ヴィーナスシリーズ第7戦"],
+    ["07-07","07-12","びわこ","V","ヴィーナスシリーズ第8戦"],
+    ["07-25","07-30","平和島","V","ヴィーナスシリーズ第9戦"],
+    ["08-18","08-23","児島","V","ヴィーナスシリーズ第10戦"],
+    ["08-24","08-29","三国","V","ヴィーナスシリーズ第11戦"],
+    ["09-06","09-11","鳴門","V","ヴィーナスシリーズ第12戦"],
+    ["09-12","09-17","常滑","V","ヴィーナスシリーズ第13戦"],
+    ["10-01","10-06","下関","V","ヴィーナスシリーズ第14戦"],
+    ["10-13","10-18","若松","V","ヴィーナスシリーズ第15戦"],
+    ["10-25","10-30","桐生","V","ヴィーナスシリーズ第16戦"],
+    ["11-06","11-11","多摩川","V","ヴィーナスシリーズ第17戦"],
+    ["11-12","11-17","唐津","V","ヴィーナスシリーズ第18戦"],
+    ["12-08","12-13","尼崎","V","ヴィーナスシリーズ第19戦"],
+    // === ルーキー (25件) ===
+    ["01-11","01-17","鳴門","R","ルーキーシリーズ第1戦"],
+    ["01-20","01-26","三国","R","ルーキーシリーズ第2戦"],
+    ["02-17","02-22","尼崎","R","ルーキーシリーズ第3戦"],
+    ["02-26","03-03","大村","R","ルーキーシリーズ第4戦"],
+    ["03-07","03-12","戸田","R","ルーキーシリーズ第5戦"],
+    ["03-16","03-21","桐生","R","ルーキーシリーズ第6戦"],
+    ["03-25","03-30","平和島","R","ルーキーシリーズ第7戦"],
+    ["04-09","04-14","浜名湖","R","ルーキーシリーズ第8戦"],
+    ["04-18","04-23","大村","R","ルーキーシリーズ第9戦"],
+    ["05-13","05-18","下関","R","ルーキーシリーズ第10戦"],
+    ["05-22","05-27","尼崎","R","ルーキーシリーズ第11戦"],
+    ["06-02","06-08","三国","R","ルーキーシリーズ第12戦"],
+    ["06-11","06-16","江戸川","R","ルーキーシリーズ第13戦"],
+    ["06-20","06-25","丸亀","R","ルーキーシリーズ第14戦"],
+    ["07-30","08-04","常滑","R","ルーキーシリーズ第15戦"],
+    ["09-04","09-09","びわこ","R","ルーキーシリーズ第16戦"],
+    ["09-13","09-18","蒲郡","R","ルーキーシリーズ第17戦"],
+    ["10-02","10-07","徳山","R","ルーキーシリーズ第18戦"],
+    ["10-12","10-17","鳴門","R","ルーキーシリーズ第19戦"],
+    ["10-22","10-27","多摩川","R","ルーキーシリーズ第20戦"],
+    ["11-01","11-06","宮島","R","ルーキーシリーズ第21戦"],
+    ["11-10","11-15","津","R","ルーキーシリーズ第22戦"],
+    ["11-19","11-24","福岡","R","ルーキーシリーズ第23戦"],
+    ["12-09","12-14","戸田","R","ルーキーシリーズ第24戦"],
+    ["12-18","12-23","芦屋","R","ルーキーシリーズ第25戦"],
+    // === マスターズ (9件) ===
+    ["05-29","06-04","津","M","マスターズリーグ第1戦"],
+    ["06-17","06-22","宮島","M","マスターズリーグ第2戦"],
+    ["07-07","07-12","三国","M","マスターズリーグ第3戦"],
+    ["07-31","08-05","浜名湖","M","マスターズリーグ第4戦"],
+    ["08-31","09-05","若松","M","マスターズリーグ第5戦"],
+    ["09-28","10-03","平和島","M","マスターズリーグ第6戦"],
+    ["10-29","11-03","徳山","M","マスターズリーグ第7戦"],
+    ["11-20","11-25","芦屋","M","マスターズリーグ第8戦"],
+    ["12-19","12-24","戸田","M","マスターズリーグ第9戦"],
+  ]
+};
+
+// 日付+会場 → グレード情報 ({grade, title} or null)
+// dateStr: "YYYY-MM-DD"形式、venue: 会場名（例："桐生"）
+function getRaceGrade(dateStr, venue){
+  if(!dateStr || !venue) return null;
+  var year = dateStr.substring(0, 4);
+  var table = RACE_GRADE_SCHEDULE[year];
+  if(!table) return null;
+  var md = dateStr.substring(5);  // "MM-DD"
+  for(var i=0; i<table.length; i++){
+    var r = table[i];
+    if(r[2] === venue && md >= r[0] && md <= r[1]){
+      return { grade: r[3], title: r[4] };
+    }
+  }
+  return null;
+}
+
+// グレード別バッジスタイル（bg:背景、fg:文字、border:枠、label:表示ラベル）
+function raceGradeBadgeStyle(g){
+  if(g === "SG") return { bg:"#c02020", fg:"#fff", border:"#e04040", label:"SG" };
+  if(g === "G12") return { bg:"#7a4b9c", fg:"#fff", border:"#9666b8", label:"G1/G2" };
+  if(g === "G3") return { bg:"#a87344", fg:"#fff", border:"#c48a5c", label:"G3" };
+  if(g === "V") return { bg:"#d977a8", fg:"#fff", border:"#e896bc", label:"V" };
+  if(g === "R") return { bg:"#4a7ec7", fg:"#fff", border:"#6a9adf", label:"R" };
+  if(g === "M") return { bg:"#5a7a5a", fg:"#fff", border:"#78987a", label:"M" };
+  return null;
+}
+
 const VENUES = {
   "桐生":[50.2,11.8,13.6,13.7,8.6,2.4],"戸田":[44.5,16.2,16.1,14.1,6.7,2.7],"江戸川":[47.0,18.4,14.5,11.8,6.6,2.6],
   "平和島":[46.8,15.6,14.7,13.1,7.4,3.1],"多摩川":[53.0,14.0,13.3,10.7,7.1,2.3],"浜名湖":[52.6,13.3,15.5,10.6,7.0,1.6],
@@ -4945,7 +5156,7 @@ function App() {
                       color:c,
                       border:isActive?"2px solid "+c:"1px solid "+borderC,textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.type==="cyan"?"aiP1 "+item.b1Ai1:"候補"+item.candidates.length+"艇"}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                   </button>
                 );
               })}
@@ -4969,7 +5180,7 @@ function App() {
                       background:isActive?"#3a2450":"#1a0f22",color:"#d9a7ff",
                       border:isActive?"2px solid #d9a7ff":"1px solid #6b3a7a",textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇AI1着%{item.ai.toFixed(1)}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                     <div style={{fontSize:11,color:"#ffd97a",fontWeight:800}}>1着候補 {item.pair[0]}・{item.pair[1]}号艇</div>
                     {(function(){
                       var bandData = B1_AI_BAND_VENUE_TABLE[item.vname];
@@ -5008,7 +5219,7 @@ function App() {
                       color:"#f9c513",
                       border:isActive?"2px solid #f9c513":"1px solid #7a5c00",textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　スコア{item.score.toFixed(2)}　gap{item.gap.toFixed(2)}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                     <div style={{fontSize:9,color:"#f9c513"}}>1-{""+item.candidates[0]+item.candidates[1]}-{""+item.candidates[0]+item.candidates[1]+item.third}</div>
                   </button>
                 );
@@ -5042,7 +5253,7 @@ function App() {
                       color:mainC,opacity:newByTenji?0.5:1,
                       border:isActive?("2px solid "+mainC):(good?("2px solid "+mainC):("1px solid "+borderC)),textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%{!item.hasTenji&&<span style={{color:"#e8c98a"}}>　暫定</span>}{item.noTenjiSel===true&&<span style={{color:"#5dd39e",fontWeight:800}}>　◆残り</span>}{newByTenji&&<span style={{color:"#ff9c9c",fontWeight:800}}>　⚠展示で新規</span>}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                     <div style={{fontSize:9,color:mainC}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
                     <div style={{fontSize:9,color:good?"#5dd39e":"#8b9bae"}}>
                       {!item.hasTenji?"展示前の暫定（取込で変わる場合あり）":(item.synthOdds3==null?"合成オッズ未判定（オッズ未取得）":("合成"+item.synthOdds3.toFixed(2)+"倍"+(good?"　◆好条件":"")))}
@@ -5178,7 +5389,7 @@ function App() {
                         color:"#c084fc",
                         border:isActive?"2px solid #c084fc":"1px solid #4a2c6b",textAlign:"left"}}>
                       <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.boats.join("・")}号艇</div>
-                      <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
+                      <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                     </button>
                   );
                 })}
@@ -5762,6 +5973,13 @@ function App() {
                 var s=raceTypeBadgeStyle(rt);
                 if(!s)return null;
                 return <span style={{display:"inline-block",padding:"3px 8px",fontSize:11,fontWeight:800,borderRadius:5,background:s.bg,color:s.fg,border:"1px solid "+s.border}}>{rt}</span>;
+              })()}
+              {(function(){
+                var g=raceTypeDate?getRaceGrade(raceTypeDate,venue):null;
+                if(!g)return null;
+                var gs=raceGradeBadgeStyle(g.grade);
+                if(!gs)return null;
+                return <span title={g.title} style={{display:"inline-block",padding:"3px 8px",fontSize:11,fontWeight:800,borderRadius:5,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border}}>{gs.label}</span>;
               })()}
               {rd.shimekiri&&<span style={{fontSize:13,color:"#f9c513",fontWeight:700,marginLeft:6}}>締切 {rd.shimekiri}</span>}
               <span style={{fontSize:10,color:"#9db5cc"}}>風　{rd.wind}{rd.weather&&"　　天候　"+rd.weather}{rd.waveHeight&&"　　波高　"+rd.waveHeight}</span>
