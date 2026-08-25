@@ -40,7 +40,10 @@ const PLACE_NO = {
   "尼崎":13,"鳴門":14,"丸亀":15,"児島":16,"宮島":17,"徳山":18,
   "下関":19,"若松":20,"芦屋":21,"福岡":22,"唐津":23,"大村":24,
 };
-const EXCLUDED_VENUES=["江戸川"];
+// 【マスター除外リスト】全ロジックから除外する会場。2026-08-13に江戸川を入れたが
+// 2026-08-24にユーザー判断で取り消し、現在は空。詳しい経緯と注意点は boat_race.jsx 側の
+// 同じ箇所のコメントを参照。イン逃げ2連単と合計得点の部分的な除外は別扱いで今回は触っていない。
+const EXCLUDED_VENUES=[];
 function isExcludedVenue(venue){return EXCLUDED_VENUES.indexOf(venue)>=0;}
 
 // 【追加、2026-08-22】AI帯×会場の1号艇着順分布（6/1〜8/13、AI<30、全24会場、n=1662）
@@ -4914,6 +4917,16 @@ function App() {
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇AI1着%{item.ai.toFixed(1)}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
                     <div style={{fontSize:11,color:"#ffd97a",fontWeight:800}}>1着候補 {item.pair[0]}・{item.pair[1]}号艇</div>
+                    {(function(){
+                      var bandData = B1_AI_BAND_VENUE_TABLE[item.vname];
+                      if(!bandData) return null;
+                      var d = bandData[b1AiBandKey(item.ai)];
+                      return (
+                        <div style={{fontSize:9,marginTop:2}}>
+                          <span style={{color:"#ff9c9c"}}>1着{d[1].toFixed(0)}%</span>・<span style={{color:"#c9e0f5"}}>3連対{d[2].toFixed(0)}%</span>・<span style={{color:"#5dd39e"}}>着外{d[3].toFixed(0)}%</span>
+                        </div>
+                      );
+                    })()}
                   </button>
                 );
               })}
