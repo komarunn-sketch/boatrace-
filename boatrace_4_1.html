@@ -93,6 +93,33 @@ function b1BandCellBgFirst(rate){
   if(rate>=30)return "rgba(255,120,120,0.10)";
   return "transparent";
 }
+
+// 【追加、2026-08-25】レースタイトルの8区分分類（一般/予選/企画/特賞/特選/選抜/準優/優勝戦）
+// 入力はbuild_race_sheet.pyがBテキストから取り込むCSVの「レース名」列の値
+function classifyRaceType(title){
+  var t=String(title||"").replace(/[\s　]+/g,"");
+  if(!t)return null;
+  if(t.indexOf("準優勝戦")>=0||/^準優$/.test(t))return "準優";
+  if(t.indexOf("優勝戦")>=0)return "優勝戦";
+  if(t.indexOf("特選")>=0)return "特選";
+  if(t.indexOf("特賞")>=0)return "特賞";
+  if(t.indexOf("選抜")>=0)return "選抜";
+  if(t==="一般")return "一般";
+  if(t==="予選")return "予選";
+  return "企画";
+}
+// 種別ごとのバッジスタイル
+function raceTypeBadgeStyle(t){
+  if(t==="優勝戦")return{bg:"#c77d3d",fg:"#fff",border:"#e59a58"};
+  if(t==="準優")return{bg:"#a54b9c",fg:"#fff",border:"#c86ab8"};
+  if(t==="特選")return{bg:"#b8583e",fg:"#fff",border:"#d67556"};
+  if(t==="特賞")return{bg:"#7d6a2f",fg:"#fff",border:"#a09148"};
+  if(t==="選抜")return{bg:"#4a6db8",fg:"#fff",border:"#6c8fd5"};
+  if(t==="企画")return{bg:"#3d7d5e",fg:"#fff",border:"#59a583"};
+  if(t==="予選")return{bg:"#2a4560",fg:"#c9e0f5",border:"#4a6580"};
+  if(t==="一般")return{bg:"#3a3a4a",fg:"#c9c9d0",border:"#5a5a6a"};
+  return null;
+}
 const VENUES = {
   "桐生":[50.2,11.8,13.6,13.7,8.6,2.4],"戸田":[44.5,16.2,16.1,14.1,6.7,2.7],"江戸川":[47.0,18.4,14.5,11.8,6.6,2.6],
   "平和島":[46.8,15.6,14.7,13.1,7.4,3.1],"多摩川":[53.0,14.0,13.3,10.7,7.1,2.3],"浜名湖":[52.6,13.3,15.5,10.6,7.0,1.6],
@@ -3241,6 +3268,9 @@ function App() {
   const [openB1AxisSenbatsu,setOpenB1AxisSenbatsu]=useState(false);
   // 【追加、2026-08-22】📊 AI帯×会場の全体表の開閉
   const [openB1AiBandTable,setOpenB1AiBandTable]=useState(false);
+  // 【追加、2026-08-25】レース種別マップ（CSVの「レース名」列から自動抽出）
+  const [raceTypeMap,setRaceTypeMap]=useState({});
+  const [raceTypeDate,setRaceTypeDate]=useState(null);
   const [nowTime,setNowTime]=useState(new Date());
   const [csvMsg,setCsvMsg]=useState("");
   const [resultsCsvMsg,setResultsCsvMsg]=useState("");
@@ -3295,6 +3325,30 @@ function App() {
           var vkeys=Object.keys(updated);
           for(var vi=0;vi<vkeys.length;vi++){
             imported+=Object.keys(updated[vkeys[vi]]).length;
+          }
+          // 【追加、2026-08-25】CSVの「レース名」列からrace_typeを自動抽出
+          // （build_race_sheet.pyがBテキストから取り込むレース名を使う）
+          var raceNameIdx=headers.indexOf("レース名");
+          if(raceNameIdx>=0){
+            var newRaceTypeMap={};
+            var raceTypeCount=0;
+            for(var ri=1;ri<allRows.length;ri++){
+              var row=allRows[ri];
+              if(row.length<=raceNameIdx)continue;
+              var vname=(row[15]||"").trim();
+              var rnum=parseInt(row[16]);
+              var raceName=(row[raceNameIdx]||"").trim();
+              if(!vname||!rnum||!raceName||!VENUES[vname])continue;
+              var key=vname+"_"+rnum;
+              if(!newRaceTypeMap[key]){
+                var t=classifyRaceType(raceName);
+                if(t){newRaceTypeMap[key]=t;raceTypeCount++;}
+              }
+            }
+            if(raceTypeCount>0){
+              setRaceTypeMap(newRaceTypeMap);
+              if(dateMatch)setRaceTypeDate(dateMatch[1]);
+            }
           }
         } else {
           // 旧フォーマット: 1行=1レース（ボートレース日和）
@@ -4891,7 +4945,7 @@ function App() {
                       color:c,
                       border:isActive?"2px solid "+c:"1px solid "+borderC,textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.type==="cyan"?"aiP1 "+item.b1Ai1:"候補"+item.candidates.length+"艇"}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
                   </button>
                 );
               })}
@@ -4915,7 +4969,7 @@ function App() {
                       background:isActive?"#3a2450":"#1a0f22",color:"#d9a7ff",
                       border:isActive?"2px solid #d9a7ff":"1px solid #6b3a7a",textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇AI1着%{item.ai.toFixed(1)}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
                     <div style={{fontSize:11,color:"#ffd97a",fontWeight:800}}>1着候補 {item.pair[0]}・{item.pair[1]}号艇</div>
                     {(function(){
                       var bandData = B1_AI_BAND_VENUE_TABLE[item.vname];
@@ -4954,7 +5008,7 @@ function App() {
                       color:"#f9c513",
                       border:isActive?"2px solid #f9c513":"1px solid #7a5c00",textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　スコア{item.score.toFixed(2)}　gap{item.gap.toFixed(2)}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
                     <div style={{fontSize:9,color:"#f9c513"}}>1-{""+item.candidates[0]+item.candidates[1]}-{""+item.candidates[0]+item.candidates[1]+item.third}</div>
                   </button>
                 );
@@ -4988,7 +5042,7 @@ function App() {
                       color:mainC,opacity:newByTenji?0.5:1,
                       border:isActive?("2px solid "+mainC):(good?("2px solid "+mainC):("1px solid "+borderC)),textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　gap{item.gap.toFixed(3)}　確率{(item.prob1*100).toFixed(1)}%{!item.hasTenji&&<span style={{color:"#e8c98a"}}>　暫定</span>}{item.noTenjiSel===true&&<span style={{color:"#5dd39e",fontWeight:800}}>　◆残り</span>}{newByTenji&&<span style={{color:"#ff9c9c",fontWeight:800}}>　⚠展示で新規</span>}</div>
-                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                    <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
                     <div style={{fontSize:9,color:mainC}}>{item.combos3.map(function(c){return c.join("-");}).join("　")}</div>
                     <div style={{fontSize:9,color:good?"#5dd39e":"#8b9bae"}}>
                       {!item.hasTenji?"展示前の暫定（取込で変わる場合あり）":(item.synthOdds3==null?"合成オッズ未判定（オッズ未取得）":("合成"+item.synthOdds3.toFixed(2)+"倍"+(good?"　◆好条件":"")))}
@@ -5124,7 +5178,7 @@ function App() {
                         color:"#c084fc",
                         border:isActive?"2px solid #c084fc":"1px solid #4a2c6b",textAlign:"left"}}>
                       <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　{item.boats.join("・")}号艇</div>
-                      <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}</div>
+                      <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
                     </button>
                   );
                 })}
@@ -5702,6 +5756,13 @@ function App() {
           <div>
             <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",marginBottom:10}}>
               <span style={{fontSize:19,fontWeight:800,color:"#fff"}}>{curRace}R {venue}{result.avg!=null?"（平均: "+fmt(result.avg)+"）":""}</span>
+              {(function(){
+                var rt=raceTypeMap&&raceTypeMap[venue+"_"+curRace];
+                if(!rt)return null;
+                var s=raceTypeBadgeStyle(rt);
+                if(!s)return null;
+                return <span style={{display:"inline-block",padding:"3px 8px",fontSize:11,fontWeight:800,borderRadius:5,background:s.bg,color:s.fg,border:"1px solid "+s.border}}>{rt}</span>;
+              })()}
               {rd.shimekiri&&<span style={{fontSize:13,color:"#f9c513",fontWeight:700,marginLeft:6}}>締切 {rd.shimekiri}</span>}
               <span style={{fontSize:10,color:"#9db5cc"}}>風　{rd.wind}{rd.weather&&"　　天候　"+rd.weather}{rd.waveHeight&&"　　波高　"+rd.waveHeight}</span>
               {aiEval&&<span style={{fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>}
