@@ -5457,6 +5457,7 @@ function App() {
                   {rec&&rec.b1Ai1!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,color:rec.b1Ai1>=B1_FIXED_AI1_THRESH?"#5dc9f9":"#6b7d94"}}>aiP1 {rec.b1Ai1}{rec.b1Ai1Cal!=null?"→"+rec.b1Ai1Cal:""}</div>}
                   {rec&&rec.compOdds!=null&&<div style={{fontSize:10,fontWeight:700,lineHeight:1,marginTop:1,color:rec.compOdds>=5?"#5dd39e":"#ff8a80"}}>合成{rec.compOdds.toFixed(1)}倍</div>}
                   {n}R
+                  {(function(){var rt=raceTypeMap&&raceTypeMap[venue+"_"+n];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <div style={{display:"inline-block",padding:"0 3px",fontSize:8,fontWeight:800,lineHeight:1.4,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginTop:1}}>{rt}</div>;})()}
                   {r.shimekiri&&<div style={{fontSize:8,color:"#f9c513",lineHeight:1}}>{r.shimekiri}</div>}
                   {recType&&<div style={{fontSize:8,lineHeight:1,marginTop:1,color:isB1?"#5dc9f9":recType==="v2"?"#5dd39e":"#c9a8ff"}}>{recType==="b1fixed"?"イン逃げ":recType==="b1fixed_pending"?"イン逃げ?":recType==="v2"?"V2":"AI1着%"}</div>}
                   {rec&&rec.v2Conf!=null&&<div style={{fontSize:11,fontWeight:700,lineHeight:1.3,marginTop:2,color:rec.v2Conf>=V2_SUICHI_CONF_THRESH?"#5dd39e":"#6b7d94"}}>V2 {(rec.v2Conf*100).toFixed(0)}%</div>}
