@@ -691,19 +691,30 @@ const VW={
 // 仕上がり：Brier 0.10414→0.09957、logloss 0.34588→0.32882。1号艇のビン別ずれは13ビンすべて±5pt以内。
 // ※閾値判定(AI1CHAKU_B1_CUT=45、B1_FIXED_AI1_THRESH=60)は生値のaiP1のまま。補正値を判定に使わないこと。
 // ※1号艇が20%未満の帯はaiP1に情報が残っていないので、補正後の値は「この帯では判別できていない」の意味。
+// ※2026-08-26：1号艇側をクラス別(A1/A2/B級)の3系統に分けた。
+//   同じaiP1の帯の中でも実測1着率が A1>A2>B級 と単調に違うため（評価期間の40-49.9%帯で A1+25.1/A2+12.7/B1+8.8pt）。
+//   KNEEと低帯の定数はクラス共通（A1は20%未満の帯にほぼ出てこない）、KNEE以上のa,bだけクラス別。
+//   採否は 7/1-7/31で当てはめ 8/1-8/13の別データで確認：Brier 0.10176→0.10113、logloss 0.33643→0.33474 で両方改善。
+//   係数は評価期間全体(7/1-8/13)で当て直した値。ai_p1_recalibration_fit_byclass.js で再現できる。
 const AI1_CAL={
-  b1:{knee:20,low:0.2276,a:0.6984,b:1.2675},
+  b1:{knee:20,low:0.2276,
+      byCls:{A1:{a:1.0411,b:0.9871},A2:{a:0.5409,b:1.0289},B:{a:0.3392,b:1.0902}},
+      a:0.6984,b:1.2675},
   other:{knee:null,low:null,a:0.0449,b:1.2223},
 };
-function calibrateAiP1Rows(rows){
+// b1Class は rd.racerClass[0]（A1/A2/B1/B2）。取れないときは AI1_CAL.b1 直下の a,b（クラス分けなし）に落ちる。
+function calibrateAiP1Rows(rows,b1Class){
+  var ck=(b1Class==="A1")?"A1":((b1Class==="A2")?"A2":((b1Class==="B1"||b1Class==="B2")?"B":null));
   var raw=[];
   for(var ci=0;ci<rows.length;ci++){
-    var c=(rows[ci].boat===1)?AI1_CAL.b1:AI1_CAL.other;
+    var isB1=(rows[ci].boat===1);
+    var c=isB1?AI1_CAL.b1:AI1_CAL.other;
     var v=rows[ci].aiP1;
     if(v==null){raw.push(null);continue;}
     if(c.knee!=null&&v<c.knee){raw.push(c.low);continue;}
+    var ab=(isB1&&ck&&c.byCls&&c.byCls[ck])?c.byCls[ck]:c;
     var p=Math.min(0.998,Math.max(0.002,v/100));
-    raw.push(1/(1+Math.exp(-(c.a+c.b*Math.log(p/(1-p))))));
+    raw.push(1/(1+Math.exp(-(ab.a+ab.b*Math.log(p/(1-p))))));
   }
   var s=0,ok=true;
   for(var ci2=0;ci2<raw.length;ci2++){if(raw[ci2]==null){ok=false;break;}s+=raw[ci2];}
@@ -2787,7 +2798,7 @@ function computeResultForRd(venue,rd,racerCat){
         rows[i].aiP2=+(s2[i].s/sum2*100).toFixed(1);
         rows[i].aiP3=+(s3[i].s/sum3*100).toFixed(1);
       }
-      calibrateAiP1Rows(rows);
+      calibrateAiP1Rows(rows,rd.racerClass?rd.racerClass[0]:null);
     })();
     var sorted=null;
     if(hasRacer){
