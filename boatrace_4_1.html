@@ -2679,6 +2679,12 @@ function computeB1AxisFormation(rd,venue,resultIn){
     totalStakeP2:betP2.length*B1_AXIS_STAKE_PER_POINT,used1y:used1y
   };
 }
+// 【2026-09-13追加】tokutenBonusを「得点（生・出走回数で割らない）」にした並行版の重み。
+// 7/1-7/31で当てはめ、8/1-8/13の別データで topHit 54.65 vs 54.29%・Brier 0.10644 vs 0.10671・
+// logloss 1.42653 vs 1.43165 と三つとも改善。独立窓8/14-9/12でも同じ向き。
+// クリップは18/24/36/なしで差が出なかったのでクリップなし。
+// ⚠️既存の aiP1 は一切変更していない。aiP1Score として並行に出すだけ。
+const TOKUTEN_SCORE_W=0.12;
 function computeResultForRd(venue,rd,racerCat){
     if(!venue)return null;
     var vw=VW[venue]||{tenji:1,isshu:1,mawari:1,chokusen:1};
@@ -2799,6 +2805,18 @@ function computeResultForRd(venue,rd,racerCat){
         var diff=Math.max(-4,Math.min(4,tk.rate-tokutenFieldAvg));
         return diff*0.3;
       }
+      // 並行版：得点（生）をフィールド平均との差で、クリップなし
+      var tokutenScores=[];
+      for(var tb2=1;tb2<=6;tb2++){
+        var tk2=rd.tokuten&&rd.tokuten[tb2];
+        if(tk2&&tk2.score!=null&&(tk2.nodes||0)>=1)tokutenScores.push(tk2.score);
+      }
+      var tokutenScoreAvg=tokutenScores.length?tokutenScores.reduce(function(a,c){return a+c;},0)/tokutenScores.length:null;
+      function tokutenBonusScore(b){
+        var tk=rd.tokuten&&rd.tokuten[b];
+        if(!tk||tk.score==null||(tk.nodes||0)<1||tokutenScoreAvg==null)return 0;
+        return (tk.score-tokutenScoreAvg)*TOKUTEN_SCORE_W;
+      }
       var b1r=rows.filter(function(r){return r.boat===1;})[0];
       var b1diff=b1r&&b1r.diff!=null&&b1r.diff<=0;
       // 【本セッションで発見・分離実装】展示なし時、diffのデフォルト値が0.0のため
@@ -2810,30 +2828,35 @@ function computeResultForRd(venue,rd,racerCat){
       // 103.26%→98.60%に悪化するという区分間トレードオフを確認したため、切り替えず
       // 参考表示として分離する方針とした（精度分析ログ参照）。
       var b1diffFixed=b1r&&avg!=null&&b1r.diff!=null&&b1r.diff<=0;
-      var s1=[],s1Fixed=[],s2=[],s3=[];
+      var s1=[],s1Fixed=[],s1Score=[],s2=[],s3=[];
       for(var i=0;i<rows.length;i++){
         var r=rows[i];
         var r1v=r.racerR1final!=null?r.racerR1final:r.final1;
         var r2v=r.racerR2final!=null?r.racerR2final:r.baseRate*0.3;
         var r3v=r.racerR3final!=null?r.racerR3final:r.baseRate*0.2;
         var ts1=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3+tokutenBonus(r.boat);
+        var ts1Score=r1v*0.6+cScore(r.boat)*1+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.4+(r.windAdj+r.waveAdj+r.weatherAdj)*0.3+tokutenBonusScore(r.boat);
         var ts1Fixed=ts1;
         if(r.boat===1&&b1diff)ts1-=10;
+        if(r.boat===1&&b1diff)ts1Score-=10;
         if(r.boat===1&&b1diffFixed)ts1Fixed-=10;
         var ts2=r2v*0.5+cScore(r.boat)*1.5+rScore(r.boat)*0.5+kScore(r)*0.3+mScore(r.boat)*0.5;
         var ts3=r3v*0.7+cScore(r.boat)*1+kScore(r)*0.2+mScore(r.boat)*0.3;
         s1.push({boat:r.boat,s:Math.max(0,ts1)});
         s1Fixed.push({boat:r.boat,s:Math.max(0,ts1Fixed)});
+        s1Score.push({boat:r.boat,s:Math.max(0,ts1Score)});
         s2.push({boat:r.boat,s:Math.max(0,ts2)});
         s3.push({boat:r.boat,s:Math.max(0,ts3)});
       }
       var sum1=s1.reduce(function(a,c){return a+c.s;},0)||1;
       var sum1Fixed=s1Fixed.reduce(function(a,c){return a+c.s;},0)||1;
+      var sum1Score=s1Score.reduce(function(a,c){return a+c.s;},0)||1;
       var sum2=s2.reduce(function(a,c){return a+c.s;},0)||1;
       var sum3=s3.reduce(function(a,c){return a+c.s;},0)||1;
       for(var i=0;i<rows.length;i++){
         rows[i].aiP1=+(s1[i].s/sum1*100).toFixed(1);
         rows[i].aiP1Fixed=+(s1Fixed[i].s/sum1Fixed*100).toFixed(1);
+        rows[i].aiP1Score=+(s1Score[i].s/sum1Score*100).toFixed(1);
         rows[i].aiP2=+(s2[i].s/sum2*100).toFixed(1);
         rows[i].aiP3=+(s3[i].s/sum3*100).toFixed(1);
       }
@@ -6209,7 +6232,7 @@ function App() {
                             {result.racerRank&&pctC(r.racerR3final)}
                             {result.racerRank&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:r.ren3total!=null?"#c084fc":"#4a5d70"}}>{r.ren3total!=null?(fmt(r.ren3total,1)+"%"):"―"}</td>}
                             {rd.racerStats&&rd.racerStats.ren3raw&&<td style={{padding:"7px 8px",textAlign:"center",fontWeight:600,color:r.ren3raw1y!=null?"#9db5cc":"#4a5d70"}}>{r.ren3raw1y!=null?(fmt(r.ren3raw1y,1)+"%"):"―"}</td>}
-                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#f9c513"}}>{r.aiP1!=null?r.aiP1+"%":"―"}{r.aiP1Cal!=null&&<span style={{color:"#5dd39e",fontSize:11,fontWeight:700}}> → {r.aiP1Cal}%</span>}</td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#f9c513"}}>{r.aiP1!=null?r.aiP1+"%":"―"}{r.aiP1Cal!=null&&<span style={{color:"#5dd39e",fontSize:11,fontWeight:700}}> → {r.aiP1Cal}%</span>}{r.aiP1Score!=null&&r.aiP1!=null&&<span style={{color:"#a9cbea",fontSize:10,fontWeight:400,display:"block"}}>{"得点版 "}{r.aiP1Score}{"%（"}{(r.aiP1Score-r.aiP1>=0?"+":"")+(r.aiP1Score-r.aiP1).toFixed(1)}{"）"}</span>}</td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#5dd39e"}}>{r.aiP2!=null?r.aiP2+"%":"―"}</td>
                             <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#7db4e8"}}>{r.aiP3!=null?r.aiP3+"%":"―"}</td>
                             {kimariByBoat&&numC(kc?kc.nige:null)}
