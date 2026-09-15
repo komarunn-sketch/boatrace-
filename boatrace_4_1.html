@@ -5300,22 +5300,23 @@ function App() {
                       // 【2026-09-15追加】②本命（AI<30でX1X2-（1号艇+内+外））の買い目を一覧に出す。
                       // この一覧は既にAI1着%<30で絞られているので、全カードで②が成立する。
                       // 内＝頭の1つ内側の艇番（1号艇は別扱いなので除く）、外＝1つ外側。
-                      var hs=[item.pair[0],item.pair[1]], out=[], seen={};
+                      var hs=[item.pair[0],item.pair[1]], parts=[];
                       for(var i=0;i<hs.length;i++){
                         var h=hs[i];
                         var ss=[1,(h-1>=2?h-1:null),(h+1<=6?h+1:null)];
+                        var tails=[];
                         for(var j=0;j<ss.length;j++){
                           var sb=ss[j];
                           if(!sb||sb===h) continue;
-                          var kk=h+"-"+sb;
-                          if(seen[kk]) continue;
-                          seen[kk]=1; out.push(kk);
+                          if(tails.indexOf(sb)<0) tails.push(sb);
                         }
+                        tails.sort(function(a,b){return a-b;});
+                        if(tails.length) parts.push(h+"-"+tails.join(""));
                       }
-                      if(!out.length) return null;
+                      if(!parts.length) return null;
                       return (
                         <div style={{fontSize:10,marginTop:3,color:"#9fe07a",fontWeight:700,lineHeight:1.4}}>
-                          ② {out.join("　")}
+                          ② {parts.join("　")}
                         </div>
                       );
                     })()}
@@ -6869,18 +6870,19 @@ function App() {
                     var innerOf=function(h){ return (h-1>=2)?(h-1):null; };
                     var outerOf=function(h){ return (h+1<=6)?(h+1):null; };
                     var mk=function(heads,secFn){
-                      var out=[], seen={};
+                      // 頭ごとにまとめて 3-124 の形で返す
+                      var parts=[];
                       for(var i=0;i<heads.length;i++){
-                        var h=heads[i], ss=secFn(h);
+                        var h=heads[i], ss=secFn(h), tails=[];
                         for(var j=0;j<ss.length;j++){
                           var s=ss[j];
                           if(!s||s===h) continue;
-                          var k=h+"-"+s;
-                          if(seen[k]) continue;
-                          seen[k]=1; out.push(k);
+                          if(tails.indexOf(s)<0) tails.push(s);
                         }
+                        tails.sort(function(a,b){return a-b;});
+                        if(tails.length) parts.push(h+"-"+tails.join(""));
                       }
-                      return out;
+                      return parts;
                     };
                     var planA = (ai1<20 && X1<X2) ? mk([X1],function(h){return [1,2,3,4,5,6].filter(function(b){return b!==h;});}) : null;
                     var planB = (ai1<30) ? mk([X1,X2],function(h){return [1,innerOf(h),outerOf(h)];}) : null;
@@ -6897,7 +6899,7 @@ function App() {
                                 {bets.map(function(b,bi){
                                   return <span key={key+bi} style={{fontSize:13,fontWeight:800,color:"#d7f5c9",background:"#12210e",borderRadius:5,padding:"3px 9px",border:"1px solid #2e4a26"}}>{b}</span>;
                                 })}
-                                <span style={{fontSize:9,color:"#8a9a8a",alignSelf:"center"}}>{bets.length}点</span>
+                                <span style={{fontSize:9,color:"#8a9a8a",alignSelf:"center"}}>{bets.reduce(function(a,x){return a+(x.split("-")[1]||"").length;},0)}点</span>
                               </span>
                             : <span style={{fontSize:11,color:"#6a7a6a"}}>選定外</span>}
                         </div>
