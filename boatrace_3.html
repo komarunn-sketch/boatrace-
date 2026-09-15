@@ -6838,6 +6838,69 @@ function App() {
                       </div>
                     </div>
                   )}
+                  {b1AxisFormation&&b1AxisFormation.selected&&(function(){
+                    // 【2026-09-15追加】2連の買い目3本の表示。
+                    // 計算はb1AxisFormationの pair と b1AiP1 を使うだけでaiP1には一切触れない。
+                    // 内＝頭の1つ内側の艇番（1号艇は別扱いなので除く）、外＝1つ外側。
+                    var X1=b1AxisFormation.pair[0], X2=b1AxisFormation.pair[1], ai1=b1AxisFormation.b1AiP1;
+                    var innerOf=function(h){ return (h-1>=2)?(h-1):null; };
+                    var outerOf=function(h){ return (h+1<=6)?(h+1):null; };
+                    var mk=function(heads,secFn){
+                      var out=[], seen={};
+                      for(var i=0;i<heads.length;i++){
+                        var h=heads[i], ss=secFn(h);
+                        for(var j=0;j<ss.length;j++){
+                          var s=ss[j];
+                          if(!s||s===h) continue;
+                          var k=h+"-"+s;
+                          if(seen[k]) continue;
+                          seen[k]=1; out.push(k);
+                        }
+                      }
+                      return out;
+                    };
+                    var planA = (ai1<20 && X1<X2) ? mk([X1],function(h){return [1,2,3,4,5,6].filter(function(b){return b!==h;});}) : null;
+                    var planB = (ai1<30) ? mk([X1,X2],function(h){return [1,innerOf(h),outerOf(h)];}) : null;
+                    var planC = (ai1<20) ? (X1<X2
+                      ? mk([X1],function(h){return [1,innerOf(h),outerOf(h)];})
+                      : mk([X1],function(h){return [innerOf(h),outerOf(h)];})) : null;
+                    var row=function(key,label,cond,bets,color){
+                      return (
+                        <div key={key} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                          <span style={{fontSize:10,fontWeight:800,color:color,minWidth:74}}>{label}</span>
+                          <span style={{fontSize:9,color:"#8a9a8a",minWidth:96}}>{cond}</span>
+                          {bets
+                            ? <span style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                                {bets.map(function(b,bi){
+                                  return <span key={key+bi} style={{fontSize:13,fontWeight:800,color:"#d7f5c9",background:"#12210e",borderRadius:5,padding:"3px 9px",border:"1px solid #2e4a26"}}>{b}</span>;
+                                })}
+                                <span style={{fontSize:9,color:"#8a9a8a",alignSelf:"center"}}>{bets.length}点</span>
+                              </span>
+                            : <span style={{fontSize:11,color:"#6a7a6a"}}>選定外</span>}
+                        </div>
+                      );
+                    };
+                    return (
+                      <div style={{marginTop:10,background:"#0e1a0c",borderRadius:8,padding:"10px 12px",border:"1px solid #2e4a26"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#9fe07a"}}>🎯2連{"\u5358"} 3本くらべ（2026-09-15から記録中）</div>
+                          <span style={{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:6,background:"#1a2a14",color:"#9fe07a",border:"1px solid #2e4a26"}}>
+                            X1={X1}号艇・X2={X2}号艇・AI1着%={ai1.toFixed(1)}%
+                          </span>
+                        </div>
+                        {row("pA","①現行","AI<20 かつ X1が内",planA,"#9fe07a")}
+                        {row("pB","②本命","AI<30",planB,"#ffd97a")}
+                        {row("pC","③分岐",X1<X2?"AI<20（X1が内）":"AI<20（X1が外）",planC,"#7abcff")}
+                        <div style={{fontSize:10,color:"#8a9a8a",lineHeight:1.5,marginTop:4}}>
+                          配分はオッズ反比例（均等は全帯で8〜13pt不利）。内＝頭の1つ内側、外＝1つ外側。1号艇は別扱い。
+                        </div>
+                        <div style={{fontSize:10,color:"#ff9c9c",lineHeight:1.5,fontWeight:700}}>
+                          ⚠ 出発点は①84.0% ②85.4% ③93.6%（8/14〜9/15の33日・全30点のベース77.8%）。**3本とも100%に届いていない**。
+                          12月中旬に100%で判定するまで形は変えない。
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {plPrecisionPick&&plPrecisionPick.selected&&(
                     <div style={{marginTop:10,background:"#0a2733",borderRadius:8,padding:"10px 12px",border:"1px solid #1f5a75"}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
