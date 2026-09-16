@@ -5315,8 +5315,14 @@ function App() {
                       }
                       if(!parts.length) return null;
                       return (
-                        <div style={{fontSize:10,marginTop:3,color:"#9fe07a",fontWeight:700,lineHeight:1.4}}>
-                          ② {parts.join("　")}
+                        <div style={{fontSize:10,marginTop:3,color:"#9fe07a",fontWeight:700,lineHeight:1.5}}>
+                          {parts.map(function(p,pi){
+                            return (
+                              <div key={"p2_"+pi} style={{whiteSpace:"nowrap"}}>
+                                <span style={{color:"#6f8f5f"}}>{pi===0?"②":"　"}</span> {p}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()}
