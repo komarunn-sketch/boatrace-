@@ -387,6 +387,9 @@ const SHOW_HONMEI_TAIKO_ANA = false;
 // 表示切替。2026-07-30ユーザー要望により非表示化（内部計算は維持、表示のみオフ）。
 const SHOW_6X6_CHALLENGE = false;
 const SHOW_MOTOR_B1_AXIS = false;
+// 【2026-09-22追加】「🎯 厳選レースあり」（紫・水色の一覧）を画面に出すか。表示が増えたのでユーザー希望で非表示。
+// 計算はそのまま残してあるので、戻すときは true にするだけ。
+const SHOW_SENBATSU_LIST = false;
 // 1号艇ペナルティ修正版：206日実測で回収率102.5%（採用中の対角線バランス型114.1%・
 // 旧ベース版110.9%のいずれよりも悪化）と不採用が確定したため、2026-07-31ユーザー要望で非表示化。
 const SHOW_B1_PENALTY_FIXED = false;
@@ -2687,9 +2690,10 @@ function computeB1AxisFormation(rd,venue,resultIn){
 //   予想1着率＝racerR1final、予想2着率＝racerR2final（backtest\user_rules_check.js と同じ値）
 //   ⚠️検証（6/1〜9/22）では、どちらも的中率は上がるがROIは100%に届いていない（Bの1-〇-全は9月83.0%）。表示は選ぶ手間を減らすためのもの
 const USER_RULE_TH={2:20,3:20,4:20,5:15,6:10};
-function computeUserRulesPick(rd,venue,resultIn){
+function computeUserRulesPick(rd,venue,resultIn,racerCat){
   if(!rd||!rd.racerStats)return null;
-  var res=resultIn||computeResultForRd(venue,rd,"直近6ヶ月");
+  // racerCat＝成績の期間（省略時は直近6ヶ月）。画面の🎯一覧は「1-〇-全・直近6ヶ月」と「1-全-〇・直近1年」を切り替える
+  var res=resultIn||computeResultForRd(venue,rd,racerCat||"直近6ヶ月");
   if(!res||!res.rows)return null;
   var y1={},y2={},ai={};
   for(var i=0;i<res.rows.length;i++){var rw=res.rows[i];y1[rw.boat]=rw.racerR1final;y2[rw.boat]=rw.racerR2final;if(rw.aiP1!=null)ai[rw.boat]=rw.aiP1;}
@@ -3610,6 +3614,20 @@ function App() {
   const [openB1AxisSenbatsu,setOpenB1AxisSenbatsu]=useState(false);
   // 【追加、2026-09-22】🎯イン逃げ（ユーザー条件B）の一覧の開閉。1日35件前後出るので既定は閉じておく
   const [openUserB,setOpenUserB]=useState(false);
+  // 【追加、2026-09-22】🎯イン逃げ（条件B）の買い目の形と成績の期間の組み合わせ。
+  //   "maru2"＝1-〇-全・直近6ヶ月／"maru3"＝1-全-〇・直近1年（7/06〜9/22の検証で、それぞれの期間で良かった形：87.2%・80.5%）。
+  //   切り替えると画面上部の期間ボタン（racerCat）も同じ期間にする。選んだ組み合わせは端末に覚えさせる
+  const [userBMode,setUserBMode]=useState(function(){
+    try{var v=(typeof localStorage!=="undefined")?localStorage.getItem("userBMode"):null;return v==="maru3"?"maru3":"maru2";}catch(e){return "maru2";}
+  });
+  const userBCat=userBMode==="maru3"?"直近1年":"直近6ヶ月";
+  function chooseUserBMode(m){
+    setUserBMode(m);
+    setRacerCat(m==="maru3"?"直近1年":"直近6ヶ月");
+    try{if(typeof localStorage!=="undefined")localStorage.setItem("userBMode",m);}catch(e){}
+  }
+  // 開いたときに期間ボタンを選んでいる組み合わせの期間にそろえる（一覧と表の〇を一致させるため）
+  useEffect(function(){setRacerCat(userBMode==="maru3"?"直近1年":"直近6ヶ月");},[]);
   // 【追加、2026-08-22】📊 AI帯×会場の全体表の開閉
   const [openB1AiBandTable,setOpenB1AiBandTable]=useState(false);
   // 【追加、2026-08-25】レース種別マップ（CSVの「レース名」列から自動抽出）
@@ -5155,9 +5173,12 @@ function App() {
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
-      var up=computeUserRulesPick(raceEntry,vname);
+      var up=computeUserRulesPick(raceEntry,vname,null,userBCat);
       if(!up||!up.isB)return;
-      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,b1Yoso1:up.b1Yoso1,maru:up.maru,second:up.second});
+      // もう一方の期間での〇（カードに「1年なら…」「6ヶ月なら…」として並べる。2026-09-22ユーザー希望）
+      var up2=computeUserRulesPick(raceEntry,vname,null,userBCat==="直近1年"?"直近6ヶ月":"直近1年");
+      out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,b1Yoso1:up.b1Yoso1,maru:up.maru,second:up.second,
+        maruOther:up2?up2.maru:null,isBOther:!!(up2&&up2.isB)});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -5165,7 +5186,12 @@ function App() {
       return ta-tb||(a.rnum-b.rnum);
     });
     return out;
-  },[races]);
+  },[races,userBCat]);
+
+  // 【追加、2026-09-22】表示中のレースが条件Bか（レース詳細の帯用。一覧と同じ期間で判定）
+  const userBPick=useMemo(function(){
+    return computeUserRulesPick(rd,venue,null,userBCat);
+  },[rd,venue,userBCat]);
 
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
   // ai1chakuと同じmakeAi1chakuBetForAxisロジックを、閾値判定を経ずに任意の艇へ適用する。
@@ -5324,7 +5350,7 @@ function App() {
           );
         })()}
 
-        {senbatsuList.length>0&&(
+        {SHOW_SENBATSU_LIST&&senbatsuList.length>0&&(
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openSenbatsu?5:0}}>
               <div style={{fontSize:10,color:"#c9a8ff",fontWeight:700}}>🎯 厳選レースあり</div>
@@ -5351,13 +5377,19 @@ function App() {
           </div>
         )}
 
-        {userRuleBList.length>0&&(
+        {Object.keys(races).length>0&&(
           <div style={{marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openUserB?5:0}}>
-              <div style={{fontSize:10,color:"#7ee0c3",fontWeight:700}}>🎯 イン逃げの対象（条件B） {userRuleBList.length}件　買い目 1-〇-全（〇＝予想2着率1位）</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openUserB?5:0,flexWrap:"wrap"}}>
+              <div style={{fontSize:10,color:"#7ee0c3",fontWeight:700}}>🎯 イン逃げの対象（条件B） {userRuleBList.length}件</div>
+              <span style={{display:"inline-flex",border:"1px solid #2e7a66",borderRadius:6,overflow:"hidden"}}>
+                {[["maru2","1-〇-全・6ヶ月"],["maru3","1-全-〇・1年"]].map(function(o){
+                  var on=userBMode===o[0];
+                  return <button key={o[0]} onClick={function(){chooseUserBMode(o[0]);}} style={{fontSize:9,padding:"2px 8px",cursor:"pointer",border:"none",background:on?"#2e7a66":"#0f2420",color:on?"#eafff7":"#7ee0c3",fontWeight:700}}>{o[1]}</button>;
+                })}
+              </span>
               <button onClick={function(){setOpenUserB(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#0f2420",color:"#7ee0c3",border:"1px solid #2e7a66",fontWeight:700}}>{openUserB?"▲ 閉じる":"▼ 開く"}</button>
             </div>
-            {openUserB&&<div style={{fontSize:9,color:"#9db5cc",marginBottom:4}}>条件＝1号艇の予想1着率50%以上、他艇が2〜4号艇20%以下・5号艇15%以下・6号艇10%以下。⚠検証では的中は上がるが回収率は100%未満（9月83.0%）</div>}
+            {openUserB&&<div style={{fontSize:9,color:"#9db5cc",marginBottom:4}}>条件＝1号艇の予想1着率50%以上、他艇が2〜4号艇20%以下・5号艇15%以下・6号艇10%以下（〇＝予想2着率1位）。切り替えると期間ボタンも同じ期間になる。⚠検証（7/06〜9/22）では 1-〇-全・6ヶ月 87.2%、1-全-〇・1年 80.5%で、どちらも回収率100%未満</div>}
             {openUserB&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
               {userRuleBList.map(function(item){
                 var isActive=venue===item.vname&&curRace===item.rnum;
@@ -5369,8 +5401,10 @@ function App() {
                       border:isActive?"2px solid #7ee0c3":"1px solid #2e7a66",textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇 予想1着率{item.b1Yoso1!=null?item.b1Yoso1.toFixed(1):"-"}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}</div>
-                    <div style={{fontSize:12,color:"#ffd97a",fontWeight:800}}>1-{item.maru}-全</div>
+                    <div style={{fontSize:12,color:"#ffd97a",fontWeight:800}}>{userBMode==="maru3"?"1-全-"+item.maru:"1-"+item.maru+"-全"}</div>
                     <div style={{fontSize:9,color:"#9db5cc"}}>〇={item.maru}号艇　2番手={item.second}号艇</div>
+                    {item.maruOther!=null&&<div style={{fontSize:10,color:"#c9e0f5",fontWeight:700}}>{userBCat==="直近1年"?"6ヶ月":"1年"}なら {userBMode==="maru3"?"1-全-"+item.maruOther:"1-"+item.maruOther+"-全"}{!item.isBOther&&<span style={{fontSize:9,color:"#8a9bb0",fontWeight:400}}>（{userBCat==="直近1年"?"6ヶ月":"1年"}では条件B外）</span>}</div>}
+                    <div style={{fontSize:9,color:"#7fae9f"}}>（{userBCat}で判定）</div>
                   </button>
                 );
               })}
@@ -5974,7 +6008,8 @@ function App() {
 
         </>)}
 
-        {activeTab==="data"&&(<>
+        {/* 【2026-09-22変更】②データ確認は縦並びのflexにして、レースの見出し〜予想着率〜補正の表（order:-1）を一番上に出す（ユーザー希望） */}
+        {activeTab==="data"&&(<div style={{display:"flex",flexDirection:"column"}}>
         <div id="section-slit" style={{marginBottom:24}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <div style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea"}}>スリット予測</div>
@@ -6266,7 +6301,7 @@ function App() {
           })()}
         </div>
 
-        <div style={{marginBottom:24}}>
+        <div style={{marginBottom:24,order:-1}}>
           <div id="section-tenji" style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea",marginBottom:8}}>展示タイム一覧</div>
           {venue&&VENUE_TENJI_IMPORTANCE[venue]&&(function(){
             var info=VENUE_TENJI_IMPORTANCE[venue];
@@ -6336,8 +6371,8 @@ function App() {
           <div style={{textAlign:"center",padding:"28px 16px",borderRadius:10,border:"1px dashed #2c4762",color:"#a9cbea",fontSize:13}}>
             データを読み込んでください
           </div>
-        ):(
-          <div>
+        ):(<>
+          <div style={{order:-2,minWidth:0}}>
             <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",marginBottom:10}}>
               <span style={{fontSize:19,fontWeight:800,color:"#fff"}}>{curRace}R {venue}{result.avg!=null?"（平均: "+fmt(result.avg)+"）":""}</span>
               {(function(){
@@ -6383,6 +6418,18 @@ function App() {
               </div>;
             })()}
             {result.dup&&<div style={{fontSize:12,color:"#f9c513",background:"#2e2710",border:"1px solid #6b5a1d",borderRadius:8,padding:"8px 10px",marginBottom:12}}>⚠ 同じコースに複数の艇が入っています。</div>}
+            {/* 【追加、2026-09-22】条件B（イン逃げ）の対象なら表の上に帯を出す。一覧と同じ期間で判定し、表の期間が違えば注意と「合わせる」ボタン */}
+            {userBPick&&userBPick.isB&&(
+              <div style={{marginBottom:12,padding:"8px 10px",borderRadius:8,background:"#0f2420",border:"1px solid #2e7a66"}}>
+                <div style={{fontSize:12,color:"#7ee0c3",fontWeight:700}}>🎯 イン逃げの対象（条件B・{userBCat}で判定）　<span style={{color:"#ffd97a",fontSize:14,fontWeight:800}}>{userBMode==="maru3"?"1-全-"+userBPick.maru:"1-"+userBPick.maru+"-全"}</span>　〇={userBPick.maru}号艇・2番手={userBPick.second}号艇</div>
+                {racerCat!==userBCat&&(
+                  <div style={{fontSize:11,color:"#ffcf8a",marginTop:4,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span>⚠ いまの表は「{racerCat}」の値です。〇の順位が表と違うことがあります</span>
+                    <button onClick={function(){setRacerCat(userBCat);}} style={{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1d3149",color:"#cfe3f7",border:"1px solid #3d7ab8",fontWeight:700}}>{userBCat}に合わせる</button>
+                  </div>
+                )}
+              </div>
+            )}
 
 
             {(result.racerRank||kimariByBoat)&&(
@@ -6546,7 +6593,8 @@ function App() {
                 </tbody>
               </table>
             </div>
-
+          </div>
+          <div style={{minWidth:0}}>
             <div id="section-baserate" onClick={function(){setOpenBaseRate(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:8,marginBottom:openBaseRate?8:16,cursor:"pointer",userSelect:"none"}}>
               <span style={{fontSize:11,letterSpacing:"0.2em",color:"#a9cbea"}}>場平均で見る1着率</span>
               <span style={{fontSize:11,color:"#a9cbea",marginLeft:"auto"}}>{openBaseRate?"▲ 閉じる":"▼ 開く"}</span>
@@ -6695,9 +6743,9 @@ function App() {
               </div>
             )}
           </div>
-        )}
-
         </>)}
+
+        </div>)}
 
             {activeTab==="plmodel"&&(
               <div id="section-plmodel" style={{marginBottom:16,background:"#16273c",borderRadius:10,padding:"12px"}}>
