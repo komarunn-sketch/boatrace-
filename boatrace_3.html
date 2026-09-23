@@ -5153,7 +5153,7 @@ function App() {
       if(!fm||!fm.selected)return;
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
         ai:fm.b1AiP1,pair:fm.pair,bet:fm.bet,betP2:fm.betP2,used1y:fm.used1y,
-        aPass:(function(){var up=computeUserRulesPick(raceEntry,vname);return !!(up&&up.aPass);})()});
+        aPass:(function(){var up=computeUserRulesPick(raceEntry,vname,null,"直近1年");return !!(up&&up.aPass);})()});   /* 【2026-09-22】条件Aは直近1年で判定（7/06〜9/22でX1の1着率が市場より+2.6pt。6ヶ月は+1.6pt） */
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
