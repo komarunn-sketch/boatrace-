@@ -2003,6 +2003,35 @@ function stripTenjiFromRd(rd){
   copy.inputs=inputs;
   return copy;
 }
+// 【追加、2026-09-25】直前情報（展示）で入る値をすべて外した版＝「朝の画面」。🎯条件Bの一覧で
+//   「展示で新たに入った」「〇が変わった」「展示で金枠になった」を見分けるために使う（表示だけ。買い目は変えない）。
+//   parseTenjiCSV が入れる inputs（展示・一周・まわり足・直線）・チルト・体重・気温水温に加え、進入とSTも枠なり・空に戻す。
+//   backtest\tenji_change_check.js（parseNewCSVだけ vs ＋parseTenjiCSV）と同じ比べ方。
+//   6/1〜9/25：〇が変わったレースは〇の着外が約44%（〇が同じは33〜37%）。展示で金枠になったレースの1-全-◎ 91.9% vs 朝から金枠 72.3%
+function stripAllTenjiFromRd(rd){
+  if(!rd)return rd;
+  var copy={};
+  for(var p in rd)copy[p]=rd[p];
+  copy.inputs={1:emptyInput(),2:emptyInput(),3:emptyInput(),4:emptyInput(),5:emptyInput(),6:emptyInput()};
+  copy.tilts={1:"",2:"",3:"",4:"",5:"",6:""};
+  copy.weights={1:"",2:"",3:"",4:"",5:"",6:""};
+  copy.courses={1:1,2:2,3:3,4:4,5:5,6:6};
+  copy.sts={1:"",2:"",3:"",4:"",5:"",6:""};
+  delete copy.airTemp;delete copy.waterTemp;
+  copy.tenjiMsg="";
+  return copy;
+}
+// 直前情報が入っているか（展示タイムかチルトか体重が1艇でもあれば入っているとみなす）
+function hasTenjiData(rd){
+  if(!rd)return false;
+  for(var b=1;b<=6;b++){
+    var inp=rd.inputs&&rd.inputs[b];
+    if(inp&&(inp.tenji||inp.isshu||inp.chokusen))return true;
+    if(rd.tilts&&rd.tilts[b])return true;
+    if(rd.weights&&rd.weights[b])return true;
+  }
+  return false;
+}
 function computePLPickNoTenji(rd,venue){
   return computePLPrecisionPick(stripTenjiFromRd(rd),venue);
 }
@@ -2690,6 +2719,10 @@ function computeB1AxisFormation(rd,venue,resultIn){
 //   予想1着率＝racerR1final、予想2着率＝racerR2final（backtest\user_rules_check.js と同じ値）
 //   ⚠️検証（6/1〜9/22）では、どちらも的中率は上がるがROIは100%に届いていない（Bの1-〇-全は9月83.0%）。表示は選ぶ手間を減らすためのもの
 const USER_RULE_TH={2:20,3:20,4:20,5:15,6:10};
+// 【追加、2026-09-26】飛びそうなレースの金枠：X1の予想1着率がこの値を超え、X1を除いた5艇で予想2着率1位＝予想3着率1位の艇（◎）がいる。
+//   6/1〜9/24（直近1年）：X1-◎-全 前半99.6%・後半120.0%、X1-全-◎ 前半192.4%（高配当1本で約60pt）・後半114.4%。
+//   線の引き方を複数試したうえでの形なので、毎晩の記録（backtest\tobi_gold_forward.js）で11月下旬に判定する
+const TOBI_GOLD_X1_MIN=25.2;
 function computeUserRulesPick(rd,venue,resultIn,racerCat){
   if(!rd||!rd.racerStats)return null;
   // racerCat＝成績の期間（省略時は直近6ヶ月）。画面の🎯一覧は「1-〇-全・直近6ヶ月」と「1-全-〇・直近1年」を切り替える
@@ -2717,7 +2750,18 @@ function computeUserRulesPick(rd,venue,resultIn,racerCat){
       for(var k=0;k<pair.length&&aPass;k++){var vv=num(y1[pair[k]]);if(vv==null||vv<USER_RULE_TH[pair[k]])aPass=false;}
     }
   }
-  return {isB:isB,b1Yoso1:b1y,maru:order[0],second:order[1],top3:order3[0],sameMaru:sameMaru,isTobi:isTobi,aPass:aPass,pair:pair};
+  // 【追加、2026-09-26】飛びそうなレースの金枠（上の TOBI_GOLD_X1_MIN の説明）
+  var tobiGold=false,tobiMaru=null,tobiX1=null,tobiX1Yoso1=null;
+  if(isTobi&&pair&&pair.length){
+    tobiX1=pair[0];tobiX1Yoso1=num(y1[tobiX1]);
+    var rest=[1,2,3,4,5,6].filter(function(x){return x!==tobiX1;});
+    var t2=rest.slice().sort(function(a,c){var ya=num(y2[a]),yc=num(y2[c]);return ((yc==null?-999:yc)-(ya==null?-999:ya))||(a-c);})[0];
+    var t3=rest.slice().sort(function(a,c){var ya=num(y3[a]),yc=num(y3[c]);return ((yc==null?-999:yc)-(ya==null?-999:ya))||(a-c);})[0];
+    tobiMaru=t2;
+    tobiGold=tobiX1Yoso1!=null&&tobiX1Yoso1>TOBI_GOLD_X1_MIN&&t2===t3&&num(y2[t2])!=null&&num(y3[t3])!=null;
+  }
+  return {isB:isB,b1Yoso1:b1y,maru:order[0],second:order[1],top3:order3[0],sameMaru:sameMaru,isTobi:isTobi,aPass:aPass,pair:pair,
+    tobiGold:tobiGold,tobiMaru:tobiMaru,tobiX1:tobiX1,tobiX1Yoso1:tobiX1Yoso1};
 }
 // 【2026-09-13追加】tokutenBonusを「得点（生・出走回数で割らない）」にした並行版の重み。
 // 7/1-7/31で当てはめ、8/1-8/13の別データで topHit 54.65 vs 54.29%・Brier 0.10644 vs 0.10671・
@@ -5158,7 +5202,8 @@ function App() {
       if(!fm||!fm.selected)return;
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,
         ai:fm.b1AiP1,pair:fm.pair,bet:fm.bet,betP2:fm.betP2,used1y:fm.used1y,
-        aPass:(function(){var up=computeUserRulesPick(raceEntry,vname,null,"直近1年");return !!(up&&up.aPass);})()});   /* 【2026-09-22】条件Aは直近1年で判定（7/06〜9/22でX1の1着率が市場より+2.6pt。6ヶ月は+1.6pt） */
+        aPass:(function(){var up=computeUserRulesPick(raceEntry,vname,null,"直近1年");return !!(up&&up.aPass);})(),
+        tobi:(function(){var up=computeUserRulesPick(raceEntry,vname,null,"直近1年");return up?{gold:!!up.tobiGold,maru:up.tobiMaru,x1:up.tobiX1,x1y:up.tobiX1Yoso1}:null;})()});   /* 【2026-09-22】条件Aは直近1年で判定（7/06〜9/22でX1の1着率が市場より+2.6pt。6ヶ月は+1.6pt） */
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -5182,8 +5227,13 @@ function App() {
       if(!up||!up.isB)return;
       // もう一方の期間での〇（カードに「1年なら…」「6ヶ月なら…」として並べる。2026-09-22ユーザー希望）
       var up2=computeUserRulesPick(raceEntry,vname,null,userBCat==="直近1年"?"直近6ヶ月":"直近1年");
+      // 【追加、2026-09-25】直前情報なしの版（朝の画面）と比べる。直前情報がまだ入っていないレースは比べない
+      var hasT=hasTenjiData(raceEntry);
+      var upM=hasT?computeUserRulesPick(stripAllTenjiFromRd(raceEntry),vname,null,userBCat):null;
       out.push({vname:vname,rnum:rnum,shimekiri:raceEntry.shimekiri||null,b1Yoso1:up.b1Yoso1,maru:up.maru,second:up.second,
         sameMaru:!!up.sameMaru,top3:up.top3,
+        hasTenji:hasT,tenjiAdded:hasT&&!(upM&&upM.isB),maruChanged:hasT&&!!(upM&&upM.isB&&upM.maru!==up.maru),maruMorning:upM?upM.maru:null,
+        goldAdded:hasT&&!!up.sameMaru&&!(upM&&upM.isB&&upM.sameMaru),
         maruOther:up2?up2.maru:null,isBOther:!!(up2&&up2.isB)});
     });
     out.sort(function(a,b){
@@ -5197,6 +5247,11 @@ function App() {
   // 【追加、2026-09-22】表示中のレースが条件Bか（レース詳細の帯用。一覧と同じ期間で判定）
   const userBPick=useMemo(function(){
     return computeUserRulesPick(rd,venue,null,userBCat);
+  },[rd,venue,userBCat]);
+  // 【追加、2026-09-25】同じレースの直前情報なしの版（朝の画面）。帯のバッジ用
+  const userBPickMorning=useMemo(function(){
+    if(!hasTenjiData(rd))return null;
+    return computeUserRulesPick(stripAllTenjiFromRd(rd),venue,null,userBCat);
   },[rd,venue,userBCat]);
 
   // 新機能：各艇を1着と仮定した出目予想（軸ボタンで手動選択）。
@@ -5411,6 +5466,15 @@ function App() {
                     <div style={{fontSize:10,color:"#9db5cc"}}>〇=<b style={{color:"#ffffff",fontSize:12}}>{item.maru}</b>号艇　2番手=<b style={{color:"#8fd3ff",fontSize:12}}>{item.second}</b>号艇</div>
                     {item.sameMaru&&<div style={{fontSize:9,color:"#ffb347",fontWeight:700}}>◎ 予想2着・3着とも{item.maru}号艇が1位</div>}
                     {item.sameMaru&&<div style={{fontSize:9,fontWeight:700,color:item.maru<item.second?"#7ee07e":"#ff9b9b"}}>{item.maru<item.second?"◎が2番手より内側":"◎が2番手より外側"}</div>}
+                    {item.hasTenji&&(
+                      <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:2}}>
+                        {item.tenjiAdded
+                          ?<span style={{fontSize:8,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠展示で新たに入った</span>
+                          :<span style={{fontSize:8,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"#132b20",color:"#5dd39e",border:"1px solid #2e6b52"}}>◆展示なしでもB</span>}
+                        {item.maruChanged&&<span style={{fontSize:8,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"#2e2710",color:"#f9c513",border:"1px solid #6b5a1d"}}>🔄〇が変わった（朝は{item.maruMorning}）</span>}
+                        {item.goldAdded&&<span style={{fontSize:8,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"#2a2210",color:"#ffb347",border:"1px solid #8a5a1d"}}>★展示で金枠になった</span>}
+                      </div>
+                    )}
                     {item.maruOther!=null&&<div style={{fontSize:10,color:"#c9e0f5",fontWeight:700}}>{userBCat==="直近1年"?"6ヶ月":"1年"}なら {userBMode==="maru3"?"1-全-"+item.maruOther:"1-"+item.maruOther+"-全"}{!item.isBOther&&<span style={{fontSize:9,color:"#8a9bb0",fontWeight:400}}>（{userBCat==="直近1年"?"6ヶ月":"1年"}では条件B外）</span>}</div>}
                     <div style={{fontSize:9,color:"#7fae9f"}}>（{userBCat}で判定）</div>
                   </button>
@@ -5423,7 +5487,7 @@ function App() {
         {b1AxisSenbatsuList.length>0&&(
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:openB1AxisSenbatsu?5:0}}>
-              <div style={{fontSize:10,color:"#d9a7ff",fontWeight:700}}>🧪 1号艇が飛びそうなレース（1着候補2艇のみ） {b1AxisSenbatsuList.length}件　⚠買い目としては不採用</div>
+              <div style={{fontSize:10,color:"#d9a7ff",fontWeight:700}}>🧪 1号艇が飛びそうなレース（1着候補2艇のみ） {b1AxisSenbatsuList.length}件　⚠買い目としては不採用{(function(){var n=b1AxisSenbatsuList.filter(function(x){return x.tobi&&x.tobi.gold;}).length;return n?<span style={{color:"#ffb347"}}>（金枠 {n}件）</span>:null;})()}</div>
               <button onClick={function(){setOpenB1AxisSenbatsu(function(v){return !v;});}} style={{fontSize:9,padding:"2px 8px",borderRadius:5,cursor:"pointer",background:"#1a0f22",color:"#d9a7ff",border:"1px solid #6b3a7a",fontWeight:700}}>{openB1AxisSenbatsu?"▲ 閉じる":"▼ 開く"}</button>
             </div>
             {openB1AxisSenbatsu&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
@@ -5433,11 +5497,13 @@ function App() {
                   <button key={"b1axis_"+item.vname+"_"+item.rnum}
                     onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
                     style={{padding:"4px 6px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
-                      background:isActive?"#3a2450":"#1a0f22",color:"#d9a7ff",
-                      border:isActive?"2px solid #d9a7ff":"1px solid #6b3a7a",textAlign:"left"}}>
+                      background:isActive?"#3a2450":(item.tobi&&item.tobi.gold?"#2a2210":"#1a0f22"),color:"#d9a7ff",
+                      border:(item.tobi&&item.tobi.gold)?(isActive?"3px solid #ffb347":"2px solid #ffb347"):(isActive?"2px solid #d9a7ff":"1px solid #6b3a7a"),textAlign:"left"}}>
                     <div style={{fontSize:9,color:"#9db5cc"}}>{item.vname}　1号艇AI1着%{item.ai.toFixed(1)}{!item.used1y&&<span style={{color:"#e8c98a"}}>　代用</span>}{item.aPass&&<span style={{color:"#5dd39e",fontWeight:800}}>　✅A合格</span>}</div>
                     <div>{item.rnum}R{item.shimekiri&&"　"+item.shimekiri}{(function(){var rt=raceTypeMap&&raceTypeMap[item.vname+"_"+item.rnum];if(!rt)return null;var s=raceTypeBadgeStyle(rt);if(!s)return null;return <span style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:s.bg,color:s.fg,border:"1px solid "+s.border,marginLeft:5}}>{rt}</span>;})()}{(function(){var g=raceTypeDate?getRaceGrade(raceTypeDate,item.vname):null;if(!g)return null;var gs=raceGradeBadgeStyle(g.grade);if(!gs)return null;return <span title={g.title} style={{display:"inline-block",padding:"1px 5px",fontSize:8,fontWeight:700,borderRadius:3,background:gs.bg,color:gs.fg,border:"1px solid "+gs.border,marginLeft:3}}>{gs.label}</span>;})()}</div>
                     <div style={{fontSize:11,color:"#ffd97a",fontWeight:800}}>1着候補 {item.pair[0]}・{item.pair[1]}号艇</div>
+                    {item.tobi&&item.tobi.gold&&<div style={{fontSize:10,color:"#ffb347",fontWeight:800}}>◎{item.tobi.maru}　{item.tobi.x1}-全-{item.tobi.maru}／{item.tobi.x1}-{item.tobi.maru}-全</div>}
+                    {item.tobi&&item.tobi.gold&&<div style={{fontSize:8,color:"#c9a86a"}}>X1={item.tobi.x1}（予想1着率{item.tobi.x1y!=null?item.tobi.x1y.toFixed(1):"-"}）・X1を除いて予想2着・3着とも{item.tobi.maru}号艇が1位</div>}
                     {(function(){
                       var bandData = B1_AI_BAND_VENUE_TABLE[item.vname];
                       if(!bandData) return null;
@@ -6430,6 +6496,15 @@ function App() {
             {userBPick&&userBPick.isB&&(
               <div style={{marginBottom:12,padding:"8px 10px",borderRadius:8,background:"#0f2420",border:"1px solid #2e7a66"}}>
                 <div style={{fontSize:12,color:"#7ee0c3",fontWeight:700}}>🎯 イン逃げの対象（条件B・{userBCat}で判定）　<span style={{color:"#ffd97a",fontSize:14,fontWeight:800}}>{userBMode==="maru3"?"1-全-"+userBPick.maru:"1-"+userBPick.maru+"-全"}</span>　〇=<b style={{color:"#ffffff",fontSize:14}}>{userBPick.maru}</b>号艇・2番手=<b style={{color:"#8fd3ff",fontSize:14}}>{userBPick.second}</b>号艇{userBPick.sameMaru&&<span style={{color:"#ffb347",marginLeft:6}}>◎ 予想2着・3着とも{userBPick.maru}号艇が1位</span>}{userBPick.sameMaru&&<span style={{marginLeft:6,color:userBPick.maru<userBPick.second?"#7ee07e":"#ff9b9b"}}>{userBPick.maru<userBPick.second?"（◎が2番手より内側）":"（◎が2番手より外側）"}</span>}</div>
+                {hasTenjiData(rd)&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4}}>
+                    {!(userBPickMorning&&userBPickMorning.isB)
+                      ?<span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#3a1010",color:"#ff9c9c",border:"1px solid #7a2e2e"}}>⚠ 展示で新たに入ったレース</span>
+                      :<span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#132b20",color:"#5dd39e",border:"1px solid #2e6b52"}}>◆ 展示なしでも条件B</span>}
+                    {userBPickMorning&&userBPickMorning.isB&&userBPickMorning.maru!==userBPick.maru&&<span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#2e2710",color:"#f9c513",border:"1px solid #6b5a1d"}}>🔄 〇が変わった（朝は{userBPickMorning.maru}号艇）</span>}
+                    {userBPick.sameMaru&&!(userBPickMorning&&userBPickMorning.isB&&userBPickMorning.sameMaru)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#2a2210",color:"#ffb347",border:"1px solid #8a5a1d"}}>★ 展示で金枠になった</span>}
+                  </div>
+                )}
                 {racerCat!==userBCat&&(
                   <div style={{fontSize:11,color:"#ffcf8a",marginTop:4,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <span>⚠ いまの表は「{racerCat}」の値です。〇の順位が表と違うことがあります</span>
