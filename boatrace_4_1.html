@@ -33,7 +33,7 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } = React;
 const PLACE_NO = {
   "桐生":1,"戸田":2,"江戸川":3,"平和島":4,"多摩川":5,"浜名湖":6,
   "蒲郡":7,"常滑":8,"津":9,"三国":10,"びわこ":11,"住之江":12,
@@ -3641,6 +3641,19 @@ class ErrorBoundary extends React.Component{
 function App() {
   const [venue,setVenue]=useState("");
   const [activeTab,setActiveTab]=useState("setup");
+  // 【2026-10-02】タブごとのスクロール位置を覚えて、切り替えたらそのタブの前の位置に戻す（初めて開くタブは一番上）。
+  // 表示と操作だけの直しで、計算には触れていない。タブを切り替えるのは上の固定ナビ（QuickNav）だけなので、そこへ switchTab を渡す。
+  const tabScrollRef=useRef({});
+  const tabMountedRef=useRef(false);
+  function switchTab(next){
+    if(next!==activeTab)tabScrollRef.current[activeTab]=window.pageYOffset||document.documentElement.scrollTop||0;
+    setActiveTab(next);
+  }
+  useLayoutEffect(function(){
+    if(!tabMountedRef.current){tabMountedRef.current=true;return;}   // 最初の表示ではスクロールを動かさない
+    var y=tabScrollRef.current[activeTab];
+    window.scrollTo(0,typeof y==="number"?y:0);
+  },[activeTab]);
   const [racerCat,setRacerCat]=useState("直近1年");
   const [stPeriod,setStPeriod]=useState("今期");
   const [kimariPeriod,setKimariPeriod]=useState("直近6ヶ月");
@@ -5298,7 +5311,7 @@ function App() {
 
   return (
     <div style={wrapS}>
-      <QuickNav activeTab={activeTab} setActiveTab={setActiveTab}/>
+      <QuickNav activeTab={activeTab} setActiveTab={switchTab}/>
       <div style={innerS}>
         
 
