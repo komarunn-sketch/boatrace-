@@ -6863,6 +6863,7 @@ function App() {
                         <div style={{display:"flex",gap:6,width:"100%",boxSizing:"border-box"}}>
                           {[1,2,3,4,5,6].map(function(b){
                             var maxS=Math.max.apply(null,Object.values(pred.strength));
+                            var sumS=0;for(var sb=1;sb<=6;sb++)sumS+=pred.strength[sb]||0;
                             var pct=pred.strength[b]/maxS*100;
                             return (
                               <div key={b} style={{flex:"1 1 0%",minWidth:0,textAlign:"center"}}>
@@ -6871,10 +6872,13 @@ function App() {
                                   <div style={{width:"100%",height:pct+"%",background:"#7db4e8"}}/>
                                 </div>
                                 <div style={{fontSize:10,color:"#9db5cc",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pred.strength[b].toFixed(2)}</div>
+                                {/* 【2026-10-03追加・見た目だけ】強さ÷6艇の合計＝PLの1着確率（追記223） */}
+                                <div style={{fontSize:10,color:"#7db4e8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sumS>0?(pred.strength[b]/sumS*100).toFixed(1)+"%":"-"}</div>
                               </div>
                             );
                           })}
                         </div>
+                        <div style={{fontSize:9,color:"#8a7ab8",marginTop:4}}>1着の％はPLの予想。1号艇は低め・他の艇は高めに出る癖がある（2〜6号艇の実際の1着率はPLの％のおよそ0.6〜0.8倍、追記223）</div>
                       </div>
                       <div style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>3連単 全120通りの確率（確率降順、上位3～5点が推奨買い目レンジ）</div>
                       <div style={{maxHeight:520,overflowY:"auto",border:"1px solid #2c4762",borderRadius:6}}>
