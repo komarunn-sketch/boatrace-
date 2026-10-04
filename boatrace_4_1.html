@@ -5763,6 +5763,9 @@ function App() {
           );
         })()}
 
+        {/* 【2026-10-04追加】拡張機能（content_tool.js）が書き込む前に確かめる印。画面に今出ている会場・レース（表示だけ・計算には使わない）。
+            会場ボタンを押した直後は再計算が終わるまで前の会場のままなので、拡張機能はこの印が送り先と一致するまで待つ */}
+        <div id="rc-current-race" data-venue={venue||""} data-race={String(curRace)} style={{display:"none"}}/>
         <div style={{marginBottom:16}}>
           <div id="section-venue" style={{fontSize:11,color:"#a9cbea",marginBottom:6}}>開催場を選択</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
