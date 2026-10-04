@@ -3666,6 +3666,23 @@ function App() {
     setSaveStatusMsg(r.ok?("✓ ブラウザに保存済み（"+new Date().toLocaleTimeString()+"）"):("⚠ "+r.msg));
   },[races]);
   const [openPanel,setOpenPanel]=useState(null);
+  // 【2026-10-05追加・見た目だけ】表示の切り替え（いつもの画面／近未来の画面）。設計は ツール\引継ぎ\design\近未来レイアウト_メモ.md。
+  //   最初は「いつもの画面」。選んだ表示は localStorage（rc_view_mode）に残す。どちらの表示も計算は同じ関数を1つだけ使い、見た目だけが違う。
+  //   2つの表示を同時には描かない（拡張機能が探す data-venue・data-race・貼り付け欄・オッズ欄・印が二重にならないように）
+  const [viewMode,setViewMode]=useState(function(){
+    try{var v=(typeof localStorage!=="undefined")?localStorage.getItem("rc_view_mode"):null;return v==="future"?"future":"classic";}catch(e){return "classic";}
+  });
+  function chooseViewMode(m){
+    setViewMode(m);
+    try{if(typeof localStorage!=="undefined")localStorage.setItem("rc_view_mode",m);}catch(e){}
+  }
+  const [fxNow,setFxNow]=useState(function(){return Date.now();});
+  const [fxPending,setFxPending]=useState(null);   // 拡張機能の「未反映N件」の件数（拡張機能が無ければ null）
+  const [fxOdds3,setFxOdds3]=useState("");
+  const [fxOdds2,setFxOdds2]=useState("");
+  const [fxOddsMsg,setFxOddsMsg]=useState("");
+  const fxTenjiRef=useRef(null);
+  const fxOddsRef=useRef(null);
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
   const [openMotorB1,setOpenMotorB1]=useState(false);
@@ -5307,12 +5324,355 @@ function App() {
   var cardS={background:"#16273c",borderRadius:10,padding:"8px 10px"};
   function selS(x){return Object.assign({background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 6px",fontSize:14},x||{});}
   var inpS={width:"100%",boxSizing:"border-box",background:"#0e1b2c",color:"#fff",border:"1px solid #2c4762",borderRadius:6,padding:"7px 8px",fontSize:15};
+  // ===== 近未来の画面（2026-10-05追加・見た目だけ） =====
+  // 数字はどれも本体の今の関数をそのまま呼ぶ：予想着率＝computeResultForRd（🎯条件Bと同じ成績の期間 userBCat）、
+  // 条件B・金枠・◎＝userBPick（computeUserRulesPick）、PL＝computePLPrediction。計算の部分には手を入れていない。
+  const fxResult=useMemo(function(){
+    if(viewMode!=="future"||!venue)return null;
+    try{return computeResultForRd(venue,rd,userBCat);}catch(e){return null;}
+  },[viewMode,venue,rd,userBCat]);
+  const fxPL=useMemo(function(){
+    if(viewMode!=="future"||!venue)return null;
+    try{return computePLPrediction(rd,venue);}catch(e){return null;}
+  },[viewMode,venue,rd]);
+  // 締切までの時計と、拡張機能の「未反映N件」ボタン（#tenji-pending-badge、拡張機能が画面に足すもの）の件数を1秒ごとに読む
+  useEffect(function(){
+    if(viewMode!=="future")return;
+    function tick(){
+      setFxNow(Date.now());
+      try{
+        var b=document.getElementById("tenji-pending-badge");
+        if(!b){setFxPending(null);return;}
+        if(b.style.display==="none"){setFxPending(0);return;}
+        var m=/(\d+)件/.exec(b.textContent||"");
+        setFxPending(m?Number(m[1]):0);
+      }catch(e){}
+    }
+    tick();
+    var id=setInterval(tick,1000);
+    return function(){clearInterval(id);};
+  },[viewMode]);
+  // 近未来の画面の字体（Google Fonts）。近未来の画面を開いたときに1回だけ読み込む
+  useEffect(function(){
+    if(viewMode!=="future")return;
+    try{
+      if(!document.getElementById("rc-future-fonts")){
+        var l=document.createElement("link");
+        l.id="rc-future-fonts";l.rel="stylesheet";
+        l.href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap";
+        document.head.appendChild(l);
+      }
+    }catch(e){}
+  },[viewMode]);
+
+  function renderViewSwitch(dark){
+    var on=function(m){return viewMode===m;};
+    var bs=function(m){
+      return dark
+        ?{minHeight:44,padding:"0 16px",border:"none",borderLeft:m==="future"?"1px solid #1E2A3A":"none",background:on(m)?"#13202F":"transparent",color:on(m)?"#3FD0E8":"#E6EDF5",fontFamily:"inherit",fontSize:15,fontWeight:on(m)?700:500,cursor:"pointer"}
+        :{padding:"6px 12px",border:"none",borderLeft:m==="future"?"1px solid #2c4762":"none",background:on(m)?"#2c4762":"#16273c",color:"#fff",fontSize:12,fontWeight:on(m)?800:600,cursor:"pointer"};
+    };
+    return (
+      <div role="group" aria-label="表示の切り替え" style={{display:"inline-flex",border:"1px solid "+(dark?"#1E2A3A":"#2c4762"),borderRadius:dark?4:8,overflow:"hidden"}}>
+        <button type="button" aria-pressed={on("classic")} onClick={function(){chooseViewMode("classic");}} style={bs("classic")}>いつもの画面</button>
+        <button type="button" aria-pressed={on("future")} onClick={function(){chooseViewMode("future");}} style={bs("future")}>近未来の画面</button>
+      </div>
+    );
+  }
+
+  function renderFuture(){
+    var BG="#070B12",PANEL="#0D1420",LINE="#1E2A3A",TXT="#E6EDF5",W="#FFFFFF",AC="#3FD0E8",GOLD="#F5B342";
+    var JP="'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',sans-serif",MONO="'JetBrains Mono',ui-monospace,monospace",HEAD="'Chakra Petch',sans-serif";
+    var LANE={1:{bg:"#F2F2F2",ink:"#111111",edge:"#F2F2F2"},2:{bg:"#111111",ink:"#FFFFFF",edge:"#5B6676"},3:{bg:"#D93A2E",ink:"#FFFFFF",edge:"#D93A2E"},
+      4:{bg:"#2F6FE0",ink:"#FFFFFF",edge:"#2F6FE0"},5:{bg:"#F2C230",ink:"#111111",edge:"#F2C230"},6:{bg:"#2E9E52",ink:"#FFFFFF",edge:"#2E9E52"}};
+    var panel={background:PANEL,border:"1px solid "+LINE,borderRadius:6};
+    var cap={fontFamily:HEAD,fontSize:14,letterSpacing:"0.2em",color:W};
+    var btn={minHeight:44,padding:"0 16px",borderRadius:4,border:"1px solid "+LINE,background:PANEL,color:TXT,fontFamily:"inherit",fontSize:16,fontWeight:500,cursor:"pointer"};
+    var btnLine=Object.assign({},btn,{border:"1px solid "+AC,background:"transparent",color:AC,fontWeight:700});
+    var area={width:"100%",boxSizing:"border-box",minHeight:88,padding:"10px 12px",borderRadius:4,border:"1px solid "+LINE,background:BG,color:TXT,fontFamily:MONO,fontSize:15,lineHeight:1.5,resize:"vertical"};
+
+    // 会場：その日のデータがある会場だけ（1つも無ければ全会場）
+    var allV=Object.keys(VENUES);
+    var heldV=allV.filter(function(v){return RNUMS.some(function(n){var r=races[rk(v,n)];return r&&(r.racerStats!=null||r.stTable!=null||(r.motors&&r.motors[1]!=null));});});
+    var showV=heldV.length?heldV:allV;
+    var pick=userBPick;
+    var isB=!!(pick&&pick.isB),gold=!!(pick&&pick.isB&&pick.sameMaru),maru=pick?pick.maru:null;
+    var rows={};if(fxResult&&fxResult.rows)fxResult.rows.forEach(function(r){rows[r.boat]=r;});
+    var f1=function(v){return (v==null||!isFinite(v))?"-":Number(v).toFixed(1);};
+    var plS=fxPL&&fxPL.strength?fxPL.strength:null,plSum=0;
+    if(plS)for(var sb=1;sb<=6;sb++)plSum+=plS[sb]||0;
+    var plPct=function(b){return plS&&plSum>0?(plS[b]||0)/plSum*100:null;};
+    var top5=fxPL&&fxPL.combos?fxPL.combos.slice(0,5):[];
+    var topP=top5.length?top5[0].prob:0;
+    var hasTenji=[1,2,3,4,5,6].some(function(b){return rd.inputs&&rd.inputs[b]&&rd.inputs[b].tenji;});
+    // 締切までの残り（締切時刻は全レースCSVの「締切時間」。日付は取り込んだCSVのファイル名の日付 fbRaceDate、分からなければ今日）
+    var left=null;
+    if(rd.shimekiri&&/^\d{1,2}:\d{2}$/.test(rd.shimekiri)){
+      var t=rd.shimekiri.split(":"),dl=new Date(fxNow);
+      var dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fbRaceDate||"");
+      if(dm)dl=new Date(Number(dm[1]),Number(dm[2])-1,Number(dm[3]));
+      dl.setHours(Number(t[0]),Number(t[1]),0,0);
+      left=Math.floor((dl.getTime()-fxNow)/1000);
+    }
+    var clock=left==null?"--:--":(left<0?"締切済み":(String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0")));
+    var d=new Date(fxNow),WD=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+    var today=d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0")+" "+WD[d.getDay()];
+    var dot=function(c){return <span style={{width:8,height:8,borderRadius:"50%",background:c,display:"inline-block"}}/>;};
+    var focusTenji=function(){try{if(fxTenjiRef.current){fxTenjiRef.current.focus();fxTenjiRef.current.scrollIntoView({block:"center"});}}catch(e){}};
+    var focusOdds=function(){try{if(fxOddsRef.current){fxOddsRef.current.focus();fxOddsRef.current.scrollIntoView({block:"center"});}}catch(e){}};
+    var applyPending=function(){try{var b=document.getElementById("tenji-pending-badge");if(b)b.click();}catch(e){}};
+    // 手で貼ったオッズ：拡張機能の見えない欄（odds-data-input）と同じ形（{"1-2-3":倍率,…}）。3連単は120通り・2連単は30通りのときだけ入れる（解析して入力と同じ決まり）
+    var applyOdds=function(){
+      var msg=[],o3=null,o2=null;
+      if(fxOdds3.trim()){try{var p3=JSON.parse(fxOdds3);if(p3&&typeof p3==="object"&&Object.keys(p3).length===120)o3=p3;else msg.push("3連単は120通りそろっていません");}catch(e){msg.push("3連単が読めません（{\"1-2-3\":倍率,…}の形）");}}
+      if(fxOdds2.trim()){try{var p2=JSON.parse(fxOdds2);if(p2&&typeof p2==="object"&&Object.keys(p2).length===30)o2=p2;else msg.push("2連単は30通りそろっていません");}catch(e){msg.push("2連単が読めません（{\"1-2\":倍率,…}の形）");}}
+      if(o3||o2){
+        updateRd(function(prev){var n=Object.assign({},prev);if(o3){n.odds3tan=o3;n.oddsTime=Date.now();}if(o2)n.odds2tan=o2;return n;});
+        msg.unshift("✓ "+(o3?"3連単120通り":"")+(o3&&o2?"・":"")+(o2?"2連単30通り":"")+"を入れました");
+      }
+      setFxOddsMsg(msg.join("　")||"貼り付け欄が空です");
+    };
+
+    return (
+      <div style={{minHeight:"100vh",background:BG,color:TXT,fontFamily:JP,boxSizing:"border-box",padding:"24px 16px 40px",fontSize:16}}>
+      <div style={{maxWidth:1440,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
+        {/* 拡張機能（content_tool.js 1.3）が書き込む前に確かめる印。いつもの画面と同じ形 */}
+        <div id="rc-current-race" data-venue={venue||""} data-race={String(curRace)} style={{display:"none"}}/>
+
+        <header style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16,borderBottom:"1px solid "+LINE,paddingBottom:16}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:14,flexWrap:"wrap"}}>
+            <span style={{fontFamily:HEAD,fontWeight:700,fontSize:22,letterSpacing:"0.18em",color:AC}}>BOAT/LAB</span>
+            <span style={{fontSize:15,color:W}}>ボートレース予想ツール</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap",fontFamily:MONO,fontSize:15,color:W}}>
+            <span>{today}</span>
+            <span style={{display:"flex",alignItems:"center",gap:8}}>{dot(hasTenji?"#3DDC84":GOLD)}{hasTenji?"展示 取得済み":"展示 まだ"}</span>
+            <span style={{display:"flex",alignItems:"center",gap:8}}>{dot(fxPending!=null?"#3DDC84":GOLD)}{fxPending!=null?"拡張機能 つながっている":"拡張機能 見つからない"}</span>
+            {renderViewSwitch(true)}
+          </div>
+        </header>
+
+        <nav aria-label="会場" style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {showV.map(function(v){
+            var sel=venue===v;
+            return <button key={v} type="button" data-venue={v} onClick={function(){setVenue(v);}}
+              style={Object.assign({},btn,{border:"1px solid "+(sel?AC:LINE),background:sel?AC:PANEL,color:sel?"#04141A":TXT,fontWeight:sel?700:500})}>{v}</button>;
+          })}
+        </nav>
+        <nav aria-label="レース" style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {RNUMS.map(function(n){
+            var sel=curRace===n;
+            return <button key={n} type="button" data-race={n} onClick={function(){setCurRace(n);}}
+              style={{minWidth:52,minHeight:44,borderRadius:4,border:"1px solid "+(sel?AC:LINE),background:sel?"#13202F":"transparent",color:sel?AC:TXT,fontFamily:MONO,fontSize:16,fontWeight:sel?700:400,cursor:"pointer"}}>{n+"R"}</button>;
+          })}
+        </nav>
+
+        <div role="toolbar" aria-label="データの取り込み" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10,padding:"12px 0",borderTop:"1px solid "+LINE,borderBottom:"1px solid "+LINE}}>
+          <label style={Object.assign({},btnLine,{display:"inline-flex",alignItems:"center"})}>
+            全レースを取り込む
+            <input type="file" accept=".csv" onChange={handleCSV} style={{display:"none"}}/>
+          </label>
+          <span aria-hidden="true" style={{width:1,height:28,background:LINE}}/>
+          <button type="button" onClick={applyPending} disabled={!fxPending}
+            style={Object.assign({},btn,{border:"1px solid "+AC,background:AC,color:"#04141A",fontWeight:700,display:"flex",alignItems:"center",gap:10,opacity:fxPending?1:0.55,cursor:fxPending?"pointer":"default"})}>
+            未反映を取り込む
+            <span style={{minWidth:28,height:24,padding:"0 6px",boxSizing:"border-box",display:"inline-flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"#04141A",color:AC,fontFamily:MONO,fontSize:14}}>{fxPending==null?"-":fxPending}</span>
+          </button>
+          <button type="button" onClick={focusTenji} style={btn}>📋 展示タイム</button>
+          <button type="button" onClick={focusTenji} style={btn}>直前情報を貼り付け</button>
+          <button type="button" onClick={focusOdds} style={btn}>オッズを貼り付け</button>
+          <div style={{flex:"1 1 24px"}}/>
+          <span style={{fontSize:15,color:W}}>成績の期間</span>
+          <div role="group" aria-label="成績の期間" style={{display:"flex",border:"1px solid "+LINE,borderRadius:4,overflow:"hidden"}}>
+            <button type="button" aria-pressed={userBMode==="maru3"} onClick={function(){chooseUserBMode("maru3");}}
+              style={{minHeight:44,padding:"0 16px",border:"none",background:userBMode==="maru3"?"#13202F":"transparent",color:userBMode==="maru3"?AC:TXT,fontFamily:"inherit",fontSize:16,fontWeight:userBMode==="maru3"?700:500,cursor:"pointer"}}>直近1年（1-全-〇）</button>
+            <button type="button" aria-pressed={userBMode!=="maru3"} onClick={function(){chooseUserBMode("maru2");}}
+              style={{minHeight:44,padding:"0 16px",border:"none",borderLeft:"1px solid "+LINE,background:userBMode!=="maru3"?"#13202F":"transparent",color:userBMode!=="maru3"?AC:TXT,fontFamily:"inherit",fontSize:16,fontWeight:userBMode!=="maru3"?700:500,cursor:"pointer"}}>直近6ヶ月（1-〇-全）</button>
+          </div>
+          {csvMsg&&<span style={{fontSize:14,color:csvMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80",fontWeight:700}}>{csvMsg}</span>}
+        </div>
+
+        <div style={{display:"flex",flexWrap:"wrap",gap:20,alignItems:"flex-start"}}>
+          <main style={{flex:"999 1 640px",minWidth:0,display:"flex",flexDirection:"column",gap:20}}>
+            <section style={Object.assign({},panel,{padding:"20px 24px",display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:20})}>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <span style={cap}>RACE</span>
+                <div style={{display:"flex",alignItems:"baseline",gap:14,flexWrap:"wrap"}}>
+                  <h1 style={{margin:0,fontSize:40,fontWeight:700,letterSpacing:"0.04em",color:TXT}}>{(venue||"会場を選ぶ")+" "+curRace+"R"}</h1>
+                  <span style={{fontSize:17,color:W}}>{"締切 "+(rd.shimekiri||"--:--")}</span>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <span style={cap}>締切まで</span>
+                <span style={{fontFamily:MONO,fontSize:40,fontWeight:600,color:AC}}>{clock}</span>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"flex-end"}}>
+                {isB&&<span style={{padding:"8px 14px",border:"1px solid "+AC,color:AC,borderRadius:4,fontWeight:700,fontSize:16}}>条件B</span>}
+                {gold&&<span style={{padding:"8px 14px",background:GOLD,color:"#1A1204",borderRadius:4,fontWeight:700,fontSize:16}}>{"金枠　◎ "+maru+"号艇"}</span>}
+                {!isB&&venue&&<span style={{padding:"8px 14px",border:"1px solid "+LINE,color:W,borderRadius:4,fontSize:16}}>条件Bではない</span>}
+              </div>
+            </section>
+
+            <section aria-label="出走表" style={Object.assign({},panel,{padding:"8px 0",overflowX:"auto"})}>
+              <div style={{minWidth:760}}>
+                <div style={{display:"grid",gridTemplateColumns:"56px 1.2fr 1.6fr 56px 1.8fr",gap:16,padding:"10px 24px",fontFamily:HEAD,fontSize:17,letterSpacing:"0.14em",color:TXT,borderBottom:"1px solid "+LINE}}>
+                  <span>艇</span><span>選手</span><span style={{textAlign:"right",paddingRight:12}}>予想 1着 / 2着 / 3着</span><span style={{textAlign:"center"}}>印</span><span>PL 1着の％</span>
+                </div>
+                {[1,2,3,4,5,6].map(function(b){
+                  var L=LANE[b],r=rows[b],p=plPct(b);
+                  var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
+                  return (
+                    <div key={b} style={{display:"grid",gridTemplateColumns:"56px 1.2fr 1.6fr 56px 1.8fr",gap:16,alignItems:"center",padding:"14px 24px",borderBottom:"1px solid #141E2C"}}>
+                      <span style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,background:L.bg,color:L.ink,border:"1px solid "+L.edge,fontFamily:MONO,fontWeight:600,fontSize:18}}>{b}</span>
+                      <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0,color:W}}>
+                        <span style={{fontSize:16,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
+                        <span style={{fontFamily:MONO,fontSize:14,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
+                      </div>
+                      <div style={{display:"flex",gap:24,alignItems:"center",minWidth:0,paddingRight:12}}>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR1final):"-"}</span>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR2final):"-"}</span>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR3final):"-"}</span>
+                      </div>
+                      <span style={{fontSize:24,fontWeight:700,color:GOLD,textAlign:"center"}}>{mark}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{flex:1,height:14,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:14,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
+                        <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:17,fontWeight:600}}>{p==null?"-":p.toFixed(1)+"%"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section aria-label="展示の詳細" style={Object.assign({},panel,{padding:"18px 24px",overflowX:"auto"})}>
+              <div style={Object.assign({},cap,{marginBottom:12})}>EXHIBITION</div>
+              <div style={{minWidth:560,display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",fontFamily:MONO,fontSize:17}}>
+                {["項目","1周","周り足","直線","展示"].map(function(h,i){return <span key={h} style={{padding:"10px 0",fontFamily:JP,fontSize:16,color:i?"#7FE3F2":TXT}}>{h}</span>;})}
+                {[1,2,3,4,5,6].map(function(b){
+                  var x=(rd.inputs&&rd.inputs[b])||{};
+                  var c={padding:"10px 0",borderTop:"1px solid "+LINE};
+                  return [
+                    <span key={b+"h"} style={Object.assign({},c,{fontFamily:JP,fontSize:16,color:"#7FE3F2"})}>{b+"号艇"}</span>,
+                    <span key={b+"i"} style={c}>{x.isshu||"-"}</span>,
+                    <span key={b+"m"} style={c}>{x.mawari||"-"}</span>,
+                    <span key={b+"c"} style={c}>{x.chokusen||"-"}</span>,
+                    <span key={b+"t"} style={c}>{x.tenji||"-"}</span>
+                  ];
+                })}
+              </div>
+            </section>
+          </main>
+
+          <aside style={{flex:"1 1 340px",minWidth:0,display:"flex",flexDirection:"column",gap:20}}>
+            <section style={Object.assign({},panel,{border:"1px solid "+GOLD,padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <div style={Object.assign({},cap,{color:GOLD})}>BET PLAN　2：1</div>
+              {gold?(<React.Fragment>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <span style={{fontSize:15,color:W}}>本命（1点200円）</span>
+                  <span style={{fontFamily:MONO,fontSize:28,fontWeight:600}}>{"1 - 全 - "+maru}</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <span style={{fontSize:15,color:W}}>保険（1点100円）</span>
+                  <span style={{fontFamily:MONO,fontSize:22,fontWeight:600,color:"#C9D6E3"}}>{"1 - "+maru+" - 全"}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid "+LINE,paddingTop:12,fontSize:15,color:W}}>
+                  <span>計 8点</span><span style={{fontFamily:MONO,color:TXT}}>1,200円</span>
+                </div>
+              </React.Fragment>):(
+                <span style={{fontSize:15,color:W}}>{isB?("金枠ではありません（条件B・〇 "+maru+"号艇）"):"金枠ではありません"}</span>
+              )}
+            </section>
+
+            <section style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <div style={cap}>PL TOP 5</div>
+              {top5.length?top5.map(function(c,i){
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:12}}>
+                    <span style={{width:22,fontFamily:MONO,fontSize:14,color:W}}>{i+1}</span>
+                    <span style={{width:80,fontFamily:MONO,fontSize:18,fontWeight:600}}>{c.combo.join("-")}</span>
+                    <div style={{flex:1,height:6,background:"#17212F",borderRadius:3}}><div style={{width:(topP>0?Math.round(c.prob/topP*100):0)+"%",height:6,background:AC,borderRadius:3}}/></div>
+                    <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:15}}>{(c.prob*100).toFixed(1)+"%"}</span>
+                  </div>
+                );
+              }):<span style={{fontSize:15,color:W}}>6艇すべてのデータがそろうと出ます</span>}
+              <p style={{margin:"4px 0 0",fontSize:14,lineHeight:1.6,color:W}}>PLの％は1号艇を低め・他の艇を高めに出す癖があります（2〜6号艇の実際の1着率はPLの％のおよそ0.6〜0.8倍、追記223）。</p>
+            </section>
+
+            <section style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:10})}>
+              <div style={cap}>CONDITIONS</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14}}>
+                {[["風",rd.wind||"―"],["波高",rd.waveHeight||"―"],["天候",rd.weather||"―"]].map(function(x){
+                  return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:14,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:17}}>{x[1]}</span></div>;
+                })}
+              </div>
+            </section>
+
+            <section aria-label="手で取り込む" style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <div style={cap}>INPUT</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <label htmlFor="rc-fx-tenji" style={{fontSize:15,color:W}}>直前情報</label>
+                {/* 拡張機能が探す貼り付け欄。placeholder・中身（rd.tenjiText）・解析（parseTenji）はいつもの画面と同じ */}
+                <textarea id="rc-fx-tenji" ref={fxTenjiRef} value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" style={area}/>
+                <input type="text" id="odds-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsed=JSON.parse(e.target.value);
+                    updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;n.oddsTime=Date.now();return n;});
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <input type="text" id="odds2-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsed2=JSON.parse(e.target.value);
+                    updateRd(function(prev){var n=Object.assign({},prev);n.odds2tan=parsed2;return n;});
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <input type="text" id="fl-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsedFl=JSON.parse(e.target.value);
+                    updateRd(function(prev){
+                      var n=Object.assign({},prev);
+                      var nh=Object.assign({},prev.fHold),nc=Object.assign({},prev.fCounts);
+                      for(var b=1;b<=6;b++){
+                        var toban=prev.playerNums&&prev.playerNums[b-1];
+                        if(toban&&parsedFl[toban]){
+                          nh[b]=(parsedFl[toban].f||0)>=1;
+                          nc[b]=parsedFl[toban];
+                        }
+                      }
+                      n.fHold=nh;n.fCounts=nc;
+                      return n;
+                    });
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <button type="button" onClick={parseTenji} style={btnLine}>解析して入力</button>
+                {rd.tenjiMsg&&<span style={{fontSize:14,color:rd.tenjiMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{rd.tenjiMsg}</span>}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid "+LINE,paddingTop:14}}>
+                <label htmlFor="rc-fx-odds3" style={{fontSize:15,color:W}}>オッズ（3連単）</label>
+                <textarea id="rc-fx-odds3" ref={fxOddsRef} value={fxOdds3} onChange={function(e){setFxOdds3(e.target.value);}} placeholder="3連単オッズを貼り付け" style={area}/>
+                <label htmlFor="rc-fx-odds2" style={{fontSize:15,color:W}}>オッズ（2連単）</label>
+                <textarea id="rc-fx-odds2" value={fxOdds2} onChange={function(e){setFxOdds2(e.target.value);}} placeholder="2連単オッズを貼り付け" style={area}/>
+                <button type="button" onClick={applyOdds} style={btnLine}>オッズを入力</button>
+                {fxOddsMsg&&<span style={{fontSize:14,color:fxOddsMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{fxOddsMsg}</span>}
+                <span style={{fontSize:14,color:W}}>{(rd.odds3tan?"3連単 取得済み":"3連単 まだ")+"・"+(rd.odds2tan?"2連単 取得済み":"2連単 まだ")}</span>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+      </div>
+    );
+  }
+
   function btnS(bg,c,x){return Object.assign({padding:"10px 14px",borderRadius:10,cursor:"pointer",background:bg,color:c,fontSize:13,fontWeight:700,border:"none"},x||{});}
+  // 【2026-10-05追加】近未来の画面を選んでいるときは、いつもの画面を描かない（2つの表示を同時に出さない）
+  if(viewMode==="future")return renderFuture();
 
   return (
     <div style={wrapS}>
       <QuickNav activeTab={activeTab} setActiveTab={switchTab}/>
       <div style={innerS}>
+        {/* 【2026-10-05追加】表示の切り替え（いつもの画面／近未来の画面）。見た目だけで、計算は同じ */}
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>{renderViewSwitch(false)}</div>
         
 
         {activeTab==="setup"&&(<>
