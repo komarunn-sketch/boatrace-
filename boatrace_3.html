@@ -3695,7 +3695,14 @@ function App() {
     var on=function(){setIsNarrow(mq.matches);};
     on();
     if(mq.addEventListener)mq.addEventListener("change",on);else if(mq.addListener)mq.addListener(on);
-    return function(){if(mq.removeEventListener)mq.removeEventListener("change",on);else if(mq.removeListener)mq.removeListener(on);};
+    // 念のため、窓の大きさが変わったとき・スマホを回したときにも測り直す（古いブラウザで change が届かない場合に備える）
+    window.addEventListener("resize",on);
+    window.addEventListener("orientationchange",on);
+    return function(){
+      if(mq.removeEventListener)mq.removeEventListener("change",on);else if(mq.removeListener)mq.removeListener(on);
+      window.removeEventListener("resize",on);
+      window.removeEventListener("orientationchange",on);
+    };
   },[]);
   const [b1BandBlock,setB1BandBlock]=useState("total");   // 狭い画面の「AI1着%×会場」で見る帯（total/A/B/C）
   const [openAiEval,setOpenAiEval]=useState(false);
@@ -5405,6 +5412,40 @@ function App() {
       else window.open(u,"_blank","noopener");
     }catch(e){}
   }
+  // 【2026-10-05】⏰ 締切直前の一覧：いつもの画面の判定をそのまま関数にした（いつもの画面と近未来の画面で共用。時刻は nowTime＝「🔄 更新」で取り直す）
+  function shimekiriTop4(){
+    var now=nowTime;
+    var nowMin=now.getHours()*60+now.getMinutes();
+    var items=[];
+    Object.keys(races).forEach(function(key){
+      var r=races[key];
+      if(!r.shimekiri)return;
+      var parts=r.shimekiri.split(":");
+      if(parts.length!==2)return;
+      var t=parseInt(parts[0])*60+parseInt(parts[1]);
+      var remaining=t-nowMin;
+      if(remaining<0||remaining>60)return;
+      var sp=key.split("_");
+      var vname=sp.slice(0,-1).join("_");
+      var rnum=parseInt(sp[sp.length-1]);
+      var itemWave=false,itemStrong=false;
+      if(r.kimariCount&&r.racerRaceCount){
+        var kc2=r.kimariCount;
+        var rc2=r.racerRaceCount[0];
+        if(rc2!=null&&rc2>9){
+          var tot2=0;
+          var arrs2=[kc2.nige,kc2.sashi,kc2.makuri,kc2.makurizashi,kc2.nuki];
+          for(var ai2=0;ai2<arrs2.length;ai2++){if(arrs2[ai2]&&arrs2[ai2][0]!=null)tot2+=arrs2[ai2][0];}
+          var ratio2=tot2/rc2;
+          if(ratio2<0.45)itemWave=true;
+          else if(ratio2>=0.75)itemStrong=true;
+        }
+      }
+      items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining,isWave:itemWave,isStrong:itemStrong});
+    });
+    items.sort(function(a,b){return a.remaining-b.remaining;});
+    return items.slice(0,4);
+  }
   function renderViewSwitch(dark){
     var on=function(m){return viewMode===m;};
     var bs=function(m){
@@ -5442,6 +5483,34 @@ function App() {
     var plS=fxPL&&fxPL.strength?fxPL.strength:null,plSum=0;
     if(plS)for(var sb=1;sb<=6;sb++)plSum+=plS[sb]||0;
     var plPct=function(b){return plS&&plSum>0?(plS[b]||0)/plSum*100:null;};
+    // 【2026-10-05】出走表・EXHIBITIONの上位のハイライト（見た目だけ。順位の付け方はいつもの画面と同じ）
+    //   得点：いつもの画面の「得点／順位」のバッジと同じ順位（tokutenRank）。1位＝強、2〜3位＝弱
+    //   1周・周り足・直線・展示：いつもの画面の展示タイム一覧と同じく、小さい方から1位＝強・2位＝弱（同じ値は同じ順位）
+    //   予想1着／2着／3着・PLの1着の％：いつもの画面に決まりが無いので、展示と同じ2段を大きい方から（2026-10-05ユーザー決定）
+    //   強＝水色の太字＋薄い水色の背景、弱＝水色の文字だけ。琥珀色（金枠・◎）は使わない
+    var top2=function(vals,small){
+      var s=[];
+      vals.forEach(function(v){if(v!=null&&isFinite(v)&&s.indexOf(v)<0)s.push(v);});
+      s.sort(function(a,b){return small?a-b:b-a;});
+      return {first:s[0],second:s[1]};
+    };
+    var tierOf=function(v,t){if(v==null||!isFinite(v))return 0;return v===t.first?1:(v===t.second?2:0);};
+    var hv=function(text,tier){
+      if(tier===1)return <span style={{display:"inline-block",color:AC,fontWeight:700,background:"rgba(63,208,232,0.16)",borderRadius:3,padding:"0 5px",margin:"0 -5px"}}>{text}</span>;
+      if(tier===2)return <span style={{color:AC}}>{text}</span>;
+      return text;
+    };
+    var B6=[1,2,3,4,5,6];
+    var R1T=top2(B6.map(function(b){return rows[b]?rows[b].racerR1final:null;}));
+    var R2T=top2(B6.map(function(b){return rows[b]?rows[b].racerR2final:null;}));
+    var R3T=top2(B6.map(function(b){return rows[b]?rows[b].racerR3final:null;}));
+    var PLT=top2(B6.map(function(b){return plPct(b);}));
+    var EXT={};
+    ["isshu","mawari","chokusen","tenji"].forEach(function(k){
+      EXT[k]=top2(B6.map(function(b){var v=(rd.inputs&&rd.inputs[b])?parseFloat(rd.inputs[b][k]):NaN;return isNaN(v)?null:v;}),true);
+    });
+    var tkTier=function(b){var rk=tokutenRank?tokutenRank[b]:null;return rk===1?1:((rk!=null&&rk<=3)?2:0);};
+    var exTier=function(b,k){var v=(rd.inputs&&rd.inputs[b])?parseFloat(rd.inputs[b][k]):NaN;return isNaN(v)?0:tierOf(v,EXT[k]);};
     var top5=fxPL&&fxPL.combos?fxPL.combos.slice(0,5):[];
     var topP=top5.length?top5[0].prob:0;
     var hasTenji=[1,2,3,4,5,6].some(function(b){return rd.inputs&&rd.inputs[b]&&rd.inputs[b].tenji;});
@@ -5507,6 +5576,40 @@ function App() {
           })}
         </nav>
 
+        {/* 【2026-10-05】⏰ 締切直前：いつもの画面と同じ一覧（shimekiriTop4・同じ時刻の扱い）と同じ動き（押すとその会場・レースを選ぶ）。
+            拡張機能は data-venue・data-race のボタンを押すので、ここのボタンにはその印を付けない */}
+        {(function(){
+          var top4=shimekiriTop4();
+          if(top4.length===0)return null;
+          return (
+            <section aria-label="締切直前" style={{display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:15,fontWeight:700,color:W}}>⏰ 締切直前</span>
+                <button type="button" onClick={function(){setNowTime(new Date());}} style={{minHeight:32,padding:"0 12px",borderRadius:4,border:"1px solid "+LINE,background:PANEL,color:AC,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔄 更新</button>
+                <span style={{fontFamily:MONO,fontSize:14,color:W}}>{nowTime.getHours()+":"+String(nowTime.getMinutes()).padStart(2,"0")}</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:isNarrow?"repeat(2,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:8}}>
+                {top4.map(function(item){
+                  var isActive=venue===item.vname&&curRace===item.rnum;
+                  // 残りの色分けはいつもの画面と同じ段（10分以下・20分以下・それより前）。琥珀色の代わりに水色
+                  var tc=item.remaining<=10?"#FF6B6B":item.remaining<=20?AC:"#3DDC84";
+                  // 1号艇の決まり手の傾向（いつもの画面と同じ isStrong・isWave）は枠の色で出す
+                  var edge=isActive?AC:item.isStrong?"#3DDC84":item.isWave?"#B48CFF":LINE;
+                  var bg=isActive?"#13202F":item.isStrong?"rgba(61,220,132,0.08)":item.isWave?"rgba(180,140,255,0.10)":PANEL;
+                  return (
+                    <button key={item.vname+"_"+item.rnum} type="button" onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
+                      style={{minWidth:0,padding:"8px 12px",borderRadius:4,cursor:"pointer",textAlign:"left",background:bg,border:(isActive?"2px":"1px")+" solid "+edge,color:tc,fontFamily:"inherit"}}>
+                      <div style={{fontSize:14,color:TXT}}>{item.vname}</div>
+                      <div style={{fontFamily:MONO,fontSize:16,fontWeight:700}}>{item.rnum+"R "+item.shimekiri}</div>
+                      <div style={{fontSize:14,marginTop:2}}>{"残"+item.remaining+"分"}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
+
         <div role="toolbar" aria-label="データの取り込み" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10,padding:"12px 0",borderTop:"1px solid "+LINE,borderBottom:"1px solid "+LINE}}>
           <label style={Object.assign({},btnLine,{display:"inline-flex",alignItems:"center"})}>
             全レースを取り込む
@@ -5559,6 +5662,7 @@ function App() {
               {[1,2,3,4,5,6].map(function(b){
                 var L=LANE[b],r=rows[b],p=plPct(b);
                 var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
+                var tkS=(rd.tokuten&&rd.tokuten[b]&&rd.tokuten[b].score!=null)?String(rd.tokuten[b].score):"-";
                 return (
                   <div key={b} style={{display:"flex",flexDirection:"column",gap:8,padding:"12px 14px",borderBottom:"1px solid #141E2C"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -5569,15 +5673,15 @@ function App() {
                       </div>
                       {mark&&<span style={{fontSize:22,fontWeight:700,color:GOLD}}>{mark}</span>}
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}}>
-                      {[["予想1着",r?f1(r.racerR1final):"-"],["予想2着",r?f1(r.racerR2final):"-"],["予想3着",r?f1(r.racerR3final):"-"]].map(function(x){
-                        return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:12,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:16,color:TXT}}>{x[1]}</span></div>;
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8}}>
+                      {[["得点",tkS,tkTier(b)],["予想1着",r?f1(r.racerR1final):"-",r?tierOf(r.racerR1final,R1T):0],["予想2着",r?f1(r.racerR2final):"-",r?tierOf(r.racerR2final,R2T):0],["予想3着",r?f1(r.racerR3final):"-",r?tierOf(r.racerR3final,R3T):0]].map(function(x){
+                        return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:12,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:16,color:TXT}}>{hv(x[1],x[2])}</span></div>;
                       })}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:12,color:W}}>PL 1着</span>
                       <div style={{flex:1,height:10,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:10,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
-                      <span style={{width:60,textAlign:"right",fontFamily:MONO,fontSize:15,fontWeight:600}}>{p==null?"-":p.toFixed(1)+"%"}</span>
+                      <span style={{width:60,textAlign:"right",fontFamily:MONO,fontSize:15,fontWeight:600}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
                     </div>
                   </div>
                 );
@@ -5586,28 +5690,31 @@ function App() {
             ):(
             <section aria-label="出走表" style={Object.assign({},panel,{padding:"8px 0",overflowX:"auto"})}>
               <div style={{minWidth:760}}>
-                <div style={{display:"grid",gridTemplateColumns:"56px 1.2fr 1.6fr 56px 1.8fr",gap:16,padding:"10px 24px",fontFamily:HEAD,fontSize:17,letterSpacing:"0.14em",color:TXT,borderBottom:"1px solid "+LINE}}>
-                  <span>艇</span><span>選手</span><span style={{textAlign:"right",paddingRight:12}}>予想 1着 / 2着 / 3着</span><span style={{textAlign:"center"}}>印</span><span>PL 1着の％</span>
+                <div style={{display:"grid",gridTemplateColumns:"56px 1.2fr 64px 1.6fr 56px 1.8fr",gap:16,padding:"10px 24px",fontFamily:HEAD,fontSize:17,letterSpacing:"0.14em",color:TXT,borderBottom:"1px solid "+LINE}}>
+                  <span>艇</span><span>選手</span><span style={{textAlign:"left"}}>得点</span><span style={{textAlign:"right",paddingRight:12}}>予想 1着 / 2着 / 3着</span><span style={{textAlign:"center"}}>印</span><span>PL 1着の％</span>
                 </div>
                 {[1,2,3,4,5,6].map(function(b){
                   var L=LANE[b],r=rows[b],p=plPct(b);
                   var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
+                  // 【2026-10-05】得点：いつもの画面の「得点／順位」と同じ値（rd.tokuten[艇].score）をそのまま出す
+                  var tkS=(rd.tokuten&&rd.tokuten[b]&&rd.tokuten[b].score!=null)?String(rd.tokuten[b].score):"-";
                   return (
-                    <div key={b} style={{display:"grid",gridTemplateColumns:"56px 1.2fr 1.6fr 56px 1.8fr",gap:16,alignItems:"center",padding:"14px 24px",borderBottom:"1px solid #141E2C"}}>
+                    <div key={b} style={{display:"grid",gridTemplateColumns:"56px 1.2fr 64px 1.6fr 56px 1.8fr",gap:16,alignItems:"center",padding:"14px 24px",borderBottom:"1px solid #141E2C"}}>
                       <span style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,background:L.bg,color:L.ink,border:"1px solid "+L.edge,fontFamily:MONO,fontWeight:600,fontSize:18}}>{b}</span>
                       <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0,color:W}}>
                         <span style={{fontSize:16,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
                         <span style={{fontFamily:MONO,fontSize:14,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
                       </div>
+                      <span style={{textAlign:"left",fontFamily:MONO,fontSize:18}}>{hv(tkS,tkTier(b))}</span>
                       <div style={{display:"flex",gap:24,alignItems:"center",minWidth:0,paddingRight:12}}>
-                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR1final):"-"}</span>
-                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR2final):"-"}</span>
-                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{r?f1(r.racerR3final):"-"}</span>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR1final):"-",r?tierOf(r.racerR1final,R1T):0)}</span>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR2final):"-",r?tierOf(r.racerR2final,R2T):0)}</span>
+                        <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR3final):"-",r?tierOf(r.racerR3final,R3T):0)}</span>
                       </div>
                       <span style={{fontSize:24,fontWeight:700,color:GOLD,textAlign:"center"}}>{mark}</span>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
                         <div style={{flex:1,height:14,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:14,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
-                        <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:17,fontWeight:600}}>{p==null?"-":p.toFixed(1)+"%"}</span>
+                        <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:17,fontWeight:600}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
                       </div>
                     </div>
                   );
@@ -5626,10 +5733,10 @@ function App() {
                   var c={padding:"10px 0",borderTop:"1px solid "+LINE};
                   return [
                     <span key={b+"h"} style={Object.assign({},c,{fontFamily:JP,fontSize:isNarrow?13:16,color:"#7FE3F2"})}>{b+"号艇"}</span>,
-                    <span key={b+"i"} style={c}>{x.isshu||"-"}</span>,
-                    <span key={b+"m"} style={c}>{x.mawari||"-"}</span>,
-                    <span key={b+"c"} style={c}>{x.chokusen||"-"}</span>,
-                    <span key={b+"t"} style={c}>{x.tenji||"-"}</span>
+                    <span key={b+"i"} style={c}>{hv(x.isshu||"-",exTier(b,"isshu"))}</span>,
+                    <span key={b+"m"} style={c}>{hv(x.mawari||"-",exTier(b,"mawari"))}</span>,
+                    <span key={b+"c"} style={c}>{hv(x.chokusen||"-",exTier(b,"chokusen"))}</span>,
+                    <span key={b+"t"} style={c}>{hv(x.tenji||"-",exTier(b,"tenji"))}</span>
                   ];
                 })}
               </div>
@@ -5797,37 +5904,7 @@ function App() {
         </>)}
 
         {(function(){
-          var now=nowTime;
-          var nowMin=now.getHours()*60+now.getMinutes();
-          var items=[];
-          Object.keys(races).forEach(function(key){
-            var r=races[key];
-            if(!r.shimekiri)return;
-            var parts=r.shimekiri.split(":");
-            if(parts.length!==2)return;
-            var t=parseInt(parts[0])*60+parseInt(parts[1]);
-            var remaining=t-nowMin;
-            if(remaining<0||remaining>60)return;
-            var sp=key.split("_");
-            var vname=sp.slice(0,-1).join("_");
-            var rnum=parseInt(sp[sp.length-1]);
-            var itemWave=false,itemStrong=false;
-            if(r.kimariCount&&r.racerRaceCount){
-              var kc2=r.kimariCount;
-              var rc2=r.racerRaceCount[0];
-              if(rc2!=null&&rc2>9){
-                var tot2=0;
-                var arrs2=[kc2.nige,kc2.sashi,kc2.makuri,kc2.makurizashi,kc2.nuki];
-                for(var ai2=0;ai2<arrs2.length;ai2++){if(arrs2[ai2]&&arrs2[ai2][0]!=null)tot2+=arrs2[ai2][0];}
-                var ratio2=tot2/rc2;
-                if(ratio2<0.45)itemWave=true;
-                else if(ratio2>=0.75)itemStrong=true;
-              }
-            }
-            items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining,isWave:itemWave,isStrong:itemStrong});
-          });
-          items.sort(function(a,b){return a.remaining-b.remaining;});
-          var top4=items.slice(0,4);
+          var top4=shimekiriTop4();
           if(top4.length===0)return null;
           return (
             <div id="section-shimekiri" style={{marginBottom:12}}>
