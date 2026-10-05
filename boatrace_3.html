@@ -7,6 +7,8 @@
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: #0e1b2c; overflow-x: hidden; width: 100%; overflow-y: auto; }
+  /* 【2026-10-05】スマホ（iPhone）を横にしたときに文字が勝手に拡大されないように。PCには効かない */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   @media (pointer: coarse) {
     html, body { overscroll-behavior-y: none; }
   }
@@ -6762,7 +6764,8 @@ function App() {
               <span style={{color:"#8b9bae",marginLeft:6}}>（過去実績より）</span>
             </div>;
           })()}
-          <div>
+          {/* 【2026-10-05】スマホ縦（幅375px前後）で表がページからはみ出さないよう、表の中だけで横にスクロールする */}
+          <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
                 <tr style={{color:"#a9cbea",fontSize:11}}>
@@ -7028,7 +7031,8 @@ function App() {
               </div>
             )}
 
-            <div style={{marginBottom:26}}>
+            {/* 【2026-10-05】スマホ縦で表がはみ出さないよう、表の中だけで横にスクロールする */}
+            <div style={{marginBottom:26,overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
                   <tr style={{color:"#a9cbea",fontSize:11}}>
@@ -7087,7 +7091,7 @@ function App() {
                   <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
                 </div>
                 <div style={{display:"grid",gap:8}}>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,overflowX:"auto"}}>{/* 【2026-10-05】狭いスマホでは枠の中だけで横にスクロール */}
                   {aiEval.ranked.map(function(r){
                     var isHonmei=r.rankPos===1;
                     return (
