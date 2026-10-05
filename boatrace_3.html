@@ -5381,7 +5381,7 @@ function App() {
       if(!document.getElementById("rc-future-fonts")){
         var l=document.createElement("link");
         l.id="rc-future-fonts";l.rel="stylesheet";
-        l.href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap";
+        l.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap";
         document.head.appendChild(l);
       }
     }catch(e){}
@@ -5462,15 +5462,27 @@ function App() {
   }
 
   function renderFuture(){
-    var BG="#070B12",PANEL="#0D1420",LINE="#1E2A3A",TXT="#E6EDF5",W="#FFFFFF",AC="#3FD0E8",GOLD="#F5B342";
-    var JP="'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',sans-serif",MONO="'JetBrains Mono',ui-monospace,monospace",HEAD="'Chakra Petch',sans-serif";
-    var LANE={1:{bg:"#F2F2F2",ink:"#111111",edge:"#F2F2F2"},2:{bg:"#111111",ink:"#FFFFFF",edge:"#5B6676"},3:{bg:"#D93A2E",ink:"#FFFFFF",edge:"#D93A2E"},
-      4:{bg:"#2F6FE0",ink:"#FFFFFF",edge:"#2F6FE0"},5:{bg:"#F2C230",ink:"#111111",edge:"#F2C230"},6:{bg:"#2E9E52",ink:"#FFFFFF",edge:"#2E9E52"}};
-    var panel={background:PANEL,border:"1px solid "+LINE,borderRadius:6};
-    var cap={fontFamily:HEAD,fontSize:14,letterSpacing:"0.2em",color:W};
-    var btn={minHeight:44,padding:"0 16px",borderRadius:4,border:"1px solid "+LINE,background:PANEL,color:TXT,fontFamily:"inherit",fontSize:16,fontWeight:500,cursor:"pointer"};
+    // 【2026-10-05 v2】近未来の画面を「未来感を強めた案（紫）」に差し替えた。設計は ツール\引継ぎ\design\近未来レイアウト_メモ.md（v2）、
+    //   見本は 近未来レイアウト_見本v2.dc.html（見本とメモが食い違うときはメモに従う）。見た目だけで、計算は今までと同じ関数・同じ値を使う
+    var AC="#A78BFA",BG="#03060B",TXT="#F2F8FF",W="#FFFFFF",GOLD="#F5B342",WARN="#FF5D73",DARK="#02131A";
+    var JP="'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',sans-serif",MONO="'JetBrains Mono',ui-monospace,monospace",HEAD="'Chakra Petch',sans-serif",ORB="'Orbitron','Chakra Petch',sans-serif";
+    // 強調の色から光・方眼・枠線・メーターの空きを作る（見本と同じ作り方。枠線は22%、メーターの空きは8%、他の艇のメーターは55%を地の色に混ぜる）
+    var hexRgb=function(h){var m=String(h).replace("#","");return [0,2,4].map(function(i){return parseInt(m.slice(i,i+2),16)||0;});};
+    var rgba=function(h,a){var c=hexRgb(h);return "rgba("+c[0]+","+c[1]+","+c[2]+","+a+")";};
+    var mix=function(h,a){var c=hexRgb(h),g=[11,20,32];return "rgb("+c.map(function(v,i){return Math.round(g[i]+(v-g[i])*a);}).join(",")+")";};
+    var LINE=mix(AC,0.22),TRACK=mix(AC,0.08),SUB=mix(AC,0.55);
+    var PANELBG="rgba(10,20,32,0.92)",BTNBG="rgba(13,24,38,0.9)";
+    var LANE={1:{bg:"#F4F6F8",ink:"#0A0A0A"},2:{bg:"#151515",ink:"#FFFFFF"},3:{bg:"#E0392B",ink:"#FFFFFF"},
+      4:{bg:"#2F6FE0",ink:"#FFFFFF"},5:{bg:"#F2C230",ink:"#0A0A0A"},6:{bg:"#2E9E52",ink:"#FFFFFF"}};
+    var HEX="polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
+    var cut=function(n){return "polygon("+n+"px 0, 100% 0, 100% calc(100% - "+n+"px), calc(100% - "+n+"px) 100%, 0 100%, 0 "+n+"px)";};
+    var panel={background:PANELBG,border:"1px solid "+LINE};
+    var cap={fontFamily:HEAD,fontSize:15,letterSpacing:"0.3em",color:AC};
+    var btn={minHeight:44,padding:"0 16px",border:"1px solid "+LINE,background:"#0B1522",color:W,fontFamily:"inherit",fontSize:16,cursor:"pointer"};
     var btnLine=Object.assign({},btn,{border:"1px solid "+AC,background:"transparent",color:AC,fontWeight:700});
-    var area={width:"100%",boxSizing:"border-box",minHeight:88,padding:"10px 12px",borderRadius:4,border:"1px solid "+LINE,background:BG,color:TXT,fontFamily:MONO,fontSize:15,lineHeight:1.5,resize:"vertical"};
+    var area={width:"100%",boxSizing:"border-box",minHeight:80,padding:"10px 12px",border:"1px solid "+LINE,background:BG,color:TXT,fontFamily:MONO,fontSize:15,lineHeight:1.5,resize:"vertical"};
+    var VEN_EN={"桐生":"KIRYU","戸田":"TODA","江戸川":"EDOGAWA","平和島":"HEIWAJIMA","多摩川":"TAMAGAWA","浜名湖":"HAMANAKO","蒲郡":"GAMAGORI","常滑":"TOKONAME","津":"TSU","三国":"MIKUNI","びわこ":"BIWAKO","住之江":"SUMINOE",
+      "尼崎":"AMAGASAKI","鳴門":"NARUTO","丸亀":"MARUGAME","児島":"KOJIMA","宮島":"MIYAJIMA","徳山":"TOKUYAMA","下関":"SHIMONOSEKI","若松":"WAKAMATSU","芦屋":"ASHIYA","福岡":"FUKUOKA","唐津":"KARATSU","大村":"OMURA"};
 
     // 会場：その日のデータがある会場だけ（1つも無ければ全会場）
     var allV=Object.keys(VENUES);
@@ -5483,11 +5495,11 @@ function App() {
     var plS=fxPL&&fxPL.strength?fxPL.strength:null,plSum=0;
     if(plS)for(var sb=1;sb<=6;sb++)plSum+=plS[sb]||0;
     var plPct=function(b){return plS&&plSum>0?(plS[b]||0)/plSum*100:null;};
-    // 【2026-10-05】出走表・EXHIBITIONの上位のハイライト（見た目だけ。順位の付け方はいつもの画面と同じ）
-    //   得点：いつもの画面の「得点／順位」のバッジと同じ順位（tokutenRank）。1位＝強、2〜3位＝弱
-    //   1周・周り足・直線・展示：いつもの画面の展示タイム一覧と同じく、小さい方から1位＝強・2位＝弱（同じ値は同じ順位）
+    // 出走表・EXHIBITIONの上位のハイライト（見た目だけ。順位の付け方はいつもの画面と同じ・メモの決まり）
+    //   得点：いつもの画面の「得点／順位」のバッジと同じ順位（tokutenRank）。1位＝1位の色、2〜3位＝2位の色
+    //   1周・周り足・直線・展示：いつもの画面の展示タイム一覧と同じく、小さい方から1位・2位（同じ値は同じ順位）
     //   予想1着／2着／3着・PLの1着の％：いつもの画面に決まりが無いので、展示と同じ2段を大きい方から（2026-10-05ユーザー決定）
-    //   強＝水色の太字＋薄い水色の背景、弱＝水色の文字だけ。琥珀色（金枠・◎）は使わない
+    //   v2の色：1位＝強調の色で塗りつぶし・暗い色の太字、2位＝強調の色の太字＋強調の色の薄い背景。琥珀色（金枠・◎）は使わない
     var top2=function(vals,small){
       var s=[];
       vals.forEach(function(v){if(v!=null&&isFinite(v)&&s.indexOf(v)<0)s.push(v);});
@@ -5496,8 +5508,8 @@ function App() {
     };
     var tierOf=function(v,t){if(v==null||!isFinite(v))return 0;return v===t.first?1:(v===t.second?2:0);};
     var hv=function(text,tier){
-      if(tier===1)return <span style={{display:"inline-block",color:AC,fontWeight:700,background:"rgba(63,208,232,0.16)",borderRadius:3,padding:"0 5px",margin:"0 -5px"}}>{text}</span>;
-      if(tier===2)return <span style={{color:AC}}>{text}</span>;
+      if(tier===1)return <span data-rcfx-hl="1" style={{display:"inline-block",background:AC,color:DARK,fontWeight:700,padding:"2px 6px",margin:"-2px -6px"}}>{text}</span>;
+      if(tier===2)return <span data-rcfx-hl="2" style={{display:"inline-block",background:rgba(AC,0.14),color:AC,fontWeight:700,padding:"2px 6px",margin:"-2px -6px"}}>{text}</span>;
       return text;
     };
     var B6=[1,2,3,4,5,6];
@@ -5511,8 +5523,23 @@ function App() {
     });
     var tkTier=function(b){var rk=tokutenRank?tokutenRank[b]:null;return rk===1?1:((rk!=null&&rk<=3)?2:0);};
     var exTier=function(b,k){var v=(rd.inputs&&rd.inputs[b])?parseFloat(rd.inputs[b][k]):NaN;return isNaN(v)?0:tierOf(v,EXT[k]);};
+    var tkOf=function(b){return (rd.tokuten&&rd.tokuten[b]&&rd.tokuten[b].score!=null)?String(rd.tokuten[b].score):"-";};
+    var markOf=function(b){return (maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");};
+    // PLの1着の％のメーター（10区切り・1区切り10%）。1号艇は強調の色で光らせ、他の艇は強調の色を55%混ぜた色
+    var meter=function(b,p,h){
+      var on=p==null?0:Math.round(p/10);
+      return <div aria-hidden="true" style={{flex:1,display:"grid",gridTemplateColumns:"repeat(10,minmax(0,1fr))",gap:3}}>
+        {[0,1,2,3,4,5,6,7,8,9].map(function(i){var lit=i<on;return <span key={i} style={{height:h,background:lit?(b===1?AC:SUB):TRACK,boxShadow:lit&&b===1?"0 0 6px "+rgba(AC,0.7):"none"}}/>;})}
+      </div>;
+    };
+    // 艇番の六角形（公式の6色。2号艇の黒は細い明るい縁取り）
+    var chip=function(b,w,h,fs){
+      var L=LANE[b];
+      return <div style={{width:w,height:h,flex:"0 0 "+w+"px",background:b===2?"#8A96A8":L.bg,clipPath:HEX,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:w-2,height:h-2,background:L.bg,clipPath:HEX,display:"flex",alignItems:"center",justifyContent:"center",color:L.ink,fontFamily:ORB,fontWeight:900,fontSize:fs}}>{b}</div>
+      </div>;
+    };
     var top5=fxPL&&fxPL.combos?fxPL.combos.slice(0,5):[];
-    var topP=top5.length?top5[0].prob:0;
     var hasTenji=[1,2,3,4,5,6].some(function(b){return rd.inputs&&rd.inputs[b]&&rd.inputs[b].tenji;});
     // 締切までの残り（締切時刻は全レースCSVの「締切時間」。日付は取り込んだCSVのファイル名の日付 fbRaceDate、分からなければ今日）
     var left=null;
@@ -5526,7 +5553,7 @@ function App() {
     var clock=left==null?"--:--":(left<0?"締切済み":(String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0")));
     var d=new Date(fxNow),WD=["SUN","MON","TUE","WED","THU","FRI","SAT"];
     var today=d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0")+" "+WD[d.getDay()];
-    var dot=function(c){return <span style={{width:8,height:8,borderRadius:"50%",background:c,display:"inline-block"}}/>;};
+    var lamp=function(c,blink){return <span data-rcfx-anim={blink?"1":undefined} style={{width:9,height:9,flex:"0 0 9px",background:c,boxShadow:"0 0 8px "+c,animation:blink?"rcfxBlink 2.4s infinite":"none",display:"inline-block"}}/>;};
     var focusTenji=function(){try{if(fxTenjiRef.current){fxTenjiRef.current.focus();fxTenjiRef.current.scrollIntoView({block:"center"});}}catch(e){}};
     var focusOdds=function(){try{if(fxOddsRef.current){fxOddsRef.current.focus();fxOddsRef.current.scrollIntoView({block:"center"});}}catch(e){}};
     var applyPending=function(){try{var b=document.getElementById("tenji-pending-badge");if(b)b.click();}catch(e){}};
@@ -5541,65 +5568,85 @@ function App() {
       }
       setFxOddsMsg(msg.join("　")||"貼り付け欄が空です");
     };
+    // PL RADAR の円：6艇のPLの1着の％を塗り分け（1号艇は強調の色、2号艇は強調の色を55%混ぜた色、3〜6号艇は公式の色）
+    var ring=TRACK,p1=plPct(1);
+    if(plS&&plSum>0){
+      var acc=0,stops=[];
+      B6.forEach(function(b){var c=b===1?AC:(b===2?SUB:LANE[b].bg);var from=acc;acc+=plPct(b)||0;stops.push(c+" "+from.toFixed(1)+"% "+Math.min(100,acc).toFixed(1)+"%");});
+      ring="conic-gradient("+stops.join(", ")+", "+TRACK+" "+Math.min(100,acc).toFixed(1)+"% 100%)";
+    }
+    var css="@keyframes rcfxBlink{0%,60%{opacity:1}61%,100%{opacity:.25}}@keyframes rcfxSweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}"+
+      "@media (prefers-reduced-motion: reduce){[data-rcfx-anim]{animation:none !important}}";
 
     return (
-      <div style={{minHeight:"100vh",background:BG,color:TXT,fontFamily:JP,boxSizing:"border-box",padding:"24px 16px 40px",fontSize:16}}>
-      <div style={{maxWidth:1440,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{minHeight:"100vh",boxSizing:"border-box",padding:isNarrow?"18px 14px 40px":"22px 30px 40px",color:TXT,fontFamily:JP,fontSize:16,
+        backgroundColor:BG,backgroundImage:"linear-gradient("+rgba(AC,0.06)+" 1px, transparent 1px), linear-gradient(90deg, "+rgba(AC,0.06)+" 1px, transparent 1px)",backgroundSize:"32px 32px"}}>
+      <style>{css}</style>
+      <div style={{maxWidth:1440,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         {/* 拡張機能（content_tool.js 1.3）が書き込む前に確かめる印。いつもの画面と同じ形 */}
         <div id="rc-current-race" data-venue={venue||""} data-race={String(curRace)} style={{display:"none"}}/>
 
-        <header style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16,borderBottom:"1px solid "+LINE,paddingBottom:16}}>
-          <div style={{display:"flex",alignItems:"baseline",gap:14,flexWrap:"wrap"}}>
-            <span style={{fontFamily:HEAD,fontWeight:700,fontSize:22,letterSpacing:"0.18em",color:AC}}>BOAT/LAB</span>
-            <span style={{fontSize:15,color:W}}>ボートレース予想ツール</span>
+        <header style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <div aria-hidden="true" style={{width:38,height:38,flex:"0 0 38px",background:AC,clipPath:HEX,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:30,height:30,background:BG,clipPath:HEX}}/></div>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <span style={{fontFamily:ORB,fontWeight:900,fontSize:24,letterSpacing:"0.22em",color:AC,textShadow:"0 0 12px "+rgba(AC,0.55)}}>BOAT/LAB</span>
+              <span style={{fontFamily:HEAD,fontSize:14,letterSpacing:"0.3em",color:W}}>RACE ANALYSIS SYSTEM</span>
+            </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap",fontFamily:MONO,fontSize:15,color:W}}>
+          <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:isNarrow?14:22,fontFamily:MONO,fontSize:15,color:W}}>
             <span>{today}</span>
-            <span style={{display:"flex",alignItems:"center",gap:8}}>{dot(hasTenji?"#3DDC84":GOLD)}{hasTenji?"展示 取得済み":"展示 まだ"}</span>
-            <span style={{display:"flex",alignItems:"center",gap:8}}>{dot(fxPending!=null?"#3DDC84":GOLD)}{fxPending!=null?"拡張機能 つながっている":"拡張機能 見つからない"}</span>
-            {renderViewSwitch(true)}
+            <span style={{display:"flex",alignItems:"center",gap:8}}>{lamp(hasTenji?"#3DDC84":WARN,true)}{hasTenji?"LINK 展示 取得済み":"LINK 展示 まだ"}</span>
+            <span style={{display:"flex",alignItems:"center",gap:8}}>{lamp(fxPending!=null?"#3DDC84":WARN,false)}{fxPending!=null?"EXT つながっている":"EXT 見つからない"}</span>
+            {/* 表示の切り替え（いつもの画面へ）。選んだ表示は rc_view_mode に残る（chooseViewMode） */}
+            <button type="button" aria-label="表示の切り替え：いつもの画面へ" onClick={function(){chooseViewMode("classic");}}
+              style={{minHeight:44,padding:"0 16px",border:"1px solid "+AC,background:"transparent",color:AC,fontFamily:HEAD,fontSize:15,letterSpacing:"0.12em",cursor:"pointer",clipPath:cut(10)}}>いつもの画面へ</button>
           </div>
         </header>
 
-        <nav aria-label="会場" style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        <nav aria-label="会場" style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {showV.map(function(v){
             var sel=venue===v;
             return <button key={v} type="button" data-venue={v} onClick={function(){setVenue(v);}}
-              style={Object.assign({},btn,{border:"1px solid "+(sel?AC:LINE),background:sel?AC:PANEL,color:sel?"#04141A":TXT,fontWeight:sel?700:500})}>{v}</button>;
+              style={{minHeight:44,padding:"0 16px",border:"1px solid "+(sel?AC:LINE),background:sel?AC:BTNBG,color:sel?DARK:W,fontFamily:"inherit",fontSize:16,fontWeight:700,cursor:"pointer",clipPath:cut(8),boxShadow:sel?"0 0 14px "+rgba(AC,0.5):"none"}}>{v}</button>;
           })}
         </nav>
-        <nav aria-label="レース" style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        <nav aria-label="レース" style={{display:"flex",flexWrap:"wrap",gap:4}}>
           {RNUMS.map(function(n){
             var sel=curRace===n;
             return <button key={n} type="button" data-race={n} onClick={function(){setCurRace(n);}}
-              style={{minWidth:52,minHeight:44,borderRadius:4,border:"1px solid "+(sel?AC:LINE),background:sel?"#13202F":"transparent",color:sel?AC:TXT,fontFamily:MONO,fontSize:16,fontWeight:sel?700:400,cursor:"pointer"}}>{n+"R"}</button>;
+              style={{minWidth:54,minHeight:44,border:"none",borderBottom:"3px solid "+(sel?AC:LINE),background:sel?rgba(AC,0.16):BTNBG,color:sel?AC:W,fontFamily:ORB,fontWeight:700,fontSize:15,cursor:"pointer"}}>{n+"R"}</button>;
           })}
         </nav>
 
-        {/* 【2026-10-05】⏰ 締切直前：いつもの画面と同じ一覧（shimekiriTop4・同じ時刻の扱い）と同じ動き（押すとその会場・レースを選ぶ）。
-            拡張機能は data-venue・data-race のボタンを押すので、ここのボタンにはその印を付けない */}
+        {/* ⏰ 締切直前：いつもの画面と同じ一覧（shimekiriTop4・同じ時刻の扱い）と同じ動き（押すとその会場・レースを選ぶ）。
+            拡張機能は data-venue・data-race のボタンを押すので、ここのボタンにはその印を付けない。
+            v2：強調の色（紫）は「選んでいるレース」（実線の太い縁＋光）と「残り20分以下」（文字）にだけ使い、
+            1号艇の決まり手の傾向は緑・薄紫の「点線の縁」と縁の内側の色の帯で出して、強調の色の実線と見分けられるようにした */}
         {(function(){
           var top4=shimekiriTop4();
           if(top4.length===0)return null;
+          var KIM_STRONG="#3DDC84",KIM_WAVE="#B48CFF";
           return (
             <section aria-label="締切直前" style={{display:"flex",flexDirection:"column",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:15,fontWeight:700,color:W}}>⏰ 締切直前</span>
-                <button type="button" onClick={function(){setNowTime(new Date());}} style={{minHeight:32,padding:"0 12px",borderRadius:4,border:"1px solid "+LINE,background:PANEL,color:AC,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔄 更新</button>
-                <span style={{fontFamily:MONO,fontSize:14,color:W}}>{nowTime.getHours()+":"+String(nowTime.getMinutes()).padStart(2,"0")}</span>
+                <span style={{display:"flex",alignItems:"center",minHeight:44,padding:"0 14px",fontFamily:HEAD,fontSize:15,letterSpacing:"0.2em",color:WARN,borderLeft:"3px solid "+WARN}}>⏰ 締切直前</span>
+                <button type="button" onClick={function(){setNowTime(new Date());}} style={Object.assign({},btn,{fontSize:15})}>🔄 更新</button>
+                <span style={{fontFamily:MONO,fontSize:15,color:W}}>{nowTime.getHours()+":"+String(nowTime.getMinutes()).padStart(2,"0")}</span>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isNarrow?"repeat(2,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:8}}>
                 {top4.map(function(item){
                   var isActive=venue===item.vname&&curRace===item.rnum;
-                  // 残りの色分けはいつもの画面と同じ段（10分以下・20分以下・それより前）。琥珀色の代わりに水色
+                  // 残りの色分けはいつもの画面と同じ段（10分以下・20分以下・それより前）。琥珀色の代わりに強調の色
                   var tc=item.remaining<=10?"#FF6B6B":item.remaining<=20?AC:"#3DDC84";
-                  // 1号艇の決まり手の傾向（いつもの画面と同じ isStrong・isWave）は枠の色で出す
-                  var edge=isActive?AC:item.isStrong?"#3DDC84":item.isWave?"#B48CFF":LINE;
-                  var bg=isActive?"#13202F":item.isStrong?"rgba(61,220,132,0.08)":item.isWave?"rgba(180,140,255,0.10)":PANEL;
+                  var kim=item.isStrong?KIM_STRONG:item.isWave?KIM_WAVE:null;
+                  var border=isActive?("2px solid "+AC):kim?("2px dashed "+kim):("1px solid "+LINE);
                   return (
                     <button key={item.vname+"_"+item.rnum} type="button" onClick={function(){setVenue(item.vname);setCurRace(item.rnum);}}
-                      style={{minWidth:0,padding:"8px 12px",borderRadius:4,cursor:"pointer",textAlign:"left",background:bg,border:(isActive?"2px":"1px")+" solid "+edge,color:tc,fontFamily:"inherit"}}>
-                      <div style={{fontSize:14,color:TXT}}>{item.vname}</div>
+                      title={item.isStrong?"1号艇の逃げが強いレース（いつもの画面の緑）":item.isWave?"1号艇の逃げが弱いレース（いつもの画面の紫）":undefined}
+                      style={{minWidth:0,minHeight:44,padding:"8px 14px",cursor:"pointer",textAlign:"left",background:isActive?rgba(AC,0.16):BTNBG,border:border,
+                        boxShadow:[isActive?"0 0 14px "+rgba(AC,0.5):null,kim?"inset 4px 0 0 "+kim:null].filter(Boolean).join(", ")||"none",color:tc,fontFamily:"inherit"}}>
+                      <div style={{fontSize:15,fontWeight:700,color:W}}>{item.vname}</div>
                       <div style={{fontFamily:MONO,fontSize:16,fontWeight:700}}>{item.rnum+"R "+item.shimekiri}</div>
                       <div style={{fontSize:14,marginTop:2}}>{"残"+item.remaining+"分"}</div>
                     </button>
@@ -5610,129 +5657,128 @@ function App() {
           );
         })()}
 
-        <div role="toolbar" aria-label="データの取り込み" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10,padding:"12px 0",borderTop:"1px solid "+LINE,borderBottom:"1px solid "+LINE}}>
-          <label style={Object.assign({},btnLine,{display:"inline-flex",alignItems:"center"})}>
+        <div role="toolbar" aria-label="データの取り込み" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10,padding:"12px 14px",background:"rgba(13,24,38,0.85)",border:"1px solid "+LINE}}>
+          <label style={Object.assign({},btnLine,{display:"inline-flex",alignItems:"center",padding:"0 18px"})}>
             全レースを取り込む
             <input type="file" accept=".csv" onChange={handleCSV} style={{display:"none"}}/>
           </label>
           <span aria-hidden="true" style={{width:1,height:28,background:LINE}}/>
           <button type="button" onClick={applyPending} disabled={!fxPending}
-            style={Object.assign({},btn,{border:"1px solid "+AC,background:AC,color:"#04141A",fontWeight:700,display:"flex",alignItems:"center",gap:10,opacity:fxPending?1:0.55,cursor:fxPending?"pointer":"default"})}>
+            style={Object.assign({},btn,{padding:"0 18px",border:"none",background:AC,color:DARK,fontWeight:700,display:"flex",alignItems:"center",gap:10,boxShadow:fxPending?"0 0 16px "+rgba(AC,0.45):"none",opacity:fxPending?1:0.55,cursor:fxPending?"pointer":"default"})}>
             未反映を取り込む
-            <span style={{minWidth:28,height:24,padding:"0 6px",boxSizing:"border-box",display:"inline-flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"#04141A",color:AC,fontFamily:MONO,fontSize:14}}>{fxPending==null?"-":fxPending}</span>
+            <span style={{minWidth:28,height:24,padding:"0 6px",boxSizing:"border-box",display:"inline-flex",alignItems:"center",justifyContent:"center",background:DARK,color:AC,fontFamily:MONO,fontSize:14}}>{fxPending==null?"-":fxPending}</span>
           </button>
           <button type="button" onClick={function(e){focusTenji();if(e&&e.isTrusted)openBoatcastRace();}} style={btn}>📋 展示タイム</button>
           <button type="button" onClick={focusTenji} style={btn}>直前情報を貼り付け</button>
           <button type="button" onClick={focusOdds} style={btn}>オッズを貼り付け</button>
           <div style={{flex:"1 1 24px"}}/>
           <span style={{fontSize:15,color:W}}>成績の期間</span>
-          <div role="group" aria-label="成績の期間" style={{display:"flex",border:"1px solid "+LINE,borderRadius:4,overflow:"hidden"}}>
+          <div role="group" aria-label="成績の期間" style={{display:"flex",border:"1px solid "+LINE,maxWidth:"100%"}}>
             <button type="button" aria-pressed={userBMode==="maru3"} onClick={function(){chooseUserBMode("maru3");}}
-              style={{minHeight:44,padding:"0 16px",border:"none",background:userBMode==="maru3"?"#13202F":"transparent",color:userBMode==="maru3"?AC:TXT,fontFamily:"inherit",fontSize:16,fontWeight:userBMode==="maru3"?700:500,cursor:"pointer"}}>直近1年（1-全-〇）</button>
+              style={{minHeight:44,padding:"0 14px",border:"none",background:userBMode==="maru3"?rgba(AC,0.14):"transparent",color:userBMode==="maru3"?AC:W,fontFamily:"inherit",fontSize:15,fontWeight:userBMode==="maru3"?700:400,cursor:"pointer"}}>直近1年（1-全-〇）</button>
             <button type="button" aria-pressed={userBMode!=="maru3"} onClick={function(){chooseUserBMode("maru2");}}
-              style={{minHeight:44,padding:"0 16px",border:"none",borderLeft:"1px solid "+LINE,background:userBMode!=="maru3"?"#13202F":"transparent",color:userBMode!=="maru3"?AC:TXT,fontFamily:"inherit",fontSize:16,fontWeight:userBMode!=="maru3"?700:500,cursor:"pointer"}}>直近6ヶ月（1-〇-全）</button>
+              style={{minHeight:44,padding:"0 14px",border:"none",borderLeft:"1px solid "+LINE,background:userBMode!=="maru3"?rgba(AC,0.14):"transparent",color:userBMode!=="maru3"?AC:W,fontFamily:"inherit",fontSize:15,fontWeight:userBMode!=="maru3"?700:400,cursor:"pointer"}}>直近6ヶ月（1-〇-全）</button>
           </div>
           {csvMsg&&<span style={{fontSize:14,color:csvMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80",fontWeight:700}}>{csvMsg}</span>}
         </div>
 
-        <div style={{display:"flex",flexWrap:"wrap",gap:20,alignItems:"flex-start"}}>
-          <main style={{flex:"999 1 640px",minWidth:0,display:"flex",flexDirection:"column",gap:20}}>
-            <section style={Object.assign({},panel,{padding:"20px 24px",display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:20})}>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                <span style={cap}>RACE</span>
-                <div style={{display:"flex",alignItems:"baseline",gap:14,flexWrap:"wrap"}}>
-                  <h1 style={{margin:0,fontSize:40,fontWeight:700,letterSpacing:"0.04em",color:TXT}}>{(venue||"会場を選ぶ")+" "+curRace+"R"}</h1>
-                  <span style={{fontSize:17,color:W}}>{"締切 "+(rd.shimekiri||"--:--")}</span>
+        <div style={{display:"flex",flexWrap:"wrap",gap:18,alignItems:"flex-start"}}>
+          <main style={{flex:"999 1 680px",minWidth:0,display:"flex",flexDirection:"column",gap:18}}>
+            {/* レースの見出し：角を切り落とした形・強調の色の細い縁・上端に流れる光 */}
+            <section aria-label="レースの見出し" style={{position:"relative",overflow:"hidden",background:AC,clipPath:cut(22),padding:1}}>
+              <div style={{position:"relative",overflow:"hidden",background:"linear-gradient(120deg, #07111C, #0A1A2A)",clipPath:cut(22),padding:isNarrow?"20px 18px":"22px 28px",display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:20}}>
+                <div aria-hidden="true" data-rcfx-anim="1" style={{position:"absolute",top:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg, transparent, "+AC+", transparent)",animation:"rcfxSweep 3.2s linear infinite"}}/>
+                <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
+                  <span style={{fontFamily:HEAD,fontSize:14,letterSpacing:"0.3em",color:AC}}>{"RACE // "+(VEN_EN[venue]||"----")+" "+String(curRace).padStart(2,"0")}</span>
+                  <div style={{display:"flex",alignItems:"baseline",gap:16,flexWrap:"wrap"}}>
+                    <h1 style={{margin:0,fontSize:44,fontWeight:700,letterSpacing:"0.05em",color:TXT}}>{(venue||"会場を選ぶ")+" "+curRace+"R"}</h1>
+                    <span style={{fontFamily:MONO,fontSize:17,color:W}}>{"締切 "+(rd.shimekiri||"--:--")}</span>
+                  </div>
                 </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                <span style={cap}>締切まで</span>
-                <span style={{fontFamily:MONO,fontSize:40,fontWeight:600,color:AC}}>{clock}</span>
-              </div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"flex-end"}}>
-                {isB&&<span style={{padding:"8px 14px",border:"1px solid "+AC,color:AC,borderRadius:4,fontWeight:700,fontSize:16}}>条件B</span>}
-                {gold&&<span style={{padding:"8px 14px",background:GOLD,color:"#1A1204",borderRadius:4,fontWeight:700,fontSize:16}}>{"金枠　◎ "+maru+"号艇"}</span>}
-                {!isB&&venue&&<span style={{padding:"8px 14px",border:"1px solid "+LINE,color:W,borderRadius:4,fontSize:16}}>条件Bではない</span>}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                  <span style={{fontFamily:HEAD,fontSize:14,letterSpacing:"0.3em",color:W}}>T-MINUS</span>
+                  <span style={{fontFamily:ORB,fontSize:48,fontWeight:700,color:AC,textShadow:"0 0 18px "+rgba(AC,0.6)}}>{clock}</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:isNarrow?"flex-start":"flex-end",gap:8}}>
+                  {isB&&<span style={{padding:"7px 14px",border:"1px solid "+AC,color:AC,fontFamily:HEAD,fontWeight:700,fontSize:16,letterSpacing:"0.1em"}}>条件B</span>}
+                  {gold&&<span style={{padding:"9px 16px",background:GOLD,color:"#1A1204",fontWeight:700,fontSize:18,boxShadow:"0 0 20px rgba(245,179,66,0.5)",clipPath:cut(10)}}>{"金枠　◎ "+maru+"号艇"}</span>}
+                  {!isB&&venue&&<span style={{padding:"7px 14px",border:"1px solid "+LINE,color:W,fontSize:16}}>条件Bではない</span>}
+                </div>
               </div>
             </section>
 
-            {/* 【2026-10-05】狭い画面（幅600px以下）では1艇ずつのカードにして縦に並べる。中身は下の表と同じ */}
+            {/* 出走表。狭い画面（幅600px以下）では1艇ずつのカードにして縦に並べる。中身は表と同じ */}
             {isNarrow?(
             <section aria-label="出走表" style={Object.assign({},panel,{padding:"4px 0"})}>
-              {[1,2,3,4,5,6].map(function(b){
-                var L=LANE[b],r=rows[b],p=plPct(b);
-                var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
-                var tkS=(rd.tokuten&&rd.tokuten[b]&&rd.tokuten[b].score!=null)?String(rd.tokuten[b].score):"-";
+              {B6.map(function(b){
+                var r=rows[b],p=plPct(b),mark=markOf(b);
                 return (
-                  <div key={b} style={{display:"flex",flexDirection:"column",gap:8,padding:"12px 14px",borderBottom:"1px solid #141E2C"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{width:34,height:34,flex:"0 0 34px",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,background:L.bg,color:L.ink,border:"1px solid "+L.edge,fontFamily:MONO,fontWeight:600,fontSize:16}}>{b}</span>
-                      <div style={{flex:1,minWidth:0,display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",color:W}}>
-                        <span style={{fontSize:16,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
-                        <span style={{fontFamily:MONO,fontSize:13,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
+                  <div key={b} style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",borderBottom:"1px solid "+TRACK,background:mark==="◎"?"rgba(245,179,66,0.07)":"transparent"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      {chip(b,36,40,16)}
+                      <div style={{flex:1,minWidth:0,display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                        <span style={{fontSize:17,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
+                        <span style={{fontFamily:MONO,fontSize:14,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
                       </div>
-                      {mark&&<span style={{fontSize:22,fontWeight:700,color:GOLD}}>{mark}</span>}
+                      {mark&&<span style={{fontSize:26,fontWeight:700,color:mark==="◎"?GOLD:AC,textShadow:mark==="◎"?"0 0 12px rgba(245,179,66,0.6)":"none"}}>{mark}</span>}
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8}}>
-                      {[["得点",tkS,tkTier(b)],["予想1着",r?f1(r.racerR1final):"-",r?tierOf(r.racerR1final,R1T):0],["予想2着",r?f1(r.racerR2final):"-",r?tierOf(r.racerR2final,R2T):0],["予想3着",r?f1(r.racerR3final):"-",r?tierOf(r.racerR3final,R3T):0]].map(function(x){
-                        return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:12,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:16,color:TXT}}>{hv(x[1],x[2])}</span></div>;
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+                      {[["得点",tkOf(b),tkTier(b)],["予想1着",r?f1(r.racerR1final):"-",r?tierOf(r.racerR1final,R1T):0],["予想2着",r?f1(r.racerR2final):"-",r?tierOf(r.racerR2final,R2T):0],["予想3着",r?f1(r.racerR3final):"-",r?tierOf(r.racerR3final,R3T):0]].map(function(x){
+                        return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:4,minWidth:0}}><span style={{fontSize:12,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:17,color:TXT}}>{hv(x[1],x[2])}</span></div>;
                       })}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:12,color:W}}>PL 1着</span>
-                      <div style={{flex:1,height:10,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:10,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
-                      <span style={{width:60,textAlign:"right",fontFamily:MONO,fontSize:15,fontWeight:600}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
+                      {meter(b,p,10)}
+                      <span style={{width:62,textAlign:"right",fontFamily:MONO,fontSize:16}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
                     </div>
                   </div>
                 );
               })}
             </section>
             ):(
-            <section aria-label="出走表" style={Object.assign({},panel,{padding:"8px 0",overflowX:"auto"})}>
-              <div style={{minWidth:760}}>
-                <div style={{display:"grid",gridTemplateColumns:"56px 1.2fr 64px 1.6fr 56px 1.8fr",gap:16,padding:"10px 24px",fontFamily:HEAD,fontSize:17,letterSpacing:"0.14em",color:TXT,borderBottom:"1px solid "+LINE}}>
-                  <span>艇</span><span>選手</span><span style={{textAlign:"left"}}>得点</span><span style={{textAlign:"right",paddingRight:12}}>予想 1着 / 2着 / 3着</span><span style={{textAlign:"center"}}>印</span><span>PL 1着の％</span>
+            <section aria-label="出走表" style={Object.assign({},panel,{overflowX:"auto"})}>
+              <div style={{minWidth:820}}>
+                <div style={{display:"grid",gridTemplateColumns:"64px 1.3fr 80px 1.7fr 52px 1.7fr",gap:18,padding:"12px 24px",fontFamily:HEAD,fontSize:15,letterSpacing:"0.16em",color:AC,borderBottom:"1px solid "+LINE,background:rgba(AC,0.05)}}>
+                  <span>LANE</span><span>選手</span><span>得点</span><span style={{textAlign:"right",paddingRight:6}}>予想 1着 / 2着 / 3着</span><span style={{textAlign:"center"}}>印</span><span>PL 1着の％</span>
                 </div>
-                {[1,2,3,4,5,6].map(function(b){
-                  var L=LANE[b],r=rows[b],p=plPct(b);
-                  var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
-                  // 【2026-10-05】得点：いつもの画面の「得点／順位」と同じ値（rd.tokuten[艇].score）をそのまま出す
-                  var tkS=(rd.tokuten&&rd.tokuten[b]&&rd.tokuten[b].score!=null)?String(rd.tokuten[b].score):"-";
+                {B6.map(function(b){
+                  var r=rows[b],p=plPct(b),mark=markOf(b);
                   return (
-                    <div key={b} style={{display:"grid",gridTemplateColumns:"56px 1.2fr 64px 1.6fr 56px 1.8fr",gap:16,alignItems:"center",padding:"14px 24px",borderBottom:"1px solid #141E2C"}}>
-                      <span style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,background:L.bg,color:L.ink,border:"1px solid "+L.edge,fontFamily:MONO,fontWeight:600,fontSize:18}}>{b}</span>
-                      <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0,color:W}}>
-                        <span style={{fontSize:16,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
+                    <div key={b} style={{display:"grid",gridTemplateColumns:"64px 1.3fr 80px 1.7fr 52px 1.7fr",gap:18,alignItems:"center",padding:"14px 24px",borderBottom:"1px solid "+TRACK,background:mark==="◎"?"rgba(245,179,66,0.07)":"transparent"}}>
+                      {chip(b,44,48,18)}
+                      <div style={{display:"flex",flexDirection:"column",gap:3,minWidth:0}}>
+                        <span style={{fontSize:17,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
                         <span style={{fontFamily:MONO,fontSize:14,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
                       </div>
-                      <span style={{textAlign:"left",fontFamily:MONO,fontSize:18}}>{hv(tkS,tkTier(b))}</span>
-                      <div style={{display:"flex",gap:24,alignItems:"center",minWidth:0,paddingRight:12}}>
+                      {/* 得点：いつもの画面の「得点／順位」と同じ値（rd.tokuten[艇].score）。左寄せにして予想1着との間をあける */}
+                      <span style={{textAlign:"left",paddingLeft:6,fontFamily:MONO,fontSize:18}}>{hv(tkOf(b),tkTier(b))}</span>
+                      <div style={{display:"flex",gap:6,minWidth:0,paddingRight:6}}>
                         <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR1final):"-",r?tierOf(r.racerR1final,R1T):0)}</span>
                         <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR2final):"-",r?tierOf(r.racerR2final,R2T):0)}</span>
                         <span style={{flex:1,textAlign:"right",fontFamily:MONO,fontSize:18}}>{hv(r?f1(r.racerR3final):"-",r?tierOf(r.racerR3final,R3T):0)}</span>
                       </div>
-                      <span style={{fontSize:24,fontWeight:700,color:GOLD,textAlign:"center"}}>{mark}</span>
+                      <span style={{fontSize:26,fontWeight:700,color:mark==="◎"?GOLD:AC,textAlign:"center",textShadow:mark==="◎"?"0 0 12px rgba(245,179,66,0.6)":"none"}}>{mark}</span>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <div style={{flex:1,height:14,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:14,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
-                        <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:17,fontWeight:600}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
+                        {meter(b,p,14)}
+                        <span style={{width:62,textAlign:"right",fontFamily:MONO,fontSize:17}}>{hv(p==null?"-":p.toFixed(1)+"%",tierOf(p,PLT))}</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
             </section>
-
             )}
 
-            <section aria-label="展示の詳細" style={Object.assign({},panel,{padding:isNarrow?"14px 12px":"18px 24px",overflowX:"auto"})}>
-              <div style={Object.assign({},cap,{marginBottom:12})}>EXHIBITION</div>
-              <div style={{minWidth:isNarrow?0:560,display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",fontFamily:MONO,fontSize:isNarrow?14:17}}>
-                {["項目","1周","周り足","直線","展示"].map(function(h,i){return <span key={h} style={{padding:"10px 0",fontFamily:JP,fontSize:isNarrow?13:16,color:i?"#7FE3F2":TXT}}>{h}</span>;})}
-                {[1,2,3,4,5,6].map(function(b){
+            <section aria-label="展示の詳細" style={Object.assign({},panel,{padding:isNarrow?"14px 12px":"16px 24px",overflowX:"auto"})}>
+              <div style={Object.assign({},cap,{marginBottom:10})}>EXHIBITION // 展示</div>
+              <div style={{minWidth:isNarrow?0:560,display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",columnGap:isNarrow?6:8,fontFamily:MONO,fontSize:isNarrow?15:17}}>
+                {["項目","1周","周り足","直線","展示"].map(function(h,i){return <span key={h} style={{padding:i?"8px 6px":"8px 0",fontFamily:JP,fontSize:isNarrow?14:16,color:i?AC:TXT}}>{h}</span>;})}
+                {B6.map(function(b){
                   var x=(rd.inputs&&rd.inputs[b])||{};
-                  var c={padding:"10px 0",borderTop:"1px solid "+LINE};
+                  var c={padding:"8px 6px",borderTop:"1px solid "+LINE};
                   return [
-                    <span key={b+"h"} style={Object.assign({},c,{fontFamily:JP,fontSize:isNarrow?13:16,color:"#7FE3F2"})}>{b+"号艇"}</span>,
+                    <span key={b+"h"} style={Object.assign({},c,{paddingLeft:0,fontFamily:JP,fontSize:isNarrow?14:16})}>{b+"号艇"}</span>,
                     <span key={b+"i"} style={c}>{hv(x.isshu||"-",exTier(b,"isshu"))}</span>,
                     <span key={b+"m"} style={c}>{hv(x.mawari||"-",exTier(b,"mawari"))}</span>,
                     <span key={b+"c"} style={c}>{hv(x.chokusen||"-",exTier(b,"chokusen"))}</span>,
@@ -5743,53 +5789,64 @@ function App() {
             </section>
           </main>
 
-          <aside style={{flex:"1 1 340px",minWidth:0,display:"flex",flexDirection:"column",gap:20}}>
-            <section style={Object.assign({},panel,{border:"1px solid "+GOLD,padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
-              <div style={Object.assign({},cap,{color:GOLD})}>BET PLAN　2：1</div>
-              {gold?(<React.Fragment>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                  <span style={{fontSize:15,color:W}}>本命（1点200円）</span>
-                  <span style={{fontFamily:MONO,fontSize:28,fontWeight:600}}>{"1 - 全 - "+maru}</span>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                  <span style={{fontSize:15,color:W}}>保険（1点100円）</span>
-                  <span style={{fontFamily:MONO,fontSize:22,fontWeight:600,color:"#C9D6E3"}}>{"1 - "+maru+" - 全"}</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid "+LINE,paddingTop:12,fontSize:15,color:W}}>
-                  <span>計 8点</span><span style={{fontFamily:MONO,color:TXT}}>1,200円</span>
-                </div>
-              </React.Fragment>):(
-                <span style={{fontSize:15,color:W}}>{isB?("金枠ではありません（条件B・〇 "+maru+"号艇）"):"金枠ではありません"}</span>
-              )}
-            </section>
-
-            <section style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
-              <div style={cap}>PL TOP 5</div>
-              {top5.length?top5.map(function(c,i){
-                return (
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:12}}>
-                    <span style={{width:22,fontFamily:MONO,fontSize:14,color:W}}>{i+1}</span>
-                    <span style={{width:80,fontFamily:MONO,fontSize:18,fontWeight:600}}>{c.combo.join("-")}</span>
-                    <div style={{flex:1,height:6,background:"#17212F",borderRadius:3}}><div style={{width:(topP>0?Math.round(c.prob/topP*100):0)+"%",height:6,background:AC,borderRadius:3}}/></div>
-                    <span style={{width:64,textAlign:"right",fontFamily:MONO,fontSize:15}}>{(c.prob*100).toFixed(1)+"%"}</span>
+          <aside style={{flex:"1 1 340px",minWidth:0,display:"flex",flexDirection:"column",gap:18}}>
+            {/* TARGET LOCK：琥珀色の細い縁・角を切り落とした形（琥珀色は金枠専用） */}
+            <section aria-label="買い目" style={{background:GOLD,clipPath:cut(18),padding:1}}>
+              <div style={{background:"#0A1420",clipPath:cut(18),padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+                <span style={{fontFamily:HEAD,fontSize:15,letterSpacing:"0.3em",color:GOLD}}>TARGET LOCK // 2：1</span>
+                {gold?(<React.Fragment>
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    <span style={{fontSize:15,color:W}}>本命（1点200円）</span>
+                    <span style={{fontFamily:ORB,fontSize:30,fontWeight:700,color:GOLD,textShadow:"0 0 14px rgba(245,179,66,0.45)"}}>{"1 - 全 - "+maru}</span>
                   </div>
-                );
-              }):<span style={{fontSize:15,color:W}}>6艇すべてのデータがそろうと出ます</span>}
-              <p style={{margin:"4px 0 0",fontSize:14,lineHeight:1.6,color:W}}>PLの％は1号艇を低め・他の艇を高めに出す癖があります（2〜6号艇の実際の1着率はPLの％のおよそ0.6〜0.8倍、追記223）。</p>
-            </section>
-
-            <section style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:10})}>
-              <div style={cap}>CONDITIONS</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14}}>
-                {[["風",rd.wind||"―"],["波高",rd.waveHeight||"―"],["天候",rd.weather||"―"]].map(function(x){
-                  return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:14,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:17}}>{x[1]}</span></div>;
-                })}
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    <span style={{fontSize:15,color:W}}>保険（1点100円）</span>
+                    <span style={{fontFamily:ORB,fontSize:22,fontWeight:700,color:TXT}}>{"1 - "+maru+" - 全"}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid "+LINE,paddingTop:12,fontSize:15,color:W}}>
+                    <span>計 8点</span><span style={{fontFamily:MONO,fontSize:17,color:TXT}}>1,200円</span>
+                  </div>
+                </React.Fragment>):(
+                  <span style={{fontSize:15,color:W}}>{isB?("金枠ではありません（条件B・〇 "+maru+"号艇）"):"金枠ではありません"}</span>
+                )}
               </div>
             </section>
 
-            <section aria-label="手で取り込む" style={Object.assign({},panel,{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14})}>
-              <div style={cap}>INPUT</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <section aria-label="PL RADAR" style={Object.assign({},panel,{padding:"18px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <span style={cap}>PL RADAR</span>
+              {top5.length?(
+                <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}}>
+                  <div role="img" aria-label={"PLの1着の％の円グラフ（1号艇 "+(p1==null?"-":p1.toFixed(1))+"％）"} style={{width:124,height:124,flex:"none",borderRadius:"50%",background:ring,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 18px "+rgba(AC,0.25)}}>
+                    <div style={{width:92,height:92,borderRadius:"50%",background:"#0A1420",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}}>
+                      <span style={{fontFamily:ORB,fontSize:20,fontWeight:700}}>{p1==null?"-":p1.toFixed(1)}</span>
+                      <span style={{fontSize:14,color:W}}>1号艇 %</span>
+                    </div>
+                  </div>
+                  <div style={{flex:"1 1 150px",minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
+                    {top5.map(function(c,i){
+                      return (
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{width:18,fontFamily:MONO,fontSize:14,color:W}}>{i+1}</span>
+                          <span style={{flex:1,fontFamily:ORB,fontSize:16,fontWeight:700}}>{c.combo.join("-")}</span>
+                          <span style={{fontFamily:MONO,fontSize:15,color:AC}}>{(c.prob*100).toFixed(1)+"%"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ):<span style={{fontSize:15,color:W}}>6艇すべてのデータがそろうと出ます</span>}
+              <p style={{margin:0,fontSize:14,lineHeight:1.6,color:W}}>PLの％は1号艇を低め・他の艇を高めに出す癖があります（2〜6号艇の実際の1着率はPLの％のおよそ0.6〜0.8倍、追記223）。</p>
+            </section>
+
+            <section aria-label="風・波高・天候" style={Object.assign({},panel,{padding:"18px 22px",display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12})}>
+              {[["WIND","風",rd.wind||"―"],["WAVE","波高",rd.waveHeight||"―"],["SKY","天候",rd.weather||"―"]].map(function(x){
+                return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:4,minWidth:0}}><span style={{fontFamily:HEAD,fontSize:14,letterSpacing:"0.2em",color:AC}} title={x[1]}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:17,overflowWrap:"anywhere"}}>{x[2]}</span></div>;
+              })}
+            </section>
+
+            <section aria-label="手で取り込む" style={Object.assign({},panel,{padding:"18px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <span style={cap}>INPUT</span>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <label htmlFor="rc-fx-tenji" style={{fontSize:15,color:W}}>直前情報</label>
                 {/* 拡張機能が探す貼り付け欄。placeholder・中身（rd.tenjiText）・解析（parseTenji）はいつもの画面と同じ */}
                 <textarea id="rc-fx-tenji" ref={fxTenjiRef} value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" style={area}/>
@@ -5826,7 +5883,7 @@ function App() {
                 <button type="button" onClick={parseTenji} style={btnLine}>解析して入力</button>
                 {rd.tenjiMsg&&<span style={{fontSize:14,color:rd.tenjiMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{rd.tenjiMsg}</span>}
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid "+LINE,paddingTop:14}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10,borderTop:"1px solid "+LINE,paddingTop:14}}>
                 <label htmlFor="rc-fx-odds3" style={{fontSize:15,color:W}}>オッズ（3連単）</label>
                 <textarea id="rc-fx-odds3" ref={fxOddsRef} value={fxOdds3} onChange={function(e){setFxOdds3(e.target.value);}} placeholder="3連単オッズを貼り付け" style={area}/>
                 <label htmlFor="rc-fx-odds2" style={{fontSize:15,color:W}}>オッズ（2連単）</label>
