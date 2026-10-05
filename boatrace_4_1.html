@@ -3685,6 +3685,19 @@ function App() {
   const [fxOddsMsg,setFxOddsMsg]=useState("");
   const fxTenjiRef=useRef(null);
   const fxOddsRef=useRef(null);
+  // 【2026-10-05】スマホ縦（幅600px以下）のときだけ、広い表の形を変える（1艇ずつのカード・折り返しなど）。PCの幅では今の表のまま
+  const [isNarrow,setIsNarrow]=useState(function(){
+    try{return typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(max-width: 600px)").matches;}catch(e){return false;}
+  });
+  useEffect(function(){
+    if(typeof window==="undefined"||!window.matchMedia)return;
+    var mq=window.matchMedia("(max-width: 600px)");
+    var on=function(){setIsNarrow(mq.matches);};
+    on();
+    if(mq.addEventListener)mq.addEventListener("change",on);else if(mq.addListener)mq.addListener(on);
+    return function(){if(mq.removeEventListener)mq.removeEventListener("change",on);else if(mq.removeListener)mq.removeListener(on);};
+  },[]);
+  const [b1BandBlock,setB1BandBlock]=useState("total");   // 狭い画面の「AI1着%×会場」で見る帯（total/A/B/C）
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
   const [openMotorB1,setOpenMotorB1]=useState(false);
@@ -5367,6 +5380,31 @@ function App() {
     }catch(e){}
   },[viewMode]);
 
+  // 【2026-10-05】狭い画面用：ラベルと値をマス目に並べる（文字は12px以上）。items の null/false は飛ばす
+  function narrowKv(items,cols){
+    return <div style={{display:"grid",gridTemplateColumns:"repeat("+(cols||3)+",minmax(0,1fr))",gap:"6px 8px"}}>
+      {items.filter(Boolean).map(function(it,i){
+        return <div key={i} style={{display:"flex",flexDirection:"column",gap:1,minWidth:0}}>
+          <span style={{fontSize:12,color:it.lc||"#8faece"}}>{it.label}</span>
+          <span style={Object.assign({fontSize:13,fontWeight:700,color:"#e8eef5",overflowWrap:"anywhere"},it.vs||{})}>{it.value}</span>
+        </div>;
+      })}
+    </div>;
+  }
+  // 【2026-10-05】いま選んでいる会場・レースのボートキャストを新しいタブで開く（ボートキャストは /replay?jo=&ymd=&race= でレースを選んだ状態で開く）。
+  //   人が押したとき（isTrusted）だけ呼ぶ。拡張機能が「📋 展示タイム」を自動で押すときは開かない
+  function openBoatcastRace(){
+    if(!venue||!PLACE_NO[venue])return;
+    var dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fbRaceDate||"");
+    var t=new Date();
+    var ymd=dm?(dm[1]+dm[2]+dm[3]):(t.getFullYear()+String(t.getMonth()+1).padStart(2,"0")+String(t.getDate()).padStart(2,"0"));
+    var u="https://race.boatcast.jp/replay?jo="+String(PLACE_NO[venue]).padStart(2,"0")+"&ymd="+ymd+"&race="+curRace;
+    try{
+      // iOSのホーム画面ショートカットから開いているときはSafariに渡す（展示情報を開くボタンと同じ）
+      if(typeof window!=="undefined"&&window.navigator&&window.navigator.standalone===true)window.location.href="x-safari-"+u;
+      else window.open(u,"_blank","noopener");
+    }catch(e){}
+  }
   function renderViewSwitch(dark){
     var on=function(m){return viewMode===m;};
     var bs=function(m){
@@ -5480,7 +5518,7 @@ function App() {
             未反映を取り込む
             <span style={{minWidth:28,height:24,padding:"0 6px",boxSizing:"border-box",display:"inline-flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"#04141A",color:AC,fontFamily:MONO,fontSize:14}}>{fxPending==null?"-":fxPending}</span>
           </button>
-          <button type="button" onClick={focusTenji} style={btn}>📋 展示タイム</button>
+          <button type="button" onClick={function(e){focusTenji();if(e&&e.isTrusted)openBoatcastRace();}} style={btn}>📋 展示タイム</button>
           <button type="button" onClick={focusTenji} style={btn}>直前情報を貼り付け</button>
           <button type="button" onClick={focusOdds} style={btn}>オッズを貼り付け</button>
           <div style={{flex:"1 1 24px"}}/>
@@ -5515,6 +5553,37 @@ function App() {
               </div>
             </section>
 
+            {/* 【2026-10-05】狭い画面（幅600px以下）では1艇ずつのカードにして縦に並べる。中身は下の表と同じ */}
+            {isNarrow?(
+            <section aria-label="出走表" style={Object.assign({},panel,{padding:"4px 0"})}>
+              {[1,2,3,4,5,6].map(function(b){
+                var L=LANE[b],r=rows[b],p=plPct(b);
+                var mark=(maru===b&&gold)?"◎":((maru===b&&isB)?"〇":"");
+                return (
+                  <div key={b} style={{display:"flex",flexDirection:"column",gap:8,padding:"12px 14px",borderBottom:"1px solid #141E2C"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{width:34,height:34,flex:"0 0 34px",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,background:L.bg,color:L.ink,border:"1px solid "+L.edge,fontFamily:MONO,fontWeight:600,fontSize:16}}>{b}</span>
+                      <div style={{flex:1,minWidth:0,display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",color:W}}>
+                        <span style={{fontSize:16,fontWeight:700}}>{(rd.playerNames&&rd.playerNames[b-1])||"―"}</span>
+                        <span style={{fontFamily:MONO,fontSize:13,color:W}}>{(rd.racerClass&&rd.racerClass[b-1])||""}</span>
+                      </div>
+                      {mark&&<span style={{fontSize:22,fontWeight:700,color:GOLD}}>{mark}</span>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}}>
+                      {[["予想1着",r?f1(r.racerR1final):"-"],["予想2着",r?f1(r.racerR2final):"-"],["予想3着",r?f1(r.racerR3final):"-"]].map(function(x){
+                        return <div key={x[0]} style={{display:"flex",flexDirection:"column",gap:2}}><span style={{fontSize:12,color:W}}>{x[0]}</span><span style={{fontFamily:MONO,fontSize:16,color:TXT}}>{x[1]}</span></div>;
+                      })}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:12,color:W}}>PL 1着</span>
+                      <div style={{flex:1,height:10,background:"#17212F",borderRadius:2}}><div style={{width:(p==null?0:Math.max(2,Math.min(100,p)))+"%",height:10,background:b===1?AC:"#4C6A8A",borderRadius:2}}/></div>
+                      <span style={{width:60,textAlign:"right",fontFamily:MONO,fontSize:15,fontWeight:600}}>{p==null?"-":p.toFixed(1)+"%"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+            ):(
             <section aria-label="出走表" style={Object.assign({},panel,{padding:"8px 0",overflowX:"auto"})}>
               <div style={{minWidth:760}}>
                 <div style={{display:"grid",gridTemplateColumns:"56px 1.2fr 1.6fr 56px 1.8fr",gap:16,padding:"10px 24px",fontFamily:HEAD,fontSize:17,letterSpacing:"0.14em",color:TXT,borderBottom:"1px solid "+LINE}}>
@@ -5546,15 +5615,17 @@ function App() {
               </div>
             </section>
 
-            <section aria-label="展示の詳細" style={Object.assign({},panel,{padding:"18px 24px",overflowX:"auto"})}>
+            )}
+
+            <section aria-label="展示の詳細" style={Object.assign({},panel,{padding:isNarrow?"14px 12px":"18px 24px",overflowX:"auto"})}>
               <div style={Object.assign({},cap,{marginBottom:12})}>EXHIBITION</div>
-              <div style={{minWidth:560,display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",fontFamily:MONO,fontSize:17}}>
-                {["項目","1周","周り足","直線","展示"].map(function(h,i){return <span key={h} style={{padding:"10px 0",fontFamily:JP,fontSize:16,color:i?"#7FE3F2":TXT}}>{h}</span>;})}
+              <div style={{minWidth:isNarrow?0:560,display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",fontFamily:MONO,fontSize:isNarrow?14:17}}>
+                {["項目","1周","周り足","直線","展示"].map(function(h,i){return <span key={h} style={{padding:"10px 0",fontFamily:JP,fontSize:isNarrow?13:16,color:i?"#7FE3F2":TXT}}>{h}</span>;})}
                 {[1,2,3,4,5,6].map(function(b){
                   var x=(rd.inputs&&rd.inputs[b])||{};
                   var c={padding:"10px 0",borderTop:"1px solid "+LINE};
                   return [
-                    <span key={b+"h"} style={Object.assign({},c,{fontFamily:JP,fontSize:16,color:"#7FE3F2"})}>{b+"号艇"}</span>,
+                    <span key={b+"h"} style={Object.assign({},c,{fontFamily:JP,fontSize:isNarrow?13:16,color:"#7FE3F2"})}>{b+"号艇"}</span>,
                     <span key={b+"i"} style={c}>{x.isshu||"-"}</span>,
                     <span key={b+"m"} style={c}>{x.mawari||"-"}</span>,
                     <span key={b+"c"} style={c}>{x.chokusen||"-"}</span>,
@@ -6010,6 +6081,42 @@ function App() {
             var tdStyle={padding:"2px 4px",fontSize:9,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",textAlign:"right"};
             var venueStyle={padding:"2px 5px",fontSize:10,fontWeight:700,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",whiteSpace:"nowrap",textAlign:"left"};
             var blockBorder="2px solid #3a5a7a";
+            // 【2026-10-05】狭い画面（幅600px以下）：16列の表は収まらないので、帯（全体・A・B・C）を選んで5列で見る。値と色分けは下の表と同じ
+            if(isNarrow){
+              var BL=[["total","全体(AI<30)"],["A","A: 0〜9.9%"],["B","B: 10〜19.9%"],["C","C: 20〜30%"]];
+              var nth={padding:"4px 4px",fontSize:12,fontWeight:700,color:"#8faece",borderBottom:"1px solid #3a5a7a",textAlign:"right"};
+              var ntd={padding:"4px 4px",fontSize:12,color:"#c9e0f5",borderBottom:"1px solid #1a2a3a",textAlign:"right"};
+              var pctN=function(v,bgFn){return <td style={Object.assign({},ntd,{background:bgFn?bgFn(v):"transparent"})}>{v==null?"-":v.toFixed(1)+"%"}</td>;};
+              return (
+                <div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+                    {BL.map(function(x){var on=b1BandBlock===x[0];return <button key={x[0]} onClick={function(){setB1BandBlock(x[0]);}} style={{fontSize:12,padding:"4px 8px",borderRadius:5,cursor:"pointer",background:on?"#3d7ab8":"#0e1b2c",color:on?"#fff":"#8faece",border:"1px solid "+(on?"#5a87b8":"#3a5a7a"),fontWeight:700}}>{x[1]}</button>;})}
+                  </div>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr><th style={Object.assign({},nth,{textAlign:"left"})}>会場</th><th style={nth}>n</th><th style={nth}>1着</th><th style={nth}>3連対</th><th style={nth}>着外</th></tr>
+                    </thead>
+                    <tbody>
+                      {venuesSorted.map(function(vname){
+                        var blk=B1_AI_BAND_VENUE_TABLE[vname][b1BandBlock];
+                        var isActive=vname===venue;
+                        return (
+                          <tr key={vname} style={{background:isActive?"#1a3050":"transparent"}}>
+                            <td style={Object.assign({},ntd,{textAlign:"left",fontWeight:700})}>{vname}</td>
+                            <td style={Object.assign({},ntd,{color:"#8faece"})}>{blk[0]}</td>
+                            {pctN(blk[1],b1BandCellBgFirst)}{pctN(blk[2])}{pctN(blk[3],b1BandCellBgOut)}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{fontSize:12,color:"#8faece",marginTop:4,lineHeight:1.5}}>
+                    会場は東から西の地域順で表示。緑系セル＝着外率高（V1の的中母数向き）、赤系セル＝1着率高（V1は的中しない）。
+                    データは 2026-06-01〜08-13 の実測、{"AI1着%<30"} のレースだけ。セルのnが少ない場合（nが15未満の目安）はSEが±10pt以上で値は当てにならない。
+                  </div>
+                </div>
+              );
+            }
             return (
               <div style={{overflowX:"auto"}}>
                 <table style={{borderCollapse:"collapse",fontSize:9,minWidth:"100%"}}>
@@ -6210,7 +6317,7 @@ function App() {
 
         <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
           <button onClick={function(){setOpenPanel(function(v){return v==="basic"?null:"basic";});}} style={btnS(openPanel==="basic"?"#2c4762":hasBasic?"#2e9e6b":"#3d7ab8","#fff",{border:openPanel==="basic"?"1px solid #5a87b8":"none"})}>📋 基本情報{hasBasic?" ✓":""}</button>
-          <button onClick={function(){setOpenPanel(function(v){return v==="tenji"?null:"tenji";});}} style={btnS(openPanel==="tenji"?"#2c4762":"#3d7ab8","#fff",{border:openPanel==="tenji"?"1px solid #5a87b8":"none"})}>📋 展示タイム</button>
+          <button onClick={function(e){var opening=openPanel!=="tenji";setOpenPanel(function(v){return v==="tenji"?null:"tenji";});if(opening&&e&&e.isTrusted)openBoatcastRace();}} style={btnS(openPanel==="tenji"?"#2c4762":"#3d7ab8","#fff",{border:openPanel==="tenji"?"1px solid #5a87b8":"none"})}>📋 展示タイム</button>
           <button onClick={function(){updateRd(function(){return emptyRace();});}} style={btnS("#3b1a1a","#ff8a80",{border:"1px solid #6b2e2e"})}>🗑 {curRace}R消去</button>
           <button onClick={function(){setRaces(initRaces());}} style={btnS("#2a1a1a","#ff6060",{fontSize:11,border:"1px solid #4b2020"})}>🗑 全消去</button>
         </div>
@@ -6354,6 +6461,52 @@ function App() {
                     {rk===1&&<span style={{color:"#f9c513",fontWeight:800,marginRight:3}}>①</span>}
                     <span style={{color:v!=null?"#e8b4b4":"#8a6a6a"}}>{txt}</span>
                   </td>
+                );
+              }
+              // 【2026-10-05】狭い画面（幅600px以下）：列が多くて収まらないので、着順に1艇ずつのカードにする。値と①の付け方は下の表と同じ
+              if(isNarrow){
+                var nv=function(v,rk,suffix){
+                  var txt="―";
+                  if(v!=null&&v!==""){var n=Number(v);txt=isFinite(n)?(suffix==="%"?n.toFixed(1):String(v))+(suffix||""):String(v)+(suffix||"");}
+                  return <span>{rk===1&&<span style={{color:"#f9c513",fontWeight:800,marginRight:3}}>①</span>}<span style={{color:v!=null?"#e8b4b4":"#8a6a6a"}}>{txt}</span></span>;
+                };
+                return (
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:12,color:"#ff9b9b",fontWeight:700,marginBottom:6}}>
+                      予想着率を着順で並べ直したもの（下のテーブルと同じ値・①はレース内1位）
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {sorted.map(function(r){
+                        var p=pos[r.boat];
+                        var kc=kimariByBoat?kimariByBoat.filter(function(k){return k.boat===r.boat;})[0]:null;
+                        var tk=rd.tokuten?rd.tokuten[r.boat]:null;
+                        return (
+                          <div key={"ordn"+r.boat} style={{border:"1px solid #5a2a2a",borderRadius:8,padding:"8px 10px",background:p===1?"#4a2020":"transparent"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                              <span style={{fontSize:14,fontWeight:800,color:p===1?"#fff":"#ff9b9b"}}>{p?p+"着":"―"}</span>
+                              <LB b={r.boat}/>
+                            </div>
+                            {narrowKv([
+                              {label:"得点",lc:"#ffd0d0",value:nv(tk&&tk.score!=null?tk.score:null,tkRk[r.boat])},
+                              {label:"得点率",lc:"#ffd0d0",value:nv(tk&&tk.rate!=null?tk.rate.toFixed(2):null,null)},
+                              {label:"予想1着",lc:"#ffd0d0",value:nv(r.racerR1final,RK.racerR1final[r.boat],"%")},
+                              {label:"予想2着",lc:"#ffd0d0",value:nv(r.racerR2final,null,"%")},
+                              {label:"予想3着",lc:"#ffd0d0",value:nv(r.racerR3final,null,"%")},
+                              {label:"AI3連対",lc:"#ffd0d0",value:nv(r.ren3total,RK.ren3total[r.boat],"%")},
+                              {label:"AI1着",lc:"#ffd0d0",value:nv(r.aiP1,RK.aiP1[r.boat],"%")},
+                              {label:"AI2着",lc:"#ffd0d0",value:nv(r.aiP2,null,"%")},
+                              {label:"AI3着",lc:"#ffd0d0",value:nv(r.aiP3,null,"%")},
+                              kimariByBoat&&{label:"逃",lc:"#ffd0d0",value:nv(kc?kc.nige:null,null)},
+                              kimariByBoat&&{label:"差",lc:"#ffd0d0",value:nv(kc?kc.sashi:null,null)},
+                              kimariByBoat&&{label:"捲",lc:"#ffd0d0",value:nv(kc?kc.makuri:null,null)},
+                              kimariByBoat&&{label:"捲差",lc:"#ffd0d0",value:nv(kc?kc.makurizashi:null,null)},
+                              kimariByBoat&&{label:"抜",lc:"#ffd0d0",value:nv(kc?kc.nuki:null,null)}
+                            ])}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               }
               return (
@@ -6772,7 +6925,7 @@ function App() {
                   {["艇","周回","周り足","直線","展示"].map(function(h,hi){
                     var keyMap={"周回":"isshu","周り足":"mawari","直線":"chokusen","展示":"tenji"};
                     var isTop=venue&&VENUE_TENJI_IMPORTANCE[venue]&&VENUE_TENJI_IMPORTANCE[venue].top===keyMap[h];
-                    return <th key={h} style={{padding:"6px 10px",textAlign:"center",borderBottom:isTop?"2px solid #f9c513":"1px solid #2c4762",color:isTop?"#f9c513":"#a9cbea"}}>{h}{isTop&&" ★"}</th>;
+                    return <th key={h} style={{padding:isNarrow?"6px 2px":"6px 10px",textAlign:"center",borderBottom:isTop?"2px solid #f9c513":"1px solid #2c4762",color:isTop?"#f9c513":"#a9cbea"}}>{h}{isTop&&" ★"}</th>;
                   })}
                 </tr>
               </thead>
@@ -6796,15 +6949,15 @@ function App() {
                     var isEmpty=["tenji","isshu","mawari","chokusen"].every(function(k){return inp[k]==="";});
                     return (
                       <tr key={b} style={{borderBottom:"1px solid #1d3149",opacity:isEmpty?0.35:1}}>
-                        <td style={{padding:"8px 10px",textAlign:"center"}}><LB b={b}/></td>
+                        <td style={{padding:isNarrow?"8px 2px":"8px 10px",textAlign:"center"}}><LB b={b}/></td>
                         {[inp.isshu,inp.mawari,inp.chokusen,inp.tenji].map(function(v,i){
                           var num=parseFloat(v),isF=!isNaN(num)&&num===ranks[i].first,isS=!isNaN(num)&&num===ranks[i].second;
                           var k=keys[i];
                           var corrected=isNaN(num)?null:num+WAKU_TIME_CORRECTION[k][b-1];
                           var cIsF=corrected!=null&&corrected===correctedRanks[i].first,cIsS=corrected!=null&&corrected===correctedRanks[i].second;
-                          return <td key={i} style={{padding:"6px 10px",textAlign:"center",whiteSpace:"nowrap"}}>
-                            <span style={{display:"inline-block",minWidth:48,padding:"4px 8px",borderRadius:6,background:isF?"rgba(217,48,37,0.55)":isS?"rgba(249,197,19,0.35)":"transparent",fontWeight:700,color:isF||isS?"#fff":v?"#fff":"#4a5d70"}}>{v||"―"}</span>
-                            {corrected!=null&&<span style={{fontSize:9,fontWeight:700,marginLeft:4,color:cIsF?"#ff6b5c":cIsS?"#f9c513":"#6b7d94"}}>補正{corrected.toFixed(2)}</span>}
+                          return <td key={i} style={{padding:isNarrow?"6px 2px":"6px 10px",textAlign:"center",whiteSpace:isNarrow?"normal":"nowrap"}}>
+                            <span style={{display:"inline-block",minWidth:isNarrow?0:48,padding:isNarrow?"3px 5px":"4px 8px",borderRadius:6,background:isF?"rgba(217,48,37,0.55)":isS?"rgba(249,197,19,0.35)":"transparent",fontWeight:700,color:isF||isS?"#fff":v?"#fff":"#4a5d70"}}>{v||"―"}</span>
+                            {corrected!=null&&<span style={Object.assign({fontSize:9,fontWeight:700,marginLeft:4,color:cIsF?"#ff6b5c":cIsS?"#f9c513":"#6b7d94"},isNarrow?{fontSize:12,marginLeft:0,marginTop:2,display:"block"}:{})}>補正{corrected.toFixed(2)}</span>}
                           </td>;
                         })}
                       </tr>
@@ -6911,6 +7064,75 @@ function App() {
                     })}
                   </div>
                 )}
+                {/* 【2026-10-05】狭い画面（幅600px以下）：列が多くて収まらないので1艇ずつのカードにする。値・色・⚡の判定は下の表と同じ */}
+                {isNarrow?(
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {result.rows.map(function(r){
+                    var kc=kimariByBoat?kimariByBoat.filter(function(k){return k.boat===r.boat;})[0]:null;
+                    var rc=rd.racerRaceCount?rd.racerRaceCount[r.boat-1]:null;
+                    var nc=kc?kc.total:null;
+                    // かみなりマーク判定（下の表と同じ。2コース以上のみ）
+                    var showThunder=false;
+                    if(r.course>=2){
+                      var inner=result.rows.filter(function(x){return x.course===r.course-1;})[0];
+                      if(inner){
+                        var myB=Number(r.boat);
+                        var inB=Number(inner.boat);
+                        var myInp=rd.inputs[myB]||rd.inputs[String(myB)];
+                        var inInp=rd.inputs[inB]||rd.inputs[String(inB)];
+                        var myTenji=myInp?parseFloat(myInp.tenji):NaN;
+                        var inTenji=inInp?parseFloat(inInp.tenji):NaN;
+                        var mySt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[myB-1]:null;
+                        var inSt=rd.stScore&&rd.stScore.st1y?rd.stScore.st1y[inB-1]:null;
+                        var myAvgRank=(rd.wakuSt&&rd.wakuSt[myB]&&rd.wakuSt[myB].rankAvg6mo!=null)?rd.wakuSt[myB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[myB-1]:null);
+                        var inAvgRank=(rd.wakuSt&&rd.wakuSt[inB]&&rd.wakuSt[inB].rankAvg6mo!=null)?rd.wakuSt[inB].rankAvg6mo:(rd.stScore&&rd.stScore.avgStRank?rd.stScore.avgStRank[inB-1]:null);
+                        var tenjOk=!isNaN(myTenji)&&!isNaN(inTenji)&&(inTenji-myTenji)>=0.1;
+                        var stOk=(myAvgRank!=null&&inAvgRank!=null)?(myAvgRank<inAvgRank):
+                                 (mySt!=null&&inSt!=null)?(inSt-mySt>=0.05):true;
+                        if(tenjOk&&stOk)showThunder=true;
+                      }
+                    }
+                    var pctV=function(v){return v!=null?(fmt(v,1)+"%"):"―";};
+                    var pctCol=function(v){return v!=null?(v>=0?"#5dd39e":"#ff8a80"):"#4a5d70";};
+                    var tk=rd.tokuten?rd.tokuten[r.boat]:null;
+                    var rate=tk&&tk.rate!=null?tk.rate:null;
+                    var rateRk=tokutenRateRank?tokutenRateRank[r.boat]:null;
+                    var net=tk&&tk.score!=null?tk.score:null;
+                    var nodes=tk&&tk.nodes!=null?tk.nodes:null;
+                    var minus=tk&&tk.minus!=null?tk.minus:0;
+                    var netRk=tokutenRank?tokutenRank[r.boat]:null;
+                    var netRkCol=netRk===1?"#f9c513":(netRk!=null&&netRk<=3)?"#5dd39e":"#9db5cc";
+                    return (
+                      <div key={r.boat} style={{background:"#0e1b2c",border:"1px solid #2c4762",borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                          <LB b={r.boat}/>
+                          {r.course!==r.boat&&<span style={{fontSize:12,color:"#f9c513"}}>{r.course}C</span>}
+                          {rd.racerClass&&<span style={{fontSize:12,fontWeight:700,color:rd.racerClass[r.boat-1]==="A1"?"#f9c513":rd.racerClass[r.boat-1]==="A2"?"#5dd39e":"#9db5cc"}}>{rd.racerClass[r.boat-1]}</span>}
+                          {showThunder&&<span style={{fontSize:16}}>⚡</span>}
+                        </div>
+                        {narrowKv([
+                          kimariByBoat&&{label:"合計／出走数",value:<span>{nc!=null?nc:"―"}<span style={{color:"#a9cbea",fontWeight:400}}>/{rc!=null?rc:"-"}</span></span>},
+                          rd.tokuten&&{label:"得点率",vs:{color:rate!=null?(rate>=6.0?"#f9c513":rate>=5.0?"#5dd39e":"#9db5cc"):"#4a5d70"},value:<span>{rate!=null?rate:"―"}{rateRk!=null&&<span style={{fontSize:12,fontWeight:400,color:"#7f96ad",marginLeft:3}}>{rateRk}位</span>}</span>},
+                          rd.tokuten&&{label:"得点／順位",vs:{color:net!=null?(net>=50?"#f9c513":net>=40?"#5dd39e":"#9db5cc"):"#4a5d70"},value:<span>{net!=null?net:"―"}{netRk!=null&&<span style={{fontSize:12,color:netRkCol,marginLeft:3}}>{"①②③④⑤⑥"[netRk-1]}</span>}{nodes!=null&&<span style={{fontSize:12,fontWeight:400,color:"#7f96ad",marginLeft:2}}>/{nodes}走</span>}{minus>0&&<span style={{fontSize:12,color:"#ff9b9b",marginLeft:2}}>−{minus}</span>}</span>},
+                          result.racerRank&&{label:"予想1着率",vs:{color:pctCol(r.racerR1final)},value:pctV(r.racerR1final)},
+                          result.racerRank&&{label:"予想2着率",vs:{color:pctCol(r.racerR2final)},value:pctV(r.racerR2final)},
+                          result.racerRank&&{label:"予想3着率",vs:{color:pctCol(r.racerR3final)},value:pctV(r.racerR3final)},
+                          result.racerRank&&{label:"AI3連対率",lc:"#c084fc",vs:{color:r.ren3total!=null?"#c084fc":"#4a5d70"},value:pctV(r.ren3total)},
+                          rd.racerStats&&rd.racerStats.ren3raw&&{label:"3連対率",vs:{color:r.ren3raw1y!=null?"#9db5cc":"#4a5d70"},value:r.ren3raw1y!=null?(fmt(r.ren3raw1y,1)+"%"):"―"},
+                          {label:"AI1着",lc:"#f9c513",vs:{color:"#f9c513"},value:<span>{r.aiP1!=null?r.aiP1+"%":"―"}{r.aiP1Cal!=null&&<span style={{color:"#5dd39e",fontSize:12}}> → {r.aiP1Cal}%</span>}{r.aiP1Score!=null&&r.aiP1!=null&&<span style={{color:"#a9cbea",fontSize:12,fontWeight:400,display:"block"}}>{"得点版 "}{r.aiP1Score}{"%（"}{(r.aiP1Score-r.aiP1>=0?"+":"")+(r.aiP1Score-r.aiP1).toFixed(1)}{"）"}</span>}</span>},
+                          {label:"AI2着",lc:"#5dd39e",vs:{color:"#5dd39e"},value:r.aiP2!=null?r.aiP2+"%":"―"},
+                          {label:"AI3着",lc:"#7db4e8",vs:{color:"#7db4e8"},value:r.aiP3!=null?r.aiP3+"%":"―"},
+                          kimariByBoat&&{label:"逃げ",vs:{color:"#c8d8e8",fontWeight:400},value:kc&&kc.nige!=null?kc.nige:"―"},
+                          kimariByBoat&&{label:"差し",vs:{color:"#c8d8e8",fontWeight:400},value:kc&&kc.sashi!=null?kc.sashi:"―"},
+                          kimariByBoat&&{label:"捲り",vs:{color:"#c8d8e8",fontWeight:400},value:kc&&kc.makuri!=null?kc.makuri:"―"},
+                          kimariByBoat&&{label:"捲差",vs:{color:"#c8d8e8",fontWeight:400},value:kc&&kc.makurizashi!=null?kc.makurizashi:"―"},
+                          kimariByBoat&&{label:"抜き",vs:{color:"#c8d8e8",fontWeight:400},value:kc&&kc.nuki!=null?kc.nuki:"―"}
+                        ])}
+                      </div>
+                    );
+                  })}
+                </div>
+                ):(
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <thead>
@@ -7011,6 +7233,7 @@ function App() {
                     </tbody>
                   </table>
                 </div>
+                )}
                 {tokutenRank&&rd.tokuten&&rd.tokuten[1]&&rd.tokuten[1].rate!=null&&tokutenRank[1]!=null&&(function(){
                   var rk=tokutenRank[1];
                   var rkRate=tokutenRateRank?tokutenRateRank[1]:null;
@@ -7036,20 +7259,20 @@ function App() {
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
                   <tr style={{color:"#a9cbea",fontSize:11}}>
-                    {["艇","1着補正","2着補正","3着補正","3連補正","合計","差"].map(function(h,i){return <th key={h} style={{padding:"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
+                    {(isNarrow?["艇","1着","2着","3着","3連","合計","差"]:["艇","1着補正","2着補正","3着補正","3連補正","合計","差"]).map(function(h,i){return <th key={h} style={{padding:isNarrow?"6px 2px":"6px 8px",textAlign:i===0?"left":"center",borderBottom:"1px solid #2c4762"}}>{h}</th>;})}
                   </tr>
                 </thead>
                 <tbody>
                   {result.rows.map(function(r){
                     return (
                       <tr key={r.boat} style={{borderBottom:"1px solid #1d3149"}}>
-                        <td style={{padding:"9px 8px"}}><LB b={r.boat}/>{r.course!==r.boat&&<span style={{fontSize:10,color:"#f9c513",marginLeft:4}}>{r.course}C</span>}</td>
-                        <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w1)}</td>
-                        <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w2)}</td>
-                        <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.w3)}</td>
-                        <td style={{padding:"9px 6px",textAlign:"center"}}>{pill(r.top3)}</td>
-                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:"#fff"}}>{r.sum!=null?fmt(r.sum):"―"}</td>
-                        <td style={{padding:"9px 8px",textAlign:"center",fontWeight:800,color:r.diff>0?"#5dd39e":r.diff<0?"#ff8a80":"#9db5cc"}}>{r.hasTime?(r.diff>0?"+":"")+fmt(r.diff):"―"}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 8px"}}><LB b={r.boat}/>{r.course!==r.boat&&<span style={{fontSize:isNarrow?12:10,color:"#f9c513",marginLeft:4}}>{r.course}C</span>}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 6px",textAlign:"center"}}>{pill(r.w1)}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 6px",textAlign:"center"}}>{pill(r.w2)}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 6px",textAlign:"center"}}>{pill(r.w3)}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 6px",textAlign:"center"}}>{pill(r.top3)}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 8px",textAlign:"center",fontWeight:800,color:"#fff"}}>{r.sum!=null?fmt(r.sum):"―"}</td>
+                        <td style={{padding:isNarrow?"9px 2px":"9px 8px",textAlign:"center",fontWeight:800,color:r.diff>0?"#5dd39e":r.diff<0?"#ff8a80":"#9db5cc"}}>{r.hasTime?(r.diff>0?"+":"")+fmt(r.diff):"―"}</td>
                       </tr>
                     );
                   })}
@@ -7091,7 +7314,7 @@ function App() {
                   <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:999,background:aiEval.badgeColor,color:"#fff"}}>{aiEval.badge}</span>
                 </div>
                 <div style={{display:"grid",gap:8}}>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,overflowX:"auto"}}>{/* 【2026-10-05】狭いスマホでは枠の中だけで横にスクロール */}
+                  <div style={{display:"grid",gridTemplateColumns:isNarrow?"repeat(3,minmax(0,1fr))":"repeat(6,1fr)",gap:4,overflowX:"auto"}}>{/* 【2026-10-05】狭い画面（幅600px以下）では3枚×2段にする */}
                   {aiEval.ranked.map(function(r){
                     var isHonmei=r.rankPos===1;
                     return (
@@ -7101,16 +7324,16 @@ function App() {
                           <span style={{fontSize:12,fontWeight:700,color:"#9db5cc"}}>{r.rankPos}位</span>
                         </div>
                         <div style={{fontSize:16,fontWeight:800,lineHeight:1.2,color:r.mark==="◎"?"#f9c513":r.mark==="○"?"#5dd39e":r.mark==="△"?"#7db4e8":"#9db5cc"}}>{r.mark}</div>
-                        <div style={{fontSize:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
-                        {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>モーター {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
+                        <div style={{fontSize:isNarrow?12:11,fontWeight:700,color:"#fff",marginTop:4}}>score {r.score.toFixed(1)}</div>
+                        {r.motorRank&&<div style={{marginTop:4}}><div style={{fontSize:isNarrow?12:11,fontWeight:700,color:"#fff"}}>モーター {r.motorRank}位</div>{r.motorRen2!=null&&<div style={{fontSize:isNarrow?12:11,fontWeight:700,color:"#fff"}}>{r.motorRen2}%</div>}</div>}
                         {r.warns&&r.warns.length>0&&(
                           <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
-                            {r.warns.map(function(w,wi){return <div key={wi} style={{fontSize:9,fontWeight:700,color:"#ff8a80",lineHeight:1.3}}>⚠ {w}</div>;})}
+                            {r.warns.map(function(w,wi){return <div key={wi} style={{fontSize:isNarrow?12:9,fontWeight:700,color:"#ff8a80",lineHeight:1.3}}>⚠ {w}</div>;})}
                           </div>
                         )}
                         {r.plus&&r.plus.length>0&&(
                           <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
-                            {r.plus.map(function(p,pi){return <div key={pi} style={{fontSize:9,fontWeight:700,color:"#5dd39e",lineHeight:1.3}}>＋ {p}</div>;})}
+                            {r.plus.map(function(p,pi){return <div key={pi} style={{fontSize:isNarrow?12:9,fontWeight:700,color:"#5dd39e",lineHeight:1.3}}>＋ {p}</div>;})}
                           </div>
                         )}
                       </div>
