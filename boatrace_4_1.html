@@ -3704,7 +3704,17 @@ function App() {
       window.removeEventListener("orientationchange",on);
     };
   },[]);
-  const [b1BandBlock,setB1BandBlock]=useState("total");   // 狭い画面の「AI1着%×会場」で見る帯（total/A/B/C）
+  const [b1BandBlock,setB1BandBlock]=useState("total");
+  // 【2026-10-06】近未来の画面の中の切り替え（1レース／締切順の一覧）。最初は「1レース」。選んだ側は次に開いたときも残す（localStorage rc_neo_panel）
+  const [neoPanel,setNeoPanel]=useState(function(){
+    try{var v=(typeof localStorage!=="undefined")?localStorage.getItem("rc_neo_panel"):null;return v==="list"?"list":"one";}catch(e){return "one";}
+  });
+  function chooseNeoPanel(m){
+    setNeoPanel(m);
+    try{if(typeof localStorage!=="undefined")localStorage.setItem("rc_neo_panel",m);}catch(e){}
+  }
+  const [radarType,setRadarType]=useState("all");   // 締切順の一覧の型のしぼり込み（all/hon/mix/out）
+  const radarCacheRef=useRef(null);                  // 締切順の一覧の作り置き（🔄 更新・取り込みのときだけ作り直す）   // 狭い画面の「AI1着%×会場」で見る帯（total/A/B/C）
   const [openAiEval,setOpenAiEval]=useState(false);
   const [openBaseRate,setOpenBaseRate]=useState(false);
   const [openMotorB1,setOpenMotorB1]=useState(false);
@@ -5413,7 +5423,8 @@ function App() {
     }catch(e){}
   }
   // 【2026-10-05】⏰ 締切直前の一覧：いつもの画面の判定をそのまま関数にした（いつもの画面と近未来の画面で共用。時刻は nowTime＝「🔄 更新」で取り直す）
-  function shimekiriTop4(){
+  // 【2026-10-06】limitMin 分以内（null なら上限なし＝締切がまだ来ていない全部）を残りの少ない順に返す。締切直前（60分・4件）と締切順の一覧で共用
+  function shimekiriList(limitMin){
     var now=nowTime;
     var nowMin=now.getHours()*60+now.getMinutes();
     var items=[];
@@ -5424,7 +5435,7 @@ function App() {
       if(parts.length!==2)return;
       var t=parseInt(parts[0])*60+parseInt(parts[1]);
       var remaining=t-nowMin;
-      if(remaining<0||remaining>60)return;
+      if(remaining<0||(limitMin!=null&&remaining>limitMin))return;
       var sp=key.split("_");
       var vname=sp.slice(0,-1).join("_");
       var rnum=parseInt(sp[sp.length-1]);
@@ -5444,7 +5455,39 @@ function App() {
       items.push({vname:vname,rnum:rnum,shimekiri:r.shimekiri,remaining:remaining,isWave:itemWave,isStrong:itemStrong});
     });
     items.sort(function(a,b){return a.remaining-b.remaining;});
-    return items.slice(0,4);
+    return items;
+  }
+  function shimekiriTop4(){return shimekiriList(60).slice(0,4);}
+  // 【2026-10-06】締切順の一覧：これから締切のレースを全部、締切の早い順に。PLの1着の％は1レースの画面の PL RADAR と同じ
+  //   computePLPrediction(races[会場_レース], 会場) の strength を6艇の合計で割ったもの（新しい計算は作らない）。
+  //   型（表示だけ・判定や記録には使わない）：PL1位が1号艇以外＝1号艇以外が強い／1号艇で RADAR_HON_LINE 以上＝本命型／未満＝混戦
+  //   作り直すのは「🔄 更新」（nowTime）と取り込み（レースの数・展示が入ったレースの数・日付が変わる）のときだけ
+  var RADAR_HON_LINE=50;
+  function radarList(){
+    var tenjiN=0;
+    Object.keys(races).forEach(function(k){var r=races[k];if(r&&r.inputs&&[1,2,3,4,5,6].some(function(b){return r.inputs[b]&&r.inputs[b].tenji;}))tenjiN++;});
+    var sig=nowTime.getTime()+"|"+Object.keys(races).length+"|"+tenjiN+"|"+(fbRaceDate||"");
+    var c=radarCacheRef.current;
+    if(c&&c.sig===sig)return c.list;
+    var list=shimekiriList(null).map(function(item){
+      var r=races[rk(item.vname,item.rnum)];
+      var pl=null;
+      try{
+        var pred=r?computePLPrediction(r,item.vname):null;
+        if(pred&&pred.strength){
+          var s=0;for(var b=1;b<=6;b++)s+=pred.strength[b]||0;
+          if(s>0)pl=[1,2,3,4,5,6].map(function(b){return (pred.strength[b]||0)/s*100;});
+        }
+      }catch(e){pl=null;}
+      var top=null,type=null;
+      if(pl){
+        top=1;for(var k=2;k<=6;k++)if(pl[k-1]>pl[top-1])top=k;   // 同じ％なら小さい艇番を1位
+        type=top!==1?"out":(pl[0]>=RADAR_HON_LINE?"hon":"mix");
+      }
+      return Object.assign({},item,{pl:pl,top:top,type:type});
+    });
+    radarCacheRef.current={sig:sig,list:list};
+    return list;
   }
   function renderViewSwitch(dark){
     var on=function(m){return viewMode===m;};
@@ -5578,6 +5621,151 @@ function App() {
     var css="@keyframes rcfxBlink{0%,60%{opacity:1}61%,100%{opacity:.25}}@keyframes rcfxSweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}"+
       "@media (prefers-reduced-motion: reduce){[data-rcfx-anim]{animation:none !important}}";
 
+    // 手で取り込むパネル（拡張機能が探す貼り付け欄・オッズ・F数の欄）。1レースでも締切順の一覧でも同じ形で1つだけ出す
+    var inputSec=(
+            <section aria-label="手で取り込む" style={Object.assign({},panel,{padding:"18px 22px",display:"flex",flexDirection:"column",gap:14})}>
+              <span style={cap}>INPUT</span>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <label htmlFor="rc-fx-tenji" style={{fontSize:15,color:W}}>直前情報</label>
+                {/* 拡張機能が探す貼り付け欄。placeholder・中身（rd.tenjiText）・解析（parseTenji）はいつもの画面と同じ */}
+                <textarea id="rc-fx-tenji" ref={fxTenjiRef} value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" style={area}/>
+                <input type="text" id="odds-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsed=JSON.parse(e.target.value);
+                    updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;n.oddsTime=Date.now();return n;});
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <input type="text" id="odds2-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsed2=JSON.parse(e.target.value);
+                    updateRd(function(prev){var n=Object.assign({},prev);n.odds2tan=parsed2;return n;});
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <input type="text" id="fl-data-input" value="" readOnly onChange={function(e){
+                  try{
+                    var parsedFl=JSON.parse(e.target.value);
+                    updateRd(function(prev){
+                      var n=Object.assign({},prev);
+                      var nh=Object.assign({},prev.fHold),nc=Object.assign({},prev.fCounts);
+                      for(var b=1;b<=6;b++){
+                        var toban=prev.playerNums&&prev.playerNums[b-1];
+                        if(toban&&parsedFl[toban]){
+                          nh[b]=(parsedFl[toban].f||0)>=1;
+                          nc[b]=parsedFl[toban];
+                        }
+                      }
+                      n.fHold=nh;n.fCounts=nc;
+                      return n;
+                    });
+                  }catch(err){}
+                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
+                <button type="button" onClick={parseTenji} style={btnLine}>解析して入力</button>
+                {rd.tenjiMsg&&<span style={{fontSize:14,color:rd.tenjiMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{rd.tenjiMsg}</span>}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10,borderTop:"1px solid "+LINE,paddingTop:14}}>
+                <label htmlFor="rc-fx-odds3" style={{fontSize:15,color:W}}>オッズ（3連単）</label>
+                <textarea id="rc-fx-odds3" ref={fxOddsRef} value={fxOdds3} onChange={function(e){setFxOdds3(e.target.value);}} placeholder="3連単オッズを貼り付け" style={area}/>
+                <label htmlFor="rc-fx-odds2" style={{fontSize:15,color:W}}>オッズ（2連単）</label>
+                <textarea id="rc-fx-odds2" value={fxOdds2} onChange={function(e){setFxOdds2(e.target.value);}} placeholder="2連単オッズを貼り付け" style={area}/>
+                <button type="button" onClick={applyOdds} style={btnLine}>オッズを入力</button>
+                {fxOddsMsg&&<span style={{fontSize:14,color:fxOddsMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{fxOddsMsg}</span>}
+                <span style={{fontSize:14,color:W}}>{(rd.odds3tan?"3連単 取得済み":"3連単 まだ")+"・"+(rd.odds2tan?"2連単 取得済み":"2連単 まだ")}</span>
+              </div>
+            </section>
+    );
+    // 【2026-10-06】締切順の一覧（PL RADAR を並べる）。設計は 近未来レイアウト_メモ.md の「締切順の一覧」の章・見本は 近未来レイアウト_見本v2_締切順一覧.dc.html。
+    //   出走表〜右の列の場所に出す。INPUT（貼り付け欄・解析して入力・オッズの欄）は拡張機能が使うので一覧の下にも同じものを出す。
+    //   カードは押すとその会場・レースを選んで「1レース」に戻る。カードには data-venue・data-race を付けない（拡張機能が取り違えて押さないため）
+    var renderRadarList=function(){
+      var list=radarList();
+      var cnt=function(t){return list.filter(function(x){return x.type===t;}).length;};
+      var FILTERS=[["all","すべて",list.length],["hon","本命型",cnt("hon")],["mix","混戦",cnt("mix")],["out","1号艇以外が強い",cnt("out")]];
+      var shown=radarType==="all"?list:list.filter(function(x){return x.type===radarType;});
+      var TAG={hon:{tag:"本命型",bg:AC,fg:DARK,border:AC},mix:{tag:"混戦",bg:"transparent",fg:W,border:W},out:{tag:"1号艇以外が強い",bg:W,fg:DARK,border:W}};
+      var ringCol=function(b){return b===1?AC:(b===2?SUB:LANE[b].bg);};
+      return (
+        <React.Fragment>
+          <section aria-label="締切順の一覧" style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 14px",background:"rgba(13,24,38,0.85)",border:"1px solid "+LINE}}>
+              <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                <span style={cap}>PL RADAR // 締切順</span>
+                <span style={{fontSize:15}}>{"これから締切のレース "+list.length+"件"}</span>
+                <button type="button" onClick={function(){setNowTime(new Date());}} style={Object.assign({},btn,{fontSize:15})}>🔄 更新</button>
+                <span style={{fontFamily:MONO,fontSize:15,color:W}}>{nowTime.getHours()+":"+String(nowTime.getMinutes()).padStart(2,"0")}</span>
+              </div>
+              <div role="group" aria-label="型でしぼる" style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {FILTERS.map(function(f){
+                  var on=radarType===f[0];
+                  return <button key={f[0]} type="button" aria-pressed={on} onClick={function(){setRadarType(f[0]);}}
+                    style={{minHeight:44,padding:"0 14px",border:"1px solid "+(on?AC:LINE),background:on?rgba(AC,0.14):BTNBG,color:on?AC:W,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>{f[1]}<span style={{fontFamily:MONO,fontSize:14}}>{f[2]}</span></button>;
+                })}
+              </div>
+            </div>
+            {shown.length===0?(
+              <span style={{fontSize:15,color:W}}>{list.length===0?"これから締切のレースはありません（全レースを取り込むか、「🔄 更新」を押してください）":"この型のレースはありません"}</span>
+            ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(min(300px, 100%), 1fr))",gap:14}}>
+              {shown.map(function(it){
+                var first=it===list[0];   // 先頭（次に締切のレース）だけ強調の色の縁と光
+                var lc=it.remaining<=10?"#FF6B6B":it.remaining<=20?AC:"#3DDC84";   // ⏰ 締切直前 と同じ段
+                var tg=it.type?TAG[it.type]:null;
+                var ring=null,ringLabel="";
+                if(it.pl){
+                  var acc=0,st=[];
+                  it.pl.forEach(function(p,k){var from=acc;acc+=p;st.push(ringCol(k+1)+" "+from.toFixed(1)+"% "+Math.min(100,acc).toFixed(1)+"%");});
+                  ring="conic-gradient("+st.join(", ")+", "+TRACK+" "+Math.min(100,acc).toFixed(1)+"% 100%)";
+                  ringLabel="PLの1着の％（"+it.pl.map(function(p,k){return (k+1)+"号艇"+p.toFixed(1)+"％";}).join("、")+"）";
+                }
+                return (
+                  <div key={it.vname+"_"+it.rnum} style={{minWidth:0,filter:first?"drop-shadow(0 0 8px "+rgba(AC,0.55)+")":"none"}}>
+                    <button type="button" aria-label={it.vname+it.rnum+"R 締切"+it.shimekiri+" "+(tg?tg.tag:"データなし")}
+                      onClick={function(){setVenue(it.vname);setCurRace(it.rnum);chooseNeoPanel("one");}}
+                      style={{display:"block",width:"100%",height:"100%",textAlign:"left",padding:1,border:"none",background:first?AC:LINE,color:TXT,fontFamily:"inherit",cursor:"pointer",clipPath:cut(16)}}>
+                      <div style={{height:"100%",boxSizing:"border-box",background:"linear-gradient(140deg, #07111C, #0A1726)",clipPath:cut(16),padding:"14px 16px 16px",display:"flex",flexDirection:"column",gap:12}}>
+                        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+                          <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0}}>
+                            <span style={{fontSize:22,fontWeight:700,letterSpacing:"0.04em"}}>{it.vname+" "}<span style={{fontFamily:ORB,fontSize:19}}>{it.rnum+"R"}</span></span>
+                            <span style={{fontFamily:MONO,fontSize:15}}>{"締切 "+it.shimekiri+" "}<span style={{color:lc}}>{"あと"+it.remaining+"分"}</span></span>
+                          </div>
+                          {tg&&<span style={{flex:"none",padding:"4px 10px",border:"1px solid "+tg.border,background:tg.bg,color:tg.fg,fontSize:14,fontWeight:700}}>{tg.tag}</span>}
+                        </div>
+                        {it.pl?(
+                          <div style={{display:"flex",alignItems:"center",gap:16}}>
+                            <div role="img" aria-label={ringLabel} style={{width:104,height:104,flex:"none",borderRadius:"50%",background:ring,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              <div style={{width:74,height:74,borderRadius:"50%",background:"#0A1420",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3}}>
+                                {chip(it.top,24,26,14)}
+                                <span style={{fontFamily:ORB,fontSize:16,fontWeight:700}}>{it.pl[it.top-1].toFixed(1)+"%"}</span>
+                              </div>
+                            </div>
+                            <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:5}}>
+                              {it.pl.map(function(p,k){
+                                var b=k+1,L=LANE[b],isTop=b===it.top;
+                                return (
+                                  <div key={b} style={{display:"flex",alignItems:"center",gap:8}}>
+                                    <span style={{width:20,height:20,flex:"none",display:"flex",alignItems:"center",justifyContent:"center",background:L.bg,color:L.ink,boxShadow:b===2?"0 0 0 1px #8A96A8":"none",fontFamily:MONO,fontSize:14,fontWeight:700}}>{b}</span>
+                                    <span style={{flex:1,height:7,background:TRACK,position:"relative"}}><span style={{position:"absolute",left:0,top:0,bottom:0,width:Math.min(100,p*1.25).toFixed(1)+"%",background:isTop?AC:SUB}}/></span>
+                                    <span style={{width:48,textAlign:"right",fontFamily:MONO,fontSize:14,fontWeight:isTop?700:400}}>{p.toFixed(1)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ):(
+                          <span style={{fontSize:15,color:W}}>データなし</span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+            <p style={{margin:0,fontSize:14,lineHeight:1.6,color:W}}>{"型の分け方（表示だけ）：本命型＝PL1位が1号艇で"+RADAR_HON_LINE+"%以上／混戦＝PL1位が1号艇で"+RADAR_HON_LINE+"%未満／1号艇以外が強い＝PL1位が1号艇以外。カードを押すとそのレースの画面へ。PLの％は1号艇を低め・他の艇を高めに出す癖があります（2〜6号艇の実際の1着率はPLの％のおよそ0.6〜0.8倍、追記223）。"}</p>
+          </section>
+          {inputSec}
+        </React.Fragment>
+      );
+    };
     return (
       <div style={{minHeight:"100vh",boxSizing:"border-box",padding:isNarrow?"18px 14px 40px":"22px 30px 40px",color:TXT,fontFamily:JP,fontSize:16,
         backgroundColor:BG,backgroundImage:"linear-gradient("+rgba(AC,0.06)+" 1px, transparent 1px), linear-gradient(90deg, "+rgba(AC,0.06)+" 1px, transparent 1px)",backgroundSize:"32px 32px"}}>
@@ -5598,6 +5786,13 @@ function App() {
             <span>{today}</span>
             <span style={{display:"flex",alignItems:"center",gap:8}}>{lamp(hasTenji?"#3DDC84":WARN,true)}{hasTenji?"LINK 展示 取得済み":"LINK 展示 まだ"}</span>
             <span style={{display:"flex",alignItems:"center",gap:8}}>{lamp(fxPending!=null?"#3DDC84":WARN,false)}{fxPending!=null?"EXT つながっている":"EXT 見つからない"}</span>
+            {/* 【2026-10-06】近未来の画面の中の切り替え（1レース／締切順の一覧）。選んでいる側を強調の色 */}
+            <div role="group" aria-label="1レースか締切順の一覧か" style={{display:"flex",border:"1px solid "+LINE}}>
+              <button type="button" aria-pressed={neoPanel!=="list"} onClick={function(){chooseNeoPanel("one");}}
+                style={{minHeight:44,padding:"0 16px",border:"none",background:neoPanel!=="list"?rgba(AC,0.14):"transparent",color:neoPanel!=="list"?AC:W,fontFamily:JP,fontSize:15,fontWeight:neoPanel!=="list"?700:400,cursor:"pointer"}}>1レース</button>
+              <button type="button" aria-pressed={neoPanel==="list"} onClick={function(){chooseNeoPanel("list");}}
+                style={{minHeight:44,padding:"0 16px",border:"none",borderLeft:"1px solid "+LINE,background:neoPanel==="list"?rgba(AC,0.14):"transparent",color:neoPanel==="list"?AC:W,fontFamily:JP,fontSize:15,fontWeight:neoPanel==="list"?700:400,cursor:"pointer"}}>締切順の一覧</button>
+            </div>
             {/* 表示の切り替え（いつもの画面へ）。選んだ表示は rc_view_mode に残る（chooseViewMode） */}
             <button type="button" aria-label="表示の切り替え：いつもの画面へ" onClick={function(){chooseViewMode("classic");}}
               style={{minHeight:44,padding:"0 16px",border:"1px solid "+AC,background:"transparent",color:AC,fontFamily:HEAD,fontSize:15,letterSpacing:"0.12em",cursor:"pointer",clipPath:cut(10)}}>いつもの画面へ</button>
@@ -5682,6 +5877,7 @@ function App() {
           {csvMsg&&<span style={{fontSize:14,color:csvMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80",fontWeight:700}}>{csvMsg}</span>}
         </div>
 
+        {neoPanel==="list"?renderRadarList():(
         <div style={{display:"flex",flexWrap:"wrap",gap:18,alignItems:"flex-start"}}>
           <main style={{flex:"999 1 680px",minWidth:0,display:"flex",flexDirection:"column",gap:18}}>
             {/* レースの見出し：角を切り落とした形・強調の色の細い縁・上端に流れる光 */}
@@ -5844,57 +6040,10 @@ function App() {
               })}
             </section>
 
-            <section aria-label="手で取り込む" style={Object.assign({},panel,{padding:"18px 22px",display:"flex",flexDirection:"column",gap:14})}>
-              <span style={cap}>INPUT</span>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <label htmlFor="rc-fx-tenji" style={{fontSize:15,color:W}}>直前情報</label>
-                {/* 拡張機能が探す貼り付け欄。placeholder・中身（rd.tenjiText）・解析（parseTenji）はいつもの画面と同じ */}
-                <textarea id="rc-fx-tenji" ref={fxTenjiRef} value={rd.tenjiText} onChange={function(e){updateRd(function(prev){var n=Object.assign({},prev);n.tenjiText=e.target.value;return n;});}} placeholder="直前情報をここに貼り付け" style={area}/>
-                <input type="text" id="odds-data-input" value="" readOnly onChange={function(e){
-                  try{
-                    var parsed=JSON.parse(e.target.value);
-                    updateRd(function(prev){var n=Object.assign({},prev);n.odds3tan=parsed;n.oddsTime=Date.now();return n;});
-                  }catch(err){}
-                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
-                <input type="text" id="odds2-data-input" value="" readOnly onChange={function(e){
-                  try{
-                    var parsed2=JSON.parse(e.target.value);
-                    updateRd(function(prev){var n=Object.assign({},prev);n.odds2tan=parsed2;return n;});
-                  }catch(err){}
-                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
-                <input type="text" id="fl-data-input" value="" readOnly onChange={function(e){
-                  try{
-                    var parsedFl=JSON.parse(e.target.value);
-                    updateRd(function(prev){
-                      var n=Object.assign({},prev);
-                      var nh=Object.assign({},prev.fHold),nc=Object.assign({},prev.fCounts);
-                      for(var b=1;b<=6;b++){
-                        var toban=prev.playerNums&&prev.playerNums[b-1];
-                        if(toban&&parsedFl[toban]){
-                          nh[b]=(parsedFl[toban].f||0)>=1;
-                          nc[b]=parsedFl[toban];
-                        }
-                      }
-                      n.fHold=nh;n.fCounts=nc;
-                      return n;
-                    });
-                  }catch(err){}
-                }} style={{position:"absolute",left:-9999,width:1,height:1,opacity:0}}/>
-                <button type="button" onClick={parseTenji} style={btnLine}>解析して入力</button>
-                {rd.tenjiMsg&&<span style={{fontSize:14,color:rd.tenjiMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{rd.tenjiMsg}</span>}
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:10,borderTop:"1px solid "+LINE,paddingTop:14}}>
-                <label htmlFor="rc-fx-odds3" style={{fontSize:15,color:W}}>オッズ（3連単）</label>
-                <textarea id="rc-fx-odds3" ref={fxOddsRef} value={fxOdds3} onChange={function(e){setFxOdds3(e.target.value);}} placeholder="3連単オッズを貼り付け" style={area}/>
-                <label htmlFor="rc-fx-odds2" style={{fontSize:15,color:W}}>オッズ（2連単）</label>
-                <textarea id="rc-fx-odds2" value={fxOdds2} onChange={function(e){setFxOdds2(e.target.value);}} placeholder="2連単オッズを貼り付け" style={area}/>
-                <button type="button" onClick={applyOdds} style={btnLine}>オッズを入力</button>
-                {fxOddsMsg&&<span style={{fontSize:14,color:fxOddsMsg.indexOf("✓")===0?"#3DDC84":"#FF8A80"}}>{fxOddsMsg}</span>}
-                <span style={{fontSize:14,color:W}}>{(rd.odds3tan?"3連単 取得済み":"3連単 まだ")+"・"+(rd.odds2tan?"2連単 取得済み":"2連単 まだ")}</span>
-              </div>
-            </section>
+            {inputSec}
           </aside>
         </div>
+        )}
       </div>
       </div>
     );
