@@ -5594,6 +5594,8 @@ function App() {
       left=Math.floor((dl.getTime()-fxNow)/1000);
     }
     var clock=left==null?"--:--":(left<0?"締切済み":(String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0")));
+    // 秒や分で変わる数字を、字体（Orbitron・Zen Kaku Gothic）の数字ごとの幅の違いで揺らさないよう、1文字ずつ同じ幅の箱に入れる（見た目だけ）。時計の数字は0.86em（Orbitron 700の「0」「8」が0.834emあり、0.8emでははみ出す）、「:」は0.4em
+    var fixedDigits=function(s,dw,cw){return String(s).split("").map(function(ch,i){var isD=ch>="0"&&ch<="9";if(!isD&&ch!==":")return ch;return <span key={i} style={{display:"inline-block",width:isD?dw:cw,textAlign:"center"}}>{ch}</span>;});};
     var d=new Date(fxNow),WD=["SUN","MON","TUE","WED","THU","FRI","SAT"];
     var today=d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0")+" "+WD[d.getDay()];
     var lamp=function(c,blink){return <span data-rcfx-anim={blink?"1":undefined} style={{width:9,height:9,flex:"0 0 9px",background:c,boxShadow:"0 0 8px "+c,animation:blink?"rcfxBlink 2.4s infinite":"none",display:"inline-block"}}/>;};
@@ -5843,7 +5845,7 @@ function App() {
                         boxShadow:[isActive?"0 0 14px "+rgba(AC,0.5):null,kim?"inset 4px 0 0 "+kim:null].filter(Boolean).join(", ")||"none",color:tc,fontFamily:"inherit"}}>
                       <div style={{fontSize:15,fontWeight:700,color:W}}>{item.vname}</div>
                       <div style={{fontFamily:MONO,fontSize:16,fontWeight:700}}>{item.rnum+"R "+item.shimekiri}</div>
-                      <div style={{fontSize:14,marginTop:2}}>{"残"+item.remaining+"分"}</div>
+                      <div style={{fontSize:14,marginTop:2}}>{"残"}{fixedDigits(item.remaining,"0.55em","0.3em")}{"分"}</div>
                     </button>
                   );
                 })}
@@ -5893,7 +5895,7 @@ function App() {
                 </div>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                   <span style={{fontFamily:HEAD,fontSize:14,letterSpacing:"0.3em",color:W}}>T-MINUS</span>
-                  <span style={{fontFamily:ORB,fontSize:48,fontWeight:700,color:AC,textShadow:"0 0 18px "+rgba(AC,0.6)}}>{clock}</span>
+                  <span style={{fontFamily:ORB,fontSize:48,fontWeight:700,color:AC,textShadow:"0 0 18px "+rgba(AC,0.6)}}>{/^\d+:\d\d$/.test(clock)?fixedDigits(clock,"0.86em","0.4em"):clock}</span>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",alignItems:isNarrow?"flex-start":"flex-end",gap:8}}>
                   {isB&&<span style={{padding:"7px 14px",border:"1px solid "+AC,color:AC,fontFamily:HEAD,fontWeight:700,fontSize:16,letterSpacing:"0.1em"}}>条件B</span>}
