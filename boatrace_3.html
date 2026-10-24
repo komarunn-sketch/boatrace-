@@ -2725,6 +2725,39 @@ const USER_RULE_TH={2:20,3:20,4:20,5:15,6:10};
 //   6/1〜9/24（直近1年）：X1-◎-全 前半99.6%・後半120.0%、X1-全-◎ 前半192.4%（高配当1本で約60pt）・後半114.4%。
 //   線の引き方を複数試したうえでの形なので、毎晩の記録（backtest\tobi_gold_forward.js）で11月下旬に判定する
 const TOBI_GOLD_X1_MIN=25.2;
+// 【追加、2026-10-24】軸の目安（表示だけ。計算・判定・記録には使わない。精度分析ログ追記256・イン逃げ調べ_2026-10\2着3着）
+//   軸＝2〜6号艇の中で、そのコースの3連対率（全国・直近1年＝全レースCSVの全国_直近1年_3連対率）が1位の艇。同じ値なら内の艇。
+//     出走5回以上の艇だけくらべ、くらべられる艇が3艇未満なら出さない（調べのスクリプト nichaku_analysis.py と同じ）
+//   2強3弱＝2号艇の全国勝率6.0以上かつ3号艇6.0未満（公式の勝率）
+//   ⚠️3連対率の列は 11/1 の夜まで 9/9 の集計で止まっている（CLAUDE.md 4章）。正しい値になるのは 11/2 の出走表から
+function computeAxisHint(rd){
+  if(!rd||!rd.racerStats||!rd.racerStats.ren3raw)return null;
+  var r3=rd.racerStats.ren3raw["直近1年"],cnt=rd.racerStats.cnt?rd.racerStats.cnt["直近1年"]:null;
+  var axis=null,best=null,ok=0;
+  if(r3&&cnt){
+    for(var b=2;b<=6;b++){
+      var v=r3[b-1],c=cnt[b-1];
+      if(v==null||!isFinite(v)||c==null||c<5)continue;
+      ok++;
+      if(best==null||v>best){best=v;axis=b;}
+    }
+  }
+  if(ok<3)axis=null;
+  var wr=rd.officialWinRate;
+  var nikyo=!!(wr&&wr[1]!=null&&wr[2]!=null&&wr[1]>=6.0&&wr[2]<6.0);
+  return {axis:axis,nikyo:nikyo};
+}
+// 軸の目安の1行（いつもの画面と近未来の画面で同じ書き方）。maru＝〇の艇、sameMaru＝◎か
+function axisHintText(h,maru,sameMaru){
+  if(!h||(h.axis==null&&!h.nikyo))return null;
+  var parts=[];
+  if(h.axis!=null){
+    parts.push("軸 "+h.axis+"号艇（3連対率1位）");
+    if(maru!=null)parts.push((sameMaru?"◎":"〇")+(h.axis===maru?"と同じ":"と違う"));
+  }
+  if(h.nikyo)parts.push("2強3弱");
+  return "軸の目安（表示だけ）："+parts.join("・");
+}
 function computeUserRulesPick(rd,venue,resultIn,racerCat){
   if(!rd||!rd.racerStats)return null;
   // racerCat＝成績の期間（省略時は直近6ヶ月）。画面の🎯一覧は「1-〇-全・直近6ヶ月」と「1-全-〇・直近1年」を切り替える
@@ -3256,6 +3289,9 @@ function parseNewCSV(allRows){
       base.racerStats.ren3[cat]=periodData[cat].ren3;
       base.racerStats.ren3raw[cat]=periodData[cat].ren3raw;
     }
+    // 【追加、2026-10-24】期間ごとのそのコースの出走数（「軸の目安」の表示だけが読む。ほかの計算には使わない）
+    base.racerStats.cnt={};
+    for(var ci2=0;ci2<catNames.length;ci2++){base.racerStats.cnt[catNames[ci2]]=periodData[catNames[ci2]].raceCount;}
     // 全期間の平均STを格納
     var ST_COLS={"直近1ヶ月":27,"直近3ヶ月":51,"直近6ヶ月":75,"直近1年":99,"全期間":123};
     var stByPeriod={};
@@ -5303,7 +5339,8 @@ function App() {
         sameMaru:!!up.sameMaru,top3:up.top3,
         hasTenji:hasT,tenjiAdded:hasT&&!(upM&&upM.isB),maruChanged:hasT&&!!(upM&&upM.isB&&upM.maru!==up.maru),maruMorning:upM?upM.maru:null,
         goldAdded:hasT&&!!up.sameMaru&&!(upM&&upM.isB&&upM.sameMaru),
-        maruOther:up2?up2.maru:null,isBOther:!!(up2&&up2.isB)});
+        maruOther:up2?up2.maru:null,isBOther:!!(up2&&up2.isB),
+        axisHint:computeAxisHint(raceEntry)});
     });
     out.sort(function(a,b){
       var ta=a.shimekiri?parseInt(a.shimekiri.split(":")[0])*60+parseInt(a.shimekiri.split(":")[1]):9999;
@@ -6122,6 +6159,7 @@ function App() {
                 </React.Fragment>):(
                   <span style={{fontSize:15,color:W}}>{isB?("金枠ではありません（条件B・〇 "+maru+"号艇）"):"金枠ではありません"}</span>
                 )}
+                {isB&&(function(){var t=axisHintText(computeAxisHint(rd),maru,!!(pick&&pick.sameMaru));return t?<span style={{fontSize:13,color:W}}>{t}</span>:null;})()}
               </div>
             </section>
 
@@ -6312,6 +6350,7 @@ function App() {
                     <div style={{fontSize:10,color:"#9db5cc"}}>〇=<b style={{color:"#ffffff",fontSize:12}}>{item.maru}</b>号艇　2番手=<b style={{color:"#8fd3ff",fontSize:12}}>{item.second}</b>号艇</div>
                     {item.sameMaru&&<div style={{fontSize:9,color:"#ffb347",fontWeight:700}}>◎ 予想2着・3着とも{item.maru}号艇が1位</div>}
                     {item.sameMaru&&<div style={{fontSize:9,fontWeight:700,color:item.maru<item.second?"#7ee07e":"#ff9b9b"}}>{item.maru<item.second?"◎が2番手より内側":"◎が2番手より外側"}</div>}
+                    {(function(){var t=axisHintText(item.axisHint,item.maru,item.sameMaru);return t?<div style={{fontSize:9,color:"#9db5cc"}}>{t}</div>:null;})()}
                     {item.hasTenji&&(
                       <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:2}}>
                         {item.tenjiAdded
